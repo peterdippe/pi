@@ -83,3 +83,1608 @@
             color: #34d399;
             border-left: 3px solid #10b981;
         }
+
+        .page-section {
+            display: none;
+            animation: fadeIn 0.35s ease-out;
+        }
+        .page-section.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        #osm-map {
+            height: 360px;
+            width: 100%;
+            border-radius: 1rem;
+            z-index: 10;
+        }
+
+        #mapsMathContainer {
+            height: 580px;
+            width: 100%;
+            border-radius: 0.85rem;
+            z-index: 10;
+            cursor: crosshair;
+        }
+
+        #areaCanvas {
+            cursor: crosshair;
+            background-color: #ffffff;
+            touch-action: none;
+        }
+
+        .map-layer-btn.active {
+            background-color: #059669;
+            color: white;
+            border-color: #059669;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col md:flex-row antialiased selection:bg-emerald-500 selection:text-white">
+
+    <!-- ===================================================================
+         KONFIGURATION FÜR PASSWORT & CLOUD-LINKS
+         =================================================================== -->
+    <script>
+        const CONFIG = {
+            fotoPasswort: "dippe", // Passwort für den Foto-Bereich
+            alben: [
+                {
+                    titel: "Familienfotos & Schnappschüsse",
+                    beschreibung: "Unsere schönsten Momente, Feste und Ausflüge der gesamten Dippe- & Wolf-Sippe.",
+                    datum: "Laufend aktualisiert",
+                    anbieter: "Google Drive",
+                    farbe: "from-emerald-600 to-teal-700",
+                    link: "https://drive.google.com/"
+                },
+                {
+                    titel: "Urlaube & Reisen",
+                    beschreibung: "Sammelordner für unsere gemeinsamen Urlaubsbilder zum Ansehen und Herunterladen.",
+                    datum: "Archiv & Aktuell",
+                    anbieter: "OneDrive",
+                    farbe: "from-amber-600 to-orange-700",
+                    link: "https://onedrive.live.com/"
+                },
+                {
+                    titel: "Foto-Upload für Alle",
+                    beschreibung: "Ihr habt neue Bilder gemacht? Ladet sie hier direkt in unseren gemeinsamen Familienordner hoch!",
+                    datum: "Mitmach-Ordner",
+                    anbieter: "Google Drive / OneDrive",
+                    farbe: "from-cyan-600 to-blue-700",
+                    link: "https://drive.google.com/"
+                }
+            ]
+        };
+    </script>
+
+    <!-- MOBILE HEADER -->
+    <header class="md:hidden bg-forest-900/95 backdrop-blur border-b border-emerald-900/60 px-5 py-4 flex items-center justify-between sticky top-0 z-50">
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-amber-500 flex items-center justify-center text-white font-display font-bold text-lg shadow-sm">
+                DS
+            </div>
+            <span class="font-display font-extrabold text-lg tracking-tight text-sand-100">Dippe-Sippe</span>
+        </div>
+        <button onclick="toggleMobileMenu()" class="p-2 rounded-lg text-sand-200 hover:bg-forest-800">
+            <i data-lucide="menu" class="w-6 h-6"></i>
+        </button>
+    </header>
+
+    <!-- SIDEBAR NAVIGATION -->
+    <aside id="sidebar" class="fixed md:sticky top-0 left-0 z-40 w-72 h-screen bg-forest-900/95 backdrop-blur-xl border-r border-emerald-800/40 flex flex-col justify-between transition-transform duration-300 -translate-x-full md:translate-x-0 shadow-2xl">
+        <div class="overflow-y-auto">
+            <!-- Branding -->
+            <div class="p-6 border-b border-emerald-800/40 flex items-center gap-3.5">
+                <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-600 via-teal-600 to-amber-500 flex items-center justify-center text-white font-display font-extrabold text-xl shadow-lg shadow-emerald-950">
+                    DS
+                </div>
+                <div>
+                    <h1 class="font-display font-extrabold text-xl tracking-tight text-sand-50">Dippe-Sippe</h1>
+                    <p class="text-xs font-medium text-emerald-400 flex items-center gap-1">
+                        <i data-lucide="trees" class="w-3.5 h-3.5"></i> Pirna · Sächsische Schweiz
+                    </p>
+                </div>
+            </div>
+
+            <!-- Navigation -->
+            <nav class="p-4 space-y-1.5">
+                <div class="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-emerald-400/70">Familie & Zuhause</div>
+                
+                <button onclick="switchPage('home')" id="nav-home" class="nav-item active w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold text-sand-200 hover:bg-forest-800 transition-all">
+                    <i data-lucide="compass" class="w-5 h-5"></i>
+                    <span>Home</span>
+                </button>
+
+                <button onclick="switchPage('sippe')" id="nav-sippe" class="nav-item w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold text-sand-200 hover:bg-forest-800 transition-all">
+                    <i data-lucide="users" class="w-5 h-5"></i>
+                    <span>Die Sippe</span>
+                </button>
+
+                <button onclick="switchPage('fotos')" id="nav-fotos" class="nav-item w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold text-sand-200 hover:bg-forest-800 transition-all">
+                    <div class="flex items-center gap-3.5">
+                        <i data-lucide="images" class="w-5 h-5"></i>
+                        <span>Fotos & Cloud</span>
+                    </div>
+                    <i data-lucide="lock" id="foto-lock-icon" class="w-3.5 h-3.5 text-amber-400"></i>
+                </button>
+
+                <button onclick="switchPage('kalender')" id="nav-kalender" class="nav-item w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold text-sand-200 hover:bg-forest-800 transition-all">
+                    <i data-lucide="calendar-heart" class="w-5 h-5"></i>
+                    <span>Termine & Treffen</span>
+                </button>
+
+                <div class="pt-4 pb-1 px-3 text-[11px] font-bold uppercase tracking-wider text-emerald-400/70">Geometrie & Karten</div>
+
+                <!-- AREA HAUPTPUNKT MIT UNTERSEITEN -->
+                <div class="space-y-1">
+                    <button onclick="switchPage('area-maps')" id="nav-area" class="nav-item w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold text-sand-200 hover:bg-forest-800 transition-all">
+                        <div class="flex items-center gap-3.5">
+                            <i data-lucide="map" class="w-5 h-5"></i>
+                            <span>Area</span>
+                        </div>
+                        <i data-lucide="chevron-down" class="w-4 h-4 opacity-70"></i>
+                    </button>
+
+                    <!-- Untermenü für Area -->
+                    <div id="area-submenu" class="pl-5 pr-1 py-1 space-y-1">
+                        <button onclick="switchPage('area-maps')" id="subnav-area-maps" class="sub-nav-item w-full flex items-center justify-between px-3.5 py-2 rounded-lg text-xs font-semibold text-sand-300 hover:bg-forest-800 transition-all">
+                            <span class="flex items-center gap-2">
+                                <i data-lucide="globe-2" class="w-3.5 h-3.5"></i> Maps Math
+                            </span>
+                            <span class="text-[10px] font-mono bg-emerald-950 text-emerald-300 px-1.5 py-0.5 rounded">Karte</span>
+                        </button>
+                        <button onclick="switchPage('area-pur')" id="subnav-area-pur" class="sub-nav-item w-full flex items-center justify-between px-3.5 py-2 rounded-lg text-xs font-semibold text-sand-300 hover:bg-forest-800 transition-all">
+                            <span class="flex items-center gap-2">
+                                <i data-lucide="grid" class="w-3.5 h-3.5"></i> Pur Math
+                            </span>
+                            <span class="text-[10px] font-mono bg-emerald-950 text-amber-300 px-1.5 py-0.5 rounded">130×100</span>
+                        </button>
+                    </div>
+                </div>
+
+                <button onclick="switchPage('pinnwand')" id="nav-pinnwand" class="nav-item w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold text-sand-200 hover:bg-forest-800 transition-all">
+                    <i data-lucide="sparkles" class="w-5 h-5"></i>
+                    <span>Familien-Pinnwand</span>
+                </button>
+            </nav>
+        </div>
+
+        <!-- Sidebar Footer -->
+        <div class="p-4 m-4 rounded-2xl bg-forest-950/90 border border-emerald-800/40">
+            <div class="flex items-center gap-2.5">
+                <div class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></div>
+                <span class="text-xs font-bold text-sand-100">www.dippe-sippe.de</span>
+            </div>
+            <p class="text-[11px] text-sand-300/70 mt-1">Emil-Gast-Str. 4 · 01796 Pirna</p>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT AREA -->
+    <main class="flex-1 p-5 md:p-10 max-w-7xl mx-auto w-full">
+
+        <!-- ===============================================================
+             1. HOME SEITE
+             =============================================================== -->
+        <section id="page-home" class="page-section active space-y-8">
+            
+            <!-- Hero Card -->
+            <div class="relative rounded-3xl glass-card shadow-2xl overflow-hidden p-6 md:p-10">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                    
+                    <div class="lg:col-span-6 space-y-5">
+                        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-950/90 border border-emerald-500/40 text-emerald-300 text-xs font-bold">
+                            <i data-lucide="leaf" class="w-4 h-4 text-emerald-400"></i>
+                            <span>Willkommen bei der Dippe-Sippe</span>
+                        </div>
+                        
+                        <h2 class="font-display text-3xl md:text-5xl font-extrabold tracking-tight text-sand-50 leading-tight">
+                            Unser Familien&shy;zuhause im Tor zur <span class="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-amber-300">Sächsischen Schweiz</span>.
+                        </h2>
+                        
+                        <p class="text-sand-200/90 text-base md:text-lg leading-relaxed">
+                            Herzlich willkommen auf der Homepage unserer Familie! Von unserem Zuhause in Pirna aus teilen wir hier Fotoalben, Familienzweige und interaktive Karten- & Geometrie-Projekte.
+                        </p>
+
+                        <!-- Familien-Überblick Badges -->
+                        <div class="pt-1">
+                            <p class="text-xs font-bold uppercase tracking-wider text-amber-400/90 mb-2.5">Unsere Familienzweige</p>
+                            <div class="flex flex-wrap gap-2">
+                                <span class="px-3 py-1.5 rounded-xl bg-emerald-950/80 text-emerald-200 border border-emerald-700/60 font-semibold text-xs">Peter, Bianca, David, Alwin & Liliana</span>
+                                <span class="px-3 py-1.5 rounded-xl bg-amber-950/80 text-amber-200 border border-amber-700/60 font-semibold text-xs">Steffi & Klaus Dippe</span>
+                                <span class="px-3 py-1.5 rounded-xl bg-teal-950/80 text-teal-200 border border-teal-700/60 font-semibold text-xs">Familie Wolf (Anna, Tobias & Kids)</span>
+                                <span class="px-3 py-1.5 rounded-xl bg-cyan-950/80 text-cyan-200 border border-cyan-700/60 font-semibold text-xs">Familie Andreas & Natascha Dippe</span>
+                            </div>
+                        </div>
+
+                        <div class="pt-3 flex flex-wrap gap-3">
+                            <button onclick="switchPage('sippe')" class="px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-sm flex items-center gap-2 shadow-lg shadow-emerald-950 transition">
+                                <i data-lucide="users" class="w-4 h-4"></i> Die ganze Sippe entdecken
+                            </button>
+                            <button onclick="switchPage('area-maps')" class="px-5 py-3 rounded-xl bg-sand-100 hover:bg-white text-forest-900 font-bold text-sm flex items-center gap-2 shadow transition">
+                                <i data-lucide="globe-2" class="w-4 h-4 text-emerald-700"></i> Maps Math starten
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Das Scrabble-Familienbild (ScrabbleFamilieDippe.jpeg) -->
+                    <div class="lg:col-span-6">
+                        <div class="relative rounded-2xl overflow-hidden shadow-2xl border-4 border-sand-200/80 bg-forest-950 group">
+                            <img src="ScrabbleFamilieDippe.jpeg" 
+                                 alt="Familie Dippe Scrabble" 
+                                 class="w-full h-auto object-cover group-hover:scale-[1.02] transition-transform duration-500"
+                                 onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'p-12 text-center text-sand-200\'><p class=\'font-bold text-amber-400 mb-2\'>Bild: ScrabbleFamilieDippe.jpeg</p><p class=\'text-xs opacity-80\'>Sobald <b>ScrabbleFamilieDippe.jpeg</b> im selben Ordner wie die index.html liegt, erscheint es hier in voller Größe.</p></div>';">
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Standort-Karte & Highlight-Karten -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                
+                <!-- OpenStreetMap Heimatkarte -->
+                <div class="lg:col-span-7 sand-card rounded-3xl shadow-xl p-6 flex flex-col justify-between">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                        <div>
+                            <span class="text-xs font-bold uppercase tracking-wider text-emerald-700">Unser Lebensmittelpunkt</span>
+                            <h3 class="font-display text-xl font-extrabold text-forest-900 flex items-center gap-2 mt-0.5">
+                                <i data-lucide="map-pin" class="w-5 h-5 text-amber-600"></i>
+                                Emil-Gast-Straße 4, 01796 Pirna
+                            </h3>
+                        </div>
+                        <a href="https://www.openstreetmap.org/search?query=Emil-Gast-Stra%C3%9Fe%204%2C%2001796%20Pirna" 
+                           target="_blank" 
+                           rel="noopener"
+                           class="inline-flex items-center gap-1.5 text-xs font-bold text-forest-900 hover:text-emerald-700 bg-sand-200 hover:bg-sand-300 px-3.5 py-2 rounded-xl transition">
+                            <span>Route planen</span>
+                            <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                        </a>
+                    </div>
+
+                    <div id="osm-map" class="border-2 border-sand-300 shadow-inner"></div>
+                </div>
+
+                <!-- Rechte Spalte: Cloud & Maps Math Teaser -->
+                <div class="lg:col-span-5 flex flex-col gap-6">
+                    
+                    <div class="bg-gradient-to-br from-emerald-800 via-forest-800 to-forest-950 border border-emerald-600/30 rounded-3xl p-6 text-sand-50 shadow-xl flex-1 flex flex-col justify-between">
+                        <div>
+                            <div class="w-11 h-11 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center mb-4">
+                                <i data-lucide="cloud-sun" class="w-6 h-6 text-amber-300"></i>
+                            </div>
+                            <h3 class="font-display text-xl font-bold">Familien-Fotoalben</h3>
+                            <p class="text-sand-200/80 text-sm mt-2 leading-relaxed">
+                                Geschützter Bereich mit direktem Zugriff auf unsere Google-Drive- und OneDrive-Ordner zum Teilen unserer schönsten Schnappschüsse.
+                            </p>
+                        </div>
+                        <button onclick="switchPage('fotos')" class="mt-6 w-full py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-forest-950 font-extrabold text-sm transition flex items-center justify-center gap-2 shadow-md">
+                            <i data-lucide="key-round" class="w-4 h-4"></i> Foto-Tresor öffnen
+                        </button>
+                    </div>
+
+                    <div class="sand-card rounded-3xl p-6 shadow-xl flex-1 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-bold uppercase tracking-wider text-emerald-700">Neu: Interaktive Kartengeometrie</span>
+                                <span class="text-xs font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold">Maps + Pur</span>
+                            </div>
+                            <h3 class="font-display text-xl font-extrabold text-forest-900 mt-1">Maps Math & Pur Math</h3>
+                            <p class="text-forest-800/80 text-sm mt-1.5 leading-relaxed">
+                                Platziere Punkte direkt auf Satelliten- oder Straßenkarten, berechne reale Flächeninhalte in $\text{m}^2$, $\text{ha}$ oder $\text{km}^2$ sowie den kleinsten Umkreis nach Welzl.
+                            </p>
+                        </div>
+                        <div class="mt-4 grid grid-cols-2 gap-2.5">
+                            <button onclick="switchPage('area-maps')" class="py-2.5 px-3 rounded-xl bg-forest-900 hover:bg-forest-800 text-sand-50 font-bold text-xs transition flex items-center justify-center gap-1.5">
+                                <i data-lucide="globe-2" class="w-4 h-4 text-emerald-400"></i> Maps Math
+                            </button>
+                            <button onclick="switchPage('area-pur')" class="py-2.5 px-3 rounded-xl bg-sand-200 hover:bg-sand-300 text-forest-900 font-bold text-xs transition flex items-center justify-center gap-1.5">
+                                <i data-lucide="grid" class="w-4 h-4 text-amber-700"></i> Pur Math
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ===============================================================
+             2. DIE SIPPE (ALLE 4 FAMILIENZWEIGE)
+             =============================================================== -->
+        <section id="page-sippe" class="page-section space-y-8">
+            <div class="border-b border-emerald-800/50 pb-5">
+                <span class="text-xs font-bold uppercase tracking-wider text-amber-400">Unser Stammbaum</span>
+                <h2 class="font-display text-3xl md:text-4xl font-extrabold text-sand-50">Die große Dippe- & Wolf-Sippe</h2>
+                <p class="text-sand-300/80 text-sm mt-1">Alle Generationen und Zweige unserer Familie im Überblick.</p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-7">
+                
+                <!-- Zweig 1: Peter & Bianca + Kinder (Pirna) -->
+                <div class="sand-card rounded-3xl p-7 shadow-xl space-y-5 relative overflow-hidden">
+                    <div class="flex items-center justify-between border-b border-sand-300 pb-4">
+                        <div class="flex items-center gap-3.5">
+                            <div class="w-12 h-12 rounded-2xl bg-emerald-700 text-white flex items-center justify-center font-display font-extrabold text-xl shadow">
+                                D
+                            </div>
+                            <div>
+                                <span class="text-xs font-bold uppercase tracking-wider text-emerald-700">Haus Pirna · Emil-Gast-Str. 4</span>
+                                <h3 class="font-display text-2xl font-extrabold text-forest-900">Peter & Bianca Dippe</h3>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="p-3.5 rounded-2xl bg-white/80 border border-sand-200">
+                            <span class="text-[11px] font-bold uppercase text-emerald-700">Vater & Admin</span>
+                            <p class="font-bold text-forest-900 text-base">Peter Dippe</p>
+                        </div>
+                        <div class="p-3.5 rounded-2xl bg-white/80 border border-sand-200">
+                            <span class="text-[11px] font-bold uppercase text-emerald-700">Mutter & Ehefrau</span>
+                            <p class="font-bold text-forest-900 text-base">Bianca Dippe</p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <p class="text-xs font-bold uppercase tracking-wider text-forest-700 mb-2.5">Unsere 3 Kinder</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div class="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200">
+                                <span class="text-[11px] font-bold text-emerald-800">1. Sohn</span>
+                                <p class="font-bold text-forest-900">David Dippe</p>
+                            </div>
+                            <div class="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200">
+                                <span class="text-[11px] font-bold text-emerald-800">2. Sohn</span>
+                                <p class="font-bold text-forest-900">Alwin Dippe</p>
+                            </div>
+                            <div class="p-3.5 rounded-2xl bg-amber-50 border border-amber-200">
+                                <span class="text-[11px] font-bold text-amber-800">Jüngste Tochter</span>
+                                <p class="font-bold text-forest-900">Liliana Dippe</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Zweig 2: Eltern Steffi & Klaus Dippe -->
+                <div class="sand-card rounded-3xl p-7 shadow-xl space-y-5 flex flex-col justify-between">
+                    <div class="space-y-5">
+                        <div class="flex items-center justify-between border-b border-sand-300 pb-4">
+                            <div class="flex items-center gap-3.5">
+                                <div class="w-12 h-12 rounded-2xl bg-amber-600 text-white flex items-center justify-center font-display font-extrabold text-xl shadow">
+                                    S&K
+                                </div>
+                                <div>
+                                    <span class="text-xs font-bold uppercase tracking-wider text-amber-700">Eltern & Großeltern</span>
+                                    <h3 class="font-display text-2xl font-extrabold text-forest-900">Steffi & Klaus Dippe</h3>
+                                </div>
+                            </div>
+                        </div>
+
+                        <p class="text-sm text-forest-800 leading-relaxed">
+                            Das Fundament der Dippe-Sippe: Eltern von Peter, Anna und Andreas sowie stolze Großeltern von acht Enkelkindern.
+                        </p>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div class="p-4 rounded-2xl bg-amber-50/90 border border-amber-200">
+                                <span class="text-xs font-bold uppercase text-amber-800">Mutter & Oma</span>
+                                <p class="font-bold text-lg text-forest-900 mt-0.5">Steffi Dippe</p>
+                            </div>
+                            <div class="p-4 rounded-2xl bg-amber-50/90 border border-amber-200">
+                                <span class="text-xs font-bold uppercase text-amber-800">Vater & Opa</span>
+                                <p class="font-bold text-lg text-forest-900 mt-0.5">Klaus Dippe</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-3.5 rounded-xl bg-sand-200/70 text-xs font-semibold text-forest-800 flex items-center gap-2">
+                        <i data-lucide="heart" class="w-4 h-4 text-amber-600 shrink-0"></i>
+                        <span>Halten die gesamte Familie über alle Generationen hinweg zusammen.</span>
+                    </div>
+                </div>
+
+                <!-- Zweig 3: Schwester Anna Wolf & Familie -->
+                <div class="sand-card rounded-3xl p-7 shadow-xl space-y-5">
+                    <div class="flex items-center justify-between border-b border-sand-300 pb-4">
+                        <div class="flex items-center gap-3.5">
+                            <div class="w-12 h-12 rounded-2xl bg-teal-700 text-white flex items-center justify-center font-display font-extrabold text-xl shadow">
+                                W
+                            </div>
+                            <div>
+                                <span class="text-xs font-bold uppercase tracking-wider text-teal-700">Schwester & Familie</span>
+                                <h3 class="font-display text-2xl font-extrabold text-forest-900">Familie Anna & Tobias Wolf</h3>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="p-3.5 rounded-2xl bg-white/80 border border-sand-200">
+                            <span class="text-[11px] font-bold uppercase text-teal-700">Schwester</span>
+                            <p class="font-bold text-forest-900 text-base">Anna Wolf</p>
+                        </div>
+                        <div class="p-3.5 rounded-2xl bg-white/80 border border-sand-200">
+                            <span class="text-[11px] font-bold uppercase text-teal-700">Schwager</span>
+                            <p class="font-bold text-forest-900 text-base">Tobias Wolf</p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <p class="text-xs font-bold uppercase tracking-wider text-forest-700 mb-2.5">Kinder (Neffen & Nichte)</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div class="p-3.5 rounded-2xl bg-teal-50 border border-teal-200">
+                                <span class="text-[11px] font-bold text-teal-800">Sohn</span>
+                                <p class="font-bold text-forest-900">Edgar Wolf</p>
+                            </div>
+                            <div class="p-3.5 rounded-2xl bg-rose-50 border border-rose-200">
+                                <span class="text-[11px] font-bold text-rose-800">Tochter</span>
+                                <p class="font-bold text-forest-900">Paula Wolf</p>
+                            </div>
+                            <div class="p-3.5 rounded-2xl bg-teal-50 border border-teal-200">
+                                <span class="text-[11px] font-bold text-teal-800">Sohn</span>
+                                <p class="font-bold text-forest-900">Enno Wolf</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Zweig 4: Bruder Andreas Dippe & Familie -->
+                <div class="sand-card rounded-3xl p-7 shadow-xl space-y-5">
+                    <div class="flex items-center justify-between border-b border-sand-300 pb-4">
+                        <div class="flex items-center gap-3.5">
+                            <div class="w-12 h-12 rounded-2xl bg-cyan-800 text-white flex items-center justify-center font-display font-extrabold text-xl shadow">
+                                D
+                            </div>
+                            <div>
+                                <span class="text-xs font-bold uppercase tracking-wider text-cyan-800">Bruder & Familie</span>
+                                <h3 class="font-display text-2xl font-extrabold text-forest-900">Andreas & Natascha Dippe</h3>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="p-3.5 rounded-2xl bg-white/80 border border-sand-200">
+                            <span class="text-[11px] font-bold uppercase text-cyan-800">Bruder</span>
+                            <p class="font-bold text-forest-900 text-base">Andreas Dippe</p>
+                        </div>
+                        <div class="p-3.5 rounded-2xl bg-white/80 border border-sand-200">
+                            <span class="text-[11px] font-bold uppercase text-cyan-800">Schwägerin</span>
+                            <p class="font-bold text-forest-900 text-base">Natascha Dippe</p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <p class="text-xs font-bold uppercase tracking-wider text-forest-700 mb-2.5">Die Zwillinge (Söhne)</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div class="p-3.5 rounded-2xl bg-cyan-50 border border-cyan-200 flex items-center justify-between">
+                                <div>
+                                    <span class="text-[11px] font-bold text-cyan-800">Zwillingsbruder</span>
+                                    <p class="font-bold text-forest-900">Nicolas Dippe</p>
+                                </div>
+                                <i data-lucide="sparkles" class="w-4 h-4 text-cyan-600"></i>
+                            </div>
+                            <div class="p-3.5 rounded-2xl bg-cyan-50 border border-cyan-200 flex items-center justify-between">
+                                <div>
+                                    <span class="text-[11px] font-bold text-cyan-800">Zwillingsbruder</span>
+                                    <p class="font-bold text-forest-900">Nikita Dippe</p>
+                                </div>
+                                <i data-lucide="sparkles" class="w-4 h-4 text-cyan-600"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+
+        <!-- ===============================================================
+             3. FOTOS & CLOUD (PASSWORTGESCHÜTZT)
+             =============================================================== -->
+        <section id="page-fotos" class="page-section space-y-6">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-emerald-800/50 pb-5">
+                <div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-amber-400">Privatbereich</span>
+                    <h2 class="font-display text-3xl font-extrabold text-sand-50">Familienfotos & Cloud-Alben</h2>
+                </div>
+                <div id="logout-btn-container" class="hidden">
+                    <button onclick="lockPhotos()" class="px-4 py-2 rounded-xl bg-rose-950/90 text-rose-300 border border-rose-700/50 hover:bg-rose-900 text-xs font-bold flex items-center gap-2 transition">
+                        <i data-lucide="lock" class="w-4 h-4"></i> Bereich wieder sperren
+                    </button>
+                </div>
+            </div>
+
+            <!-- Login Gate -->
+            <div id="foto-login-gate" class="max-w-md mx-auto my-12 sand-card rounded-3xl p-8 shadow-2xl text-center space-y-5">
+                <div class="w-16 h-16 rounded-2xl bg-emerald-800 text-amber-300 flex items-center justify-center mx-auto shadow-md">
+                    <i data-lucide="key-round" class="w-8 h-8"></i>
+                </div>
+                <div>
+                    <h3 class="font-display text-2xl font-extrabold text-forest-900">Passwortgeschützter Tresor</h3>
+                    <p class="text-sm text-forest-800/80 mt-1">
+                        Bitte gib unser Familien-Passwort ein, um die Alben auf Google Drive und OneDrive zu öffnen.
+                    </p>
+                </div>
+                <form onsubmit="unlockPhotos(event)" class="space-y-3">
+                    <input type="password" id="foto-password-input" placeholder="Passwort eingeben..." 
+                           class="w-full px-4 py-3 rounded-xl bg-white border border-sand-300 text-forest-900 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-300 outline-none text-center font-bold">
+                    <p id="foto-error-msg" class="text-xs text-rose-600 font-bold hidden">Falsches Passwort! Bitte versuche es erneut.</p>
+                    <button type="submit" class="w-full py-3.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-sm shadow-lg transition">
+                        Alben freischalten
+                    </button>
+                </form>
+            </div>
+
+            <!-- Freigeschaltete Cloud-Alben -->
+            <div id="foto-content" class="hidden space-y-8">
+                <div class="bg-emerald-950/80 border border-emerald-500/40 rounded-2xl p-4 flex items-center gap-3 text-emerald-200 text-sm">
+                    <i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-400 shrink-0"></i>
+                    <span><strong>Zugriff freigeschaltet!</strong> Wähle ein Album, um Bilder in Google Drive oder OneDrive anzusehen oder hochzuladen.</span>
+                </div>
+                <div id="alben-grid" class="grid grid-cols-1 md:grid-cols-3 gap-6"></div>
+            </div>
+        </section>
+
+
+        <!-- ===============================================================
+             4. AREA HAUPTSEITE: "MAPS MATH" (INTERAKTIVE KARTENGEOMETRIE)
+             =============================================================== -->
+        <section id="page-area-maps" class="page-section space-y-5">
+            
+            <!-- Header mit Umschalter zu Pur Math -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-emerald-800/50 pb-4">
+                <div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-amber-400">Area · Geodätische Berechnung</span>
+                    <h2 class="font-display text-3xl font-extrabold text-sand-50">Maps Math</h2>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="switchPage('area-maps')" class="px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold text-xs shadow flex items-center gap-2">
+                        <i data-lucide="globe-2" class="w-4 h-4"></i> Maps Math (Karte)
+                    </button>
+                    <button onclick="switchPage('area-pur')" class="px-4 py-2 rounded-xl bg-forest-800 hover:bg-forest-700 text-sand-200 border border-emerald-700/40 font-bold text-xs transition flex items-center gap-2">
+                        <i data-lucide="grid" class="w-4 h-4 text-amber-400"></i> Zur Unterseite: Pur Math
+                    </button>
+                </div>
+            </div>
+
+            <!-- Hauptpanel im Area-Layout -->
+            <div class="sand-card rounded-3xl shadow-2xl p-5 space-y-5">
+                
+                <!-- OBERER BEREICH: Start-Button, Kartenauswahl & Live-Koordinaten -->
+                <div class="space-y-3">
+                    <div class="flex flex-wrap gap-3">
+                        <button onclick="mapsMathStart()" 
+                                class="flex-1 min-w-[200px] py-3 px-6 rounded-xl bg-[#1e90ff] hover:bg-[#187bcd] text-black font-display font-extrabold text-xl shadow-md border border-sky-700 transition active:scale-[0.99]">
+                            Start (Punkte auf Karte setzen)
+                        </button>
+                        <button id="maps-calc-btn" onclick="mapsMathFinishAndCalculate()" 
+                                class="py-3 px-6 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-md transition flex items-center gap-2">
+                            <i data-lucide="calculator" class="w-5 h-5"></i>
+                            <span>Berechnen (ENTER)</span>
+                        </button>
+                        <button onclick="mapsMathResetToPirna()" 
+                                class="py-3 px-4 rounded-xl bg-sand-200 hover:bg-sand-300 text-forest-900 font-bold text-xs transition flex items-center gap-1.5" title="Zurück nach Pirna">
+                            <i data-lucide="home" class="w-4 h-4 text-emerald-700"></i> Pirna
+                        </button>
+                    </div>
+
+                    <!-- Karten-Typ Umschalter & Live Breiten-/Längengrad -->
+                    <div class="flex flex-wrap items-center justify-between gap-4 bg-white/80 border border-sand-300 rounded-2xl p-3">
+                        
+                        <!-- Kartenauswahl Buttons -->
+                        <div class="flex flex-wrap items-center gap-1.5">
+                            <span class="text-xs font-bold text-forest-800 mr-1">Kartenansicht:</span>
+                            <button onclick="setMapsMathLayer('osm')" id="layer-btn-osm" class="map-layer-btn active px-3 py-1.5 rounded-lg border border-sand-300 text-xs font-bold text-forest-900 transition">
+                                OpenStreetMap
+                            </button>
+                            <button onclick="setMapsMathLayer('google-streets')" id="layer-btn-google-streets" class="map-layer-btn px-3 py-1.5 rounded-lg border border-sand-300 text-xs font-bold text-forest-900 transition">
+                                Google Straßen
+                            </button>
+                            <button onclick="setMapsMathLayer('google-sat')" id="layer-btn-google-sat" class="map-layer-btn px-3 py-1.5 rounded-lg border border-sand-300 text-xs font-bold text-forest-900 transition">
+                                Google Satellit
+                            </button>
+                            <button onclick="setMapsMathLayer('topo')" id="layer-btn-topo" class="map-layer-btn px-3 py-1.5 rounded-lg border border-sand-300 text-xs font-bold text-forest-900 transition">
+                                Topografie
+                            </button>
+                        </div>
+
+                        <!-- Live Breitengrad / Längengrad + Zoom -->
+                        <div class="flex flex-wrap items-center gap-4">
+                            <div class="flex items-center gap-1.5">
+                                <span class="font-bold text-xs text-forest-800">Breite (Lat):</span>
+                                <input type="text" id="maps-lat-val" value="50.95850" readonly 
+                                       class="w-28 text-center font-mono text-xs font-bold bg-sand-100 border border-sand-300 rounded-lg py-1 px-2 text-forest-900">
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <span class="font-bold text-xs text-forest-800">Länge (Lng):</span>
+                                <input type="text" id="maps-lng-val" value="13.93720" readonly 
+                                       class="w-28 text-center font-mono text-xs font-bold bg-sand-100 border border-sand-300 rounded-lg py-1 px-2 text-forest-900">
+                            </div>
+                            <span id="maps-zoom-badge" class="text-xs font-mono font-bold bg-emerald-100 text-emerald-900 px-2.5 py-1 rounded-lg">Zoom: 16</span>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- UNTERER BEREICH: Links Interaktive Karte, Rechts Ausgabefeld -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                    
+                    <!-- Linker Bereich: Scroll- & Zoombare Karte -->
+                    <div class="lg:col-span-8 bg-white rounded-2xl border-2 border-sand-300 p-2 shadow-inner">
+                        <div id="mapsMathContainer"></div>
+                    </div>
+
+                    <!-- Rechter Bereich: Textausgabe -->
+                    <div class="lg:col-span-4 flex flex-col">
+                        <textarea id="maps-output-text" readonly 
+                                  class="w-full flex-1 min-h-[460px] font-mono text-xs md:text-sm bg-white border-2 border-sand-300 rounded-xl p-4 text-forest-950 leading-relaxed resize-none focus:outline-none shadow-inner">Willkommen bei Maps Math!
+
+1. Klicke oben auf „Start“.
+2. Scrolle und zoome frei in der Karte (OpenStreetMap oder Google Maps / Satellit).
+3. Klicke mindestens 3 Punkte auf die Karte.
+4. Klicke auf „Berechnen“ oder drücke ENTER.
+
+Der Flächeninhalt wird je nach Zoom-Faktor automatisch in m², Hektar (ha) oder km² berechnet.</textarea>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ===============================================================
+             5. AREA UNTERSEITE: "PUR MATH" (KLASSISCHES 130x100 SYSTEM)
+             =============================================================== -->
+        <section id="page-area-pur" class="page-section space-y-5">
+            
+            <!-- Header mit Rückkehr-Button zu Maps Math -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-emerald-800/50 pb-4">
+                <div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-amber-400">Area · Unterseite Koordinatensystem</span>
+                    <h2 class="font-display text-3xl font-extrabold text-sand-50">Pur Math</h2>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="switchPage('area-maps')" class="px-4 py-2 rounded-xl bg-forest-800 hover:bg-forest-700 text-sand-200 border border-emerald-700/40 font-bold text-xs transition flex items-center gap-2">
+                        <i data-lucide="globe-2" class="w-4 h-4 text-emerald-400"></i> Zurück zu: Maps Math
+                    </button>
+                    <button onclick="switchPage('area-pur')" class="px-4 py-2 rounded-xl bg-amber-500 text-forest-950 font-bold text-xs shadow flex items-center gap-2">
+                        <i data-lucide="grid" class="w-4 h-4"></i> Pur Math (130×100)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Pur Math Interface -->
+            <div class="sand-card rounded-3xl shadow-2xl p-5 space-y-5">
+                
+                <div class="space-y-3">
+                    <div class="flex gap-3">
+                        <button onclick="areaStartCollection()" 
+                                class="flex-1 py-3 px-6 rounded-xl bg-[#1e90ff] hover:bg-[#187bcd] text-black font-display font-extrabold text-xl shadow-md border border-sky-700 transition active:scale-[0.99]">
+                            Start
+                        </button>
+                        <button id="area-calc-btn" onclick="areaFinishAndCalculate()" 
+                                class="hidden py-3 px-6 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-md transition flex items-center gap-2">
+                            <i data-lucide="check" class="w-5 h-5"></i>
+                            <span>Berechnen (ENTER)</span>
+                        </button>
+                    </div>
+
+                    <div class="flex flex-wrap items-center justify-center gap-6 py-1">
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-lg text-forest-900">X:</span>
+                            <input type="text" id="area-x-val" value="0.0000" readonly 
+                                   class="w-32 text-center font-mono text-base font-bold bg-white border border-sand-300 rounded-lg py-1 px-2 text-forest-900">
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-lg text-forest-900">Y:</span>
+                            <input type="text" id="area-y-val" value="0.0000" readonly 
+                                   class="w-32 text-center font-mono text-base font-bold bg-white border border-sand-300 rounded-lg py-1 px-2 text-forest-900">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                    <div class="lg:col-span-8 bg-white rounded-2xl border-2 border-sand-300 p-3 flex items-center justify-center">
+                        <canvas id="areaCanvas" width="760" height="580" class="w-full h-auto max-w-[760px] rounded-lg shadow-inner border border-slate-300"></canvas>
+                    </div>
+                    <div class="lg:col-span-4 flex flex-col">
+                        <textarea id="area-output-text" readonly 
+                                  class="w-full flex-1 min-h-[420px] font-mono text-xs md:text-sm bg-white border-2 border-sand-300 rounded-xl p-4 text-forest-950 leading-relaxed resize-none focus:outline-none shadow-inner">Klicke oben auf „Start“, um mit der Maus Punkte im Koordinatensystem (130 x 100) zu sammeln.
+
+Abschluss per ENTER, Rechtsklick oder über den grünen Berechnen-Button.</textarea>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ===============================================================
+             6. TERMINE & TREFFEN
+             =============================================================== -->
+        <section id="page-kalender" class="page-section space-y-6">
+            <div class="border-b border-emerald-800/50 pb-5">
+                <span class="text-xs font-bold uppercase tracking-wider text-amber-400">Kalender</span>
+                <h2 class="font-display text-3xl font-extrabold text-sand-50">Termine & Familientreffen</h2>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="sand-card p-6 rounded-3xl shadow-xl flex gap-4 items-start">
+                    <div class="px-4 py-3 rounded-2xl bg-emerald-800 text-sand-50 text-center shrink-0">
+                        <span class="block text-xs font-bold uppercase text-amber-300">Pirna</span>
+                        <span class="block text-xl font-extrabold">Treffen</span>
+                    </div>
+                    <div>
+                        <h3 class="font-display font-extrabold text-xl text-forest-900">Großes Sippen-Treffen</h3>
+                        <p class="text-sm text-forest-800 mt-1">Wenn die Familien Dippe und Wolf zusammenkommen: Gemütliches Beisammensein in der Emil-Gast-Straße 4.</p>
+                    </div>
+                </div>
+
+                <div class="sand-card p-6 rounded-3xl shadow-xl flex gap-4 items-start">
+                    <div class="px-4 py-3 rounded-2xl bg-amber-600 text-white text-center shrink-0">
+                        <span class="block text-xs font-bold uppercase">Cloud</span>
+                        <span class="block text-xl font-extrabold">Fotos</span>
+                    </div>
+                    <div>
+                        <h3 class="font-display font-extrabold text-xl text-forest-900">Neue Bilder teilen</h3>
+                        <p class="text-sm text-forest-800 mt-1">Alle neuen Schnappschüsse von David, Alwin, Liliana, Edgar, Paula, Enno, Nicolas und Nikita direkt in die Cloud legen.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ===============================================================
+             7. FAMILIEN-PINNWAND
+             =============================================================== -->
+        <section id="page-pinnwand" class="page-section space-y-6">
+            <div class="border-b border-emerald-800/50 pb-5">
+                <span class="text-xs font-bold uppercase tracking-wider text-amber-400">Ideen & Notizen</span>
+                <h2 class="font-display text-3xl font-extrabold text-sand-50">Unsere Familien-Pinnwand</h2>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="sand-card rounded-3xl p-6 space-y-2 shadow-xl">
+                    <span class="text-xs font-bold text-amber-700 uppercase">Kulinarisches</span>
+                    <h3 class="font-display font-extrabold text-xl text-forest-900">Lieblingsrezepte der Sippe</h3>
+                    <p class="text-sm text-forest-800">Platz für Steffis und Biancas beste Familienrezepte, Grillideen und Festtagskuchen.</p>
+                </div>
+                <div class="sand-card rounded-3xl p-6 space-y-2 shadow-xl">
+                    <span class="text-xs font-bold text-emerald-700 uppercase">Natur & Wandern</span>
+                    <h3 class="font-display font-extrabold text-xl text-forest-900">Touren im Elbsandstein</h3>
+                    <p class="text-sm text-forest-800">Tipp: Mit „Maps Math“ könnt ihr unsere nächste Wanderroute rund um Pirna direkt auf der Karte abstecken und vermessen!</p>
+                </div>
+                <div class="sand-card rounded-3xl p-6 space-y-2 shadow-xl">
+                    <span class="text-xs font-bold text-cyan-800 uppercase">Projekte</span>
+                    <h3 class="font-display font-extrabold text-xl text-forest-900">Peters Code-Werkstatt</h3>
+                    <p class="text-sm text-forest-800">Von MATLAB über Python 3.15 bis hin zu interaktivem JavaScript im Browser.</p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+
+    <!-- ===================================================================
+         JAVASCRIPT LOGIK (Navigation, Karten, Welzl-Algorithmus, Maps Math & Pur Math)
+         =================================================================== -->
+    <script>
+        lucide.createIcons();
+
+        // -----------------------------------------------------------------
+        // 1. SEITEN-NAVIGATION
+        // -----------------------------------------------------------------
+        function switchPage(pageId) {
+            document.querySelectorAll('.page-section').forEach(sec => sec.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.sub-nav-item').forEach(btn => btn.classList.remove('active'));
+
+            const targetSection = document.getElementById('page-' + pageId);
+            if (targetSection) targetSection.classList.add('active');
+
+            if (pageId === 'area-maps' || pageId === 'area-pur') {
+                document.getElementById('nav-area').classList.add('active');
+                const subBtn = document.getElementById('subnav-' + pageId);
+                if (subBtn) subBtn.classList.add('active');
+            } else {
+                const targetNav = document.getElementById('nav-' + pageId);
+                if (targetNav) targetNav.classList.add('active');
+            }
+
+            // Mobile Sidebar schließen
+            const sidebar = document.getElementById('sidebar');
+            if (window.innerWidth < 768 && !sidebar.classList.contains('-translate-x-full')) {
+                sidebar.classList.add('-translate-x-full');
+            }
+
+            // Karten-Größen bei Sichtbarkeit aktualisieren
+            if (pageId === 'home' && homeMap) {
+                setTimeout(() => homeMap.invalidateSize(), 150);
+            }
+            if (pageId === 'area-maps') {
+                setTimeout(() => {
+                    initMapsMathIfNeeded();
+                    mapsMathMap.invalidateSize();
+                }, 150);
+            }
+            if (pageId === 'area-pur') {
+                drawAreaCanvas();
+            }
+        }
+
+        function toggleMobileMenu() {
+            document.getElementById('sidebar').classList.toggle('-translate-x-full');
+        }
+
+        // -----------------------------------------------------------------
+        // 2. STARTSEITEN-KARTE (Emil-Gast-Str. 4, 01796 Pirna)
+        // -----------------------------------------------------------------
+        let homeMap = null;
+        let pirnaCoords = [50.9585, 13.9372];
+
+        function initHomeMap() {
+            homeMap = L.map('osm-map').setView(pirnaCoords, 16);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap'
+            }).addTo(homeMap);
+
+            const marker = L.marker(pirnaCoords).addTo(homeMap);
+            marker.bindPopup("<b>Familie Dippe</b><br>Emil-Gast-Str. 4<br>01796 Pirna").openPopup();
+
+            fetch("https://nominatim.openstreetmap.org/search?format=json&q=Emil-Gast-Stra%C3%9Fe%204,%2001796%20Pirna")
+                .then(res => res.json())
+                .then(data => {
+                    if (data && data.length > 0) {
+                        pirnaCoords = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+                        homeMap.setView(pirnaCoords, 17);
+                        marker.setLatLng(pirnaCoords);
+                    }
+                })
+                .catch(() => {});
+        }
+        window.addEventListener('DOMContentLoaded', initHomeMap);
+
+        // -----------------------------------------------------------------
+        // 3. PASSWORTGESCHÜTZTER FOTO-BEREICH
+        // -----------------------------------------------------------------
+        function renderAlbums() {
+            const grid = document.getElementById('alben-grid');
+            grid.innerHTML = CONFIG.alben.map(album => `
+                <div class="sand-card rounded-3xl overflow-hidden shadow-xl flex flex-col justify-between">
+                    <div>
+                        <div class="h-28 bg-gradient-to-r ${album.farbe} p-6 flex items-end justify-between text-white">
+                            <span class="text-xs font-bold uppercase tracking-wider bg-black/25 backdrop-blur px-3 py-1 rounded-full">${album.anbieter}</span>
+                            <i data-lucide="folder-heart" class="w-8 h-8 opacity-85"></i>
+                        </div>
+                        <div class="p-6">
+                            <span class="text-xs font-bold text-emerald-700">${album.datum}</span>
+                            <h3 class="font-display font-extrabold text-xl text-forest-900 mt-1">${album.titel}</h3>
+                            <p class="text-sm text-forest-800/90 mt-2 leading-relaxed">${album.beschreibung}</p>
+                        </div>
+                    </div>
+                    <div class="px-6 pb-6">
+                        <a href="${album.link}" target="_blank" rel="noopener"
+                           class="w-full py-3 px-4 rounded-xl bg-forest-900 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition">
+                            <span>Ordner in Cloud öffnen</span>
+                            <i data-lucide="external-link" class="w-4 h-4"></i>
+                        </a>
+                    </div>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function unlockPhotos(e) {
+            e.preventDefault();
+            const input = document.getElementById('foto-password-input').value.trim();
+            const errorMsg = document.getElementById('foto-error-msg');
+            if (input === CONFIG.fotoPasswort) {
+                errorMsg.classList.add('hidden');
+                document.getElementById('foto-login-gate').classList.add('hidden');
+                document.getElementById('foto-content').classList.remove('hidden');
+                document.getElementById('logout-btn-container').classList.remove('hidden');
+                renderAlbums();
+            } else {
+                errorMsg.classList.remove('hidden');
+            }
+        }
+
+        function lockPhotos() {
+            document.getElementById('foto-password-input').value = '';
+            document.getElementById('foto-login-gate').classList.remove('hidden');
+            document.getElementById('foto-content').classList.add('hidden');
+            document.getElementById('logout-btn-container').classList.add('hidden');
+        }
+
+        // -----------------------------------------------------------------
+        // 4. GEMEINSAME MATHEMATISCHE KERNFUNKTIONEN (Konvexe Hülle, Welzl, Zentroid)
+        // -----------------------------------------------------------------
+        function circleFrom2Points(p1, p2) {
+            const xM = (p1.x + p2.x) / 2.0;
+            const yM = (p1.y + p2.y) / 2.0;
+            const r = Math.hypot(p1.x - p2.x, p1.y - p2.y) / 2.0;
+            return { x: xM, y: yM, r: r, support: [p1.idx, p2.idx] };
+        }
+
+        function circleFrom3Points(p1, p2, p3) {
+            const D = 2 * (p1.x * (p2.y - p3.y) + p2.x * (p3.y - p1.y) + p3.x * (p1.y - p2.y));
+            if (Math.abs(D) < 1e-12) {
+                const pairs = [[p1, p2], [p1, p3], [p2, p3]];
+                let best = pairs[0], maxD = -1;
+                for (const pr of pairs) {
+                    const d = Math.hypot(pr[0].x - pr[1].x, pr[0].y - pr[1].y);
+                    if (d > maxD) { maxD = d; best = pr; }
+                }
+                return circleFrom2Points(best[0], best[1]);
+            }
+            const ux = ((p1.x**2 + p1.y**2)*(p2.y - p3.y) + (p2.x**2 + p2.y**2)*(p3.y - p1.y) + (p3.x**2 + p3.y**2)*(p1.y - p2.y)) / D;
+            const uy = ((p1.x**2 + p1.y**2)*(p3.x - p2.x) + (p2.x**2 + p2.y**2)*(p1.x - p3.x) + (p3.x**2 + p3.y**2)*(p2.x - p1.x)) / D;
+            const r = Math.hypot(p1.x - ux, p1.y - uy);
+            return { x: ux, y: uy, r: r, support: [p1.idx, p2.idx, p3.idx] };
+        }
+
+        function trivialCircle(R) {
+            if (R.length === 0) return { x: 0, y: 0, r: 0, support: [] };
+            if (R.length === 1) return { x: R[0].x, y: R[0].y, r: 0, support: [R[0].idx] };
+            if (R.length === 2) return circleFrom2Points(R[0], R[1]);
+            return circleFrom3Points(R[0], R[1], R[2]);
+        }
+
+        function welzlRecursive(P, R) {
+            if (P.length === 0 || R.length === 3) return trivialCircle(R);
+            const p = P[P.length - 1];
+            const P_rest = P.slice(0, P.length - 1);
+            const c = welzlRecursive(P_rest, R);
+            if (Math.hypot(p.x - c.x, p.y - c.y) <= c.r + 1e-7) return c;
+            return welzlRecursive(P_rest, [...R, p]);
+        }
+
+        function computeCentroid(hullPts) {
+            const n = hullPts.length;
+            if (n < 3) return { x: 0, y: 0 };
+            const cx = hullPts.reduce((s, p) => s + p.x, 0) / n;
+            const cy = hullPts.reduce((s, p) => s + p.y, 0) / n;
+            const sorted = [...hullPts].sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx));
+
+            let A2 = 0, Sx = 0, Sy = 0;
+            for (let i = 0; i < n; i++) {
+                const j = (i + 1) % n;
+                const cross = sorted[i].x * sorted[j].y - sorted[j].x * sorted[i].y;
+                A2 += cross;
+                Sx += (sorted[i].x + sorted[j].x) * cross;
+                Sy += (sorted[i].y + sorted[j].y) * cross;
+            }
+            const area = A2 / 2.0;
+            if (Math.abs(area) < 1e-12) return { x: cx, y: cy };
+            return { x: Sx / (6.0 * area), y: Sy / (6.0 * area) };
+        }
+
+        function solveGeometry2D(pts) {
+            const n = pts.length;
+            const Aussenkanten = Array.from({ length: n }, () => Array(n).fill(0));
+            for (let i = 0; i < n - 1; i++) {
+                for (let j = i + 1; j < n; j++) {
+                    let seite = 0;
+                    for (let k = 0; k < n; k++) {
+                        if (k !== i && k !== j) {
+                            const cross = (pts[k].y - pts[i].y) * (pts[j].x - pts[i].x) - (pts[j].y - pts[i].y) * (pts[k].x - pts[i].x);
+                            const sig = Math.sign(cross);
+                            if (seite !== 0 && Aussenkanten[i][j] !== 0) {
+                                if (seite !== sig) {
+                                    Aussenkanten[i][j] = 0;
+                                    Aussenkanten[j][i] = 0;
+                                } else {
+                                    Aussenkanten[i][j] = 1;
+                                    Aussenkanten[j][i] = 1;
+                                }
+                            }
+                            if (seite === 0) {
+                                seite = sig;
+                                Aussenkanten[i][j] = 1;
+                                Aussenkanten[j][i] = 1;
+                            }
+                        }
+                    }
+                }
+            }
+
+            const hullEdges = [];
+            for (let i = 0; i < n; i++) {
+                for (let j = i + 1; j < n; j++) {
+                    if (Aussenkanten[i][j] === 1) hullEdges.push([i, j]);
+                }
+            }
+
+            const Aussenpunkte = Array(n).fill(0);
+            let aussenCnt = 0, xM_a = 0, yM_a = 0;
+            const hullPts = [];
+            const outerIndices = [];
+
+            for (let i = 0; i < n; i++) {
+                if (Aussenkanten[i].some(val => val === 1)) {
+                    Aussenpunkte[i] = 1;
+                    aussenCnt++;
+                    xM_a += pts[i].x;
+                    yM_a += pts[i].y;
+                    hullPts.push(pts[i]);
+                    outerIndices.push(i);
+                }
+            }
+            if (aussenCnt > 0) {
+                xM_a /= aussenCnt;
+                yM_a /= aussenCnt;
+            }
+            const M_A = { x: xM_a, y: yM_a };
+            const M_M = computeCentroid(hullPts);
+
+            // Flächeninhalt über Heronsche Formel
+            let Flaeche = 0;
+            let p1 = 0;
+            while (p1 < n && Aussenpunkte[p1] !== 1) p1++;
+            for (let p2 = p1 + 1; p2 < n - 1; p2++) {
+                for (let p3 = p2 + 1; p3 < n; p3++) {
+                    if (Aussenkanten[p2][p3] === 1) {
+                        const a = Math.hypot(pts[p2].x - pts[p1].x, pts[p2].y - pts[p1].y);
+                        const b = Math.hypot(pts[p3].x - pts[p1].x, pts[p3].y - pts[p1].y);
+                        const c = Math.hypot(pts[p3].x - pts[p2].x, pts[p3].y - pts[p2].y);
+                        const s = 0.5 * (a + b + c);
+                        Flaeche += Math.sqrt(Math.max(0, s * (s - a) * (s - b) * (s - c)));
+                    }
+                }
+            }
+
+            // Welzl Umkreis
+            const indexedPts = pts.map((p, idx) => ({ idx, x: p.x, y: p.y }));
+            for (let i = indexedPts.length - 1; i > 0; i--) {
+                const rIdx = Math.floor(Math.random() * (i + 1));
+                [indexedPts[i], indexedPts[rIdx]] = [indexedPts[rIdx], indexedPts[i]];
+            }
+            const circle = welzlRecursive(indexedPts, []);
+
+            const tol = Math.max(1e-3, circle.r * 1e-3);
+            let randIndizes = [];
+            for (let i = 0; i < n; i++) {
+                if (Math.abs(Math.hypot(pts[i].x - circle.x, pts[i].y - circle.y) - circle.r) <= tol) {
+                    randIndizes.push(i);
+                }
+            }
+            if (randIndizes.length < circle.support.length) {
+                randIndizes = [...circle.support].sort((a, b) => a - b);
+            }
+
+            return { hullEdges, aussenCnt, outerIndices, M_A, M_M, M_U: circle, Flaeche, randIndizes };
+        }
+
+        function formatPointList(indices) {
+            const labels = indices.map(i => `P${i + 1}`);
+            if (labels.length > 1) {
+                return labels.slice(0, -1).join(", ") + " und " + labels[labels.length - 1];
+            }
+            return labels[0] || "-";
+        }
+
+        // -----------------------------------------------------------------
+        // 5. "MAPS MATH" LOGIK (Interaktive Karte + Maßstabsgerechte Einheiten)
+        // -----------------------------------------------------------------
+        let mapsMathMap = null;
+        let mapsMathLayers = {};
+        let mapsMathDrawGroup = null;
+        let mapsState = {
+            collecting: true,
+            latlngs: [] // [{lat, lng}]
+        };
+
+        function initMapsMathIfNeeded() {
+            if (mapsMathMap) return;
+
+            mapsMathMap = L.map('mapsMathContainer', {
+                center: pirnaCoords,
+                zoom: 16
+            });
+
+            // Verschiedene Karten-Layer inkl. Google Maps & Satellit
+            mapsMathLayers = {
+                'osm': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 20,
+                    attribution: '© OpenStreetMap'
+                }),
+                'google-streets': L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+                    maxZoom: 20,
+                    attribution: '© Google Maps'
+                }),
+                'google-sat': L.tileLayer('https://mt1.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
+                    maxZoom: 20,
+                    attribution: '© Google Satellite'
+                }),
+                'topo': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 17,
+                    attribution: '© OpenTopoMap'
+                })
+            };
+
+            mapsMathLayers['osm'].addTo(mapsMathMap);
+            mapsMathDrawGroup = L.layerGroup().addTo(mapsMathMap);
+
+            // Live-Koordinaten bei Mausbewegung
+            mapsMathMap.on('mousemove', (e) => {
+                document.getElementById('maps-lat-val').value = e.latlng.lat.toFixed(5);
+                document.getElementById('maps-lng-val').value = e.latlng.lng.toFixed(5);
+            });
+
+            // Zoom-Anzeige aktualisieren
+            mapsMathMap.on('zoomend', () => {
+                document.getElementById('maps-zoom-badge').textContent = `Zoom: ${mapsMathMap.getZoom()}`;
+            });
+
+            // Klick auf Karte setzt Punkt
+            mapsMathMap.on('click', (e) => {
+                if (!mapsState.collecting) return;
+                mapsState.latlngs.push({ lat: e.latlng.lat, lng: e.latlng.lng });
+                renderMapsMathMarkersOnly();
+            });
+
+            // Rechtsklick auf Karte startet Berechnung
+            mapsMathMap.on('contextmenu', () => {
+                if (mapsState.collecting && mapsState.latlngs.length >= 3) {
+                    mapsMathFinishAndCalculate();
+                }
+            });
+        }
+
+        function setMapsMathLayer(layerKey) {
+            initMapsMathIfNeeded();
+            Object.values(mapsMathLayers).forEach(layer => mapsMathMap.removeLayer(layer));
+            mapsMathLayers[layerKey].addTo(mapsMathMap);
+
+            document.querySelectorAll('.map-layer-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('layer-btn-' + layerKey).classList.add('active');
+        }
+
+        function mapsMathResetToPirna() {
+            initMapsMathIfNeeded();
+            mapsMathMap.setView(pirnaCoords, 16);
+        }
+
+        function mapsMathStart() {
+            initMapsMathIfNeeded();
+            mapsState.collecting = true;
+            mapsState.latlngs = [];
+            mapsMathDrawGroup.clearLayers();
+
+            document.getElementById('maps-output-text').value = [
+                "Sammle Koordinaten auf der Karte!",
+                "",
+                "Du kannst die Karte frei verschieben und rein-/rauszoomen.",
+                "Setze Punkte per Linksklick.",
+                "",
+                "Berechnung starten:",
+                "Klicke auf „Berechnen (ENTER)“, drücke ENTER oder Rechtsklick."
+            ].join("\n");
+        }
+
+        function renderMapsMathMarkersOnly() {
+            mapsMathDrawGroup.clearLayers();
+            mapsState.latlngs.forEach((pt, idx) => {
+                L.circleMarker([pt.lat, pt.lng], {
+                    radius: 6,
+                    color: '#0072bd',
+                    weight: 2.5,
+                    fillColor: '#ffffff',
+                    fillOpacity: 0.9
+                }).bindTooltip(`P${idx + 1}`, { permanent: true, direction: 'right', className: 'font-mono font-bold text-xs' })
+                  .addTo(mapsMathDrawGroup);
+            });
+        }
+
+        function formatAdaptiveArea(areaSqMeters, zoom) {
+            // Wählt die passende Einheit nach realer Größe und Karten-Zoomfaktor
+            if (areaSqMeters >= 1_000_000 || zoom <= 11) {
+                const km2 = areaSqMeters / 1_000_000;
+                return `${km2.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} km²`;
+            } else if (areaSqMeters >= 10_000 || (zoom <= 14 && areaSqMeters >= 2500)) {
+                const ha = areaSqMeters / 10_000;
+                const m2 = Math.round(areaSqMeters).toLocaleString('de-DE');
+                return `${ha.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 3 })} ha (${m2} m²)`;
+            } else {
+                return `${areaSqMeters.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m²`;
+            }
+        }
+
+        function formatAdaptiveDistance(meters) {
+            if (meters >= 1000) {
+                return `${(meters / 1000).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 3 })} km (${Math.round(meters).toLocaleString('de-DE')} m)`;
+            }
+            return `${meters.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m`;
+        }
+
+        function mapsMathFinishAndCalculate() {
+            initMapsMathIfNeeded();
+            const n = mapsState.latlngs.length;
+            if (n < 3) {
+                document.getElementById('maps-output-text').value = [
+                    "Zu wenige Punkte auf der Karte!",
+                    `Es wurden bisher ${n} Punkte gesetzt.`,
+                    "Bitte klicke mindestens 3 Punkte auf die Karte."
+                ].join("\n");
+                return;
+            }
+
+            mapsState.collecting = false;
+            mapsMathDrawGroup.clearLayers();
+
+            // Lokale metrische Projektion (Meter relativ zum Schwerpunkt lat0, lng0)
+            const R_EARTH = 6371008.8; // Mittlerer Erdradius in Metern
+            const lat0 = mapsState.latlngs.reduce((s, p) => s + p.lat, 0) / n;
+            const lng0 = mapsState.latlngs.reduce((s, p) => s + p.lng, 0) / n;
+            const cosLat0 = Math.cos(lat0 * Math.PI / 180.0);
+
+            function toMeters(lat, lng) {
+                const x = R_EARTH * ((lng - lng0) * Math.PI / 180.0) * cosLat0;
+                const y = R_EARTH * ((lat - lat0) * Math.PI / 180.0);
+                return { x, y };
+            }
+
+            function toLatLng(x, y) {
+                const lat = lat0 + (y / R_EARTH) * (180.0 / Math.PI);
+                const lng = lng0 + (x / (R_EARTH * cosLat0)) * (180.0 / Math.PI);
+                return { lat, lng };
+            }
+
+            const metricPts = mapsState.latlngs.map(p => toMeters(p.lat, p.lng));
+            const res = solveGeometry2D(metricPts);
+
+            const M_U_ll = toLatLng(res.M_U.x, res.M_U.y);
+            const M_A_ll = toLatLng(res.M_A.x, res.M_A.y);
+            const M_M_ll = toLatLng(res.M_M.x, res.M_M.y);
+
+            // 1. Umspannendes Polygon auf der Karte zeichnen (blau gestrichelt)
+            res.hullEdges.forEach(([i, j]) => {
+                const p1 = mapsState.latlngs[i];
+                const p2 = mapsState.latlngs[j];
+                L.polyline([[p1.lat, p1.lng], [p2.lat, p2.lng]], {
+                    color: '#2563eb',
+                    weight: 2.5,
+                    dashArray: '6, 6'
+                }).addTo(mapsMathDrawGroup);
+            });
+
+            // Sortiertes Polygon zusätzlich leicht einfärben
+            const hullLatLngs = res.outerIndices.map(i => mapsState.latlngs[i]);
+            hullLatLngs.sort((a, b) => Math.atan2(a.lat - M_A_ll.lat, a.lng - M_A_ll.lng) - Math.atan2(b.lat - M_A_ll.lat, b.lng - M_A_ll.lng));
+            L.polygon(hullLatLngs.map(p => [p.lat, p.lng]), {
+                stroke: false,
+                fillColor: '#3b82f6',
+                fillOpacity: 0.12
+            }).addTo(mapsMathDrawGroup);
+
+            // 2. Kleinster Umkreis nach Welzl (grün gestrichelt, echter Radius in Metern)
+            L.circle([M_U_ll.lat, M_U_ll.lng], {
+                radius: res.M_U.r,
+                color: '#10b981',
+                weight: 2.5,
+                dashArray: '8, 6',
+                fillColor: '#10b981',
+                fillOpacity: 0.05
+            }).addTo(mapsMathDrawGroup);
+
+            // 3. Gesetzte Punkte P1..Pn einzeichnen
+            mapsState.latlngs.forEach((pt, idx) => {
+                L.circleMarker([pt.lat, pt.lng], {
+                    radius: 6,
+                    color: '#0072bd',
+                    weight: 2.5,
+                    fillColor: '#ffffff',
+                    fillOpacity: 1
+                }).bindTooltip(`P${idx + 1}`, { permanent: true, direction: 'right' })
+                  .addTo(mapsMathDrawGroup);
+            });
+
+            // 4. Mittelpunkte M_U, M_A und M_M einzeichnen
+            function addCenterPin(ll, label, colorHex, desc) {
+                L.circleMarker([ll.lat, ll.lng], {
+                    radius: 6,
+                    color: colorHex,
+                    weight: 3,
+                    fillColor: colorHex,
+                    fillOpacity: 1
+                }).bindTooltip(`${label}`, { permanent: true, direction: 'top' })
+                  .bindPopup(`<b>${label} (${desc})</b><br>Breite: ${ll.lat.toFixed(5)}°<br>Länge: ${ll.lng.toFixed(5)}°`)
+                  .addTo(mapsMathDrawGroup);
+            }
+
+            addCenterPin(M_U_ll, 'M_U', '#d97706', 'Umkreismittelpunkt');
+            addCenterPin(M_A_ll, 'M_A', '#059669', 'Arithm. Mittel Außenpunkte');
+            addCenterPin(M_M_ll, 'M_M', '#9333ea', 'Masseschwerpunkt');
+
+            // 5. Textausgabe mit Längen-/Breitengrad und maßstabsgerechter Fläche
+            const zoom = mapsMathMap.getZoom();
+            const areaFormatted = formatAdaptiveArea(res.Flaeche, zoom);
+            const radiusFormatted = formatAdaptiveDistance(res.M_U.r);
+
+            const lines = ["Die Koordinaten der Punkte (Breite / Länge):"];
+            mapsState.latlngs.forEach((p, idx) => {
+                lines.push(`P${idx + 1} = (${p.lat.toFixed(5)}° N / ${p.lng.toFixed(5)}° O)`);
+            });
+
+            lines.push(
+                "",
+                `Flächeninhalt des umspannenden ${res.aussenCnt}-Ecks (Zoom ${zoom}):`,
+                `${areaFormatted}`,
+                "",
+                `Die ${res.aussenCnt} aussen liegenden Punkte:`,
+                formatPointList(res.outerIndices),
+                "",
+                "Die Punkte, die auf dem Umkreis",
+                `(M_U = (${M_U_ll.lat.toFixed(5)}° / ${M_U_ll.lng.toFixed(5)}°), r = ${radiusFormatted}) liegen:`,
+                formatPointList(res.randIndizes),
+                "",
+                "Die Mittelpunkte (Breitengrad / Längengrad):",
+                `M_U = (${M_U_ll.lat.toFixed(5)}° N / ${M_U_ll.lng.toFixed(5)}° O), r = ${radiusFormatted}`,
+                `M_A = (${M_A_ll.lat.toFixed(5)}° N / ${M_A_ll.lng.toFixed(5)}° O)`,
+                `M_M = (${M_M_ll.lat.toFixed(5)}° N / ${M_M_ll.lng.toFixed(5)}° O)`
+            );
+
+            document.getElementById('maps-output-text').value = lines.join("\n");
+        }
+
+
+        // -----------------------------------------------------------------
+        // 6. "PUR MATH" LOGIK (Klassisches 130x100 Koordinatensystem)
+        // -----------------------------------------------------------------
+        const canvas = document.getElementById('areaCanvas');
+        const ctx = canvas.getContext('2d');
+        const PAD = { left: 48, right: 22, top: 22, bottom: 42 };
+        const X_MAX = 130;
+        const Y_MAX = 100;
+
+        let areaState = {
+            collecting: false,
+            points: [],
+            hullEdges: [],
+            M_A: null,
+            M_M: null,
+            M_U: null
+        };
+
+        function toCanvasX(x) {
+            return PAD.left + (x / X_MAX) * (canvas.width - PAD.left - PAD.right);
+        }
+        function toCanvasY(y) {
+            return canvas.height - PAD.bottom - (y / Y_MAX) * (canvas.height - PAD.top - PAD.bottom);
+        }
+        function toWorldX(px) {
+            return ((px - PAD.left) / (canvas.width - PAD.left - PAD.right)) * X_MAX;
+        }
+        function toWorldY(py) {
+            return ((canvas.height - PAD.bottom - py) / (canvas.height - PAD.top - PAD.bottom)) * Y_MAX;
+        }
+
+        function drawAreaCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const plotW = canvas.width - PAD.left - PAD.right;
+            const plotH = canvas.height - PAD.top - PAD.bottom;
+
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.strokeStyle = 'rgba(148, 163, 184, 0.45)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([2, 3]);
+            ctx.font = '12px "JetBrains Mono", monospace';
+            ctx.fillStyle = '#334155';
+
+            ctx.textAlign = 'center';
+            for (let x = 0; x <= X_MAX; x += 10) {
+                const cx = toCanvasX(x);
+                ctx.beginPath();
+                ctx.moveTo(cx, PAD.top);
+                ctx.lineTo(cx, canvas.height - PAD.bottom);
+                ctx.stroke();
+                ctx.fillText(x.toString(), cx, canvas.height - PAD.bottom + 20);
+            }
+
+            ctx.textAlign = 'right';
+            for (let y = 0; y <= Y_MAX; y += 10) {
+                const cy = toCanvasY(y);
+                ctx.beginPath();
+                ctx.moveTo(PAD.left, cy);
+                ctx.lineTo(canvas.width - PAD.right, cy);
+                ctx.stroke();
+                ctx.fillText(y.toString(), PAD.left - 8, cy + 4);
+            }
+
+            ctx.setLineDash([]);
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 1.2;
+            ctx.strokeRect(PAD.left, PAD.top, plotW, plotH);
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(PAD.left, PAD.top, plotW, plotH);
+            ctx.clip();
+
+            if (areaState.hullEdges.length > 0) {
+                ctx.strokeStyle = '#0000ff';
+                ctx.lineWidth = 1.3;
+                ctx.setLineDash([5, 4]);
+                areaState.hullEdges.forEach(([i, j]) => {
+                    const p1 = areaState.points[i];
+                    const p2 = areaState.points[j];
+                    ctx.beginPath();
+                    ctx.moveTo(toCanvasX(p1.x), toCanvasY(p1.y));
+                    ctx.lineTo(toCanvasX(p2.x), toCanvasY(p2.y));
+                    ctx.stroke();
+                });
+                ctx.setLineDash([]);
+            }
+
+            if (areaState.M_U) {
+                const cx = toCanvasX(areaState.M_U.x);
+                const cy = toCanvasY(areaState.M_U.y);
+                const rx = (areaState.M_U.r / X_MAX) * plotW;
+                const ry = (areaState.M_U.r / Y_MAX) * plotH;
+
+                ctx.strokeStyle = 'rgb(13, 210, 25)';
+                ctx.lineWidth = 1.4;
+                ctx.setLineDash([6, 4]);
+                ctx.beginPath();
+                ctx.ellipse(cx, cy, rx, ry, 0, 0, 2 * Math.PI);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            areaState.points.forEach((pt, idx) => {
+                const cx = toCanvasX(pt.x);
+                const cy = toCanvasY(pt.y);
+
+                ctx.strokeStyle = '#0072bd';
+                ctx.lineWidth = 1.8;
+                ctx.beginPath();
+                ctx.arc(cx, cy, 5, 0, 2 * Math.PI);
+                ctx.stroke();
+
+                if (!areaState.collecting) {
+                    ctx.fillStyle = '#00aa00';
+                    ctx.font = 'bold 13px sans-serif';
+                    ctx.textAlign = 'left';
+                    ctx.fillText(`${idx + 1}`, cx + 7, cy + 4);
+                }
+            });
+
+            function drawCenterMarker(pt, label, crossColor, textColor) {
+                if (!pt) return;
+                const cx = toCanvasX(pt.x);
+                const cy = toCanvasY(pt.y);
+                ctx.strokeStyle = crossColor;
+                ctx.lineWidth = 1.8;
+                ctx.beginPath();
+                ctx.moveTo(cx - 5, cy); ctx.lineTo(cx + 5, cy);
+                ctx.moveTo(cx, cy - 5); ctx.lineTo(cx, cy + 5);
+                ctx.stroke();
+
+                ctx.fillStyle = textColor;
+                ctx.font = 'bold 13px sans-serif';
+                ctx.textAlign = 'left';
+                ctx.fillText(label, cx + 8, cy + 4);
+            }
+
+            drawCenterMarker(areaState.M_A, 'M_A', '#d95319', '#00aa00');
+            drawCenterMarker(areaState.M_M, 'M_M', '#9333ea', '#9333ea');
+            drawCenterMarker(areaState.M_U, 'M_U', '#d95319', '#00aa00');
+
+            ctx.restore();
+        }
+
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const px = (e.clientX - rect.left) * (canvas.width / rect.width);
+            const py = (e.clientY - rect.top) * (canvas.height / rect.height);
+            document.getElementById('area-x-val').value = toWorldX(px).toFixed(4);
+            document.getElementById('area-y-val').value = toWorldY(py).toFixed(4);
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
+            if (!areaState.collecting) return;
+            if (e.button === 2) {
+                e.preventDefault();
+                areaFinishAndCalculate();
+                return;
+            }
+            if (e.button === 0) {
+                const rect = canvas.getBoundingClientRect();
+                const px = (e.clientX - rect.left) * (canvas.width / rect.width);
+                const py = (e.clientY - rect.top) * (canvas.height / rect.height);
+                const wx = Math.round(toWorldX(px) * 100) / 100;
+                const wy = Math.round(toWorldY(py) * 100) / 100;
+
+                if (wx >= 0 && wx <= X_MAX && wy >= 0 && wy <= Y_MAX) {
+                    areaState.points.push({ x: wx, y: wy });
+                    drawAreaCanvas();
+                }
+            }
+        });
+
+        canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                if (document.getElementById('page-area-pur').classList.contains('active') && areaState.collecting) {
+                    e.preventDefault();
+                    areaFinishAndCalculate();
+                } else if (document.getElementById('page-area-maps').classList.contains('active') && mapsState.collecting && mapsState.latlngs.length >= 3) {
+                    e.preventDefault();
+                    mapsMathFinishAndCalculate();
+                }
+            }
+        });
+
+        function areaStartCollection() {
+            areaState = { collecting: true, points: [], hullEdges: [], M_A: null, M_M: null, M_U: null };
+            document.getElementById('area-calc-btn').classList.remove('hidden');
+            document.getElementById('area-output-text').value = [
+                "Sammle Koordinaten mit der Maus!",
+                "",
+                "Sammeln beenden und Berechnung starten:",
+                "Drücke ENTER, Rechtsklick oder den grünen Button oben."
+            ].join("\n");
+            drawAreaCanvas();
+        }
+
+        function formatNum(val) {
+            return Number(Math.round(val * 100) / 100).toString();
+        }
+
+        function areaFinishAndCalculate() {
+            areaState.collecting = false;
+            document.getElementById('area-calc-btn').classList.add('hidden');
+
+            const pts = areaState.points;
+            if (pts.length < 3) {
+                document.getElementById('area-output-text').value = [
+                    "Zu wenige Punkte ausgewählt!",
+                    `Es wurden nur ${pts.length} Punkte gesetzt.`,
+                    "Bitte mindestens 3 Punkte klicken."
+                ].join("\n");
+                drawAreaCanvas();
+                return;
+            }
+
+            const res = solveGeometry2D(pts);
+            areaState.hullEdges = res.hullEdges;
+            areaState.M_A = res.M_A;
+            areaState.M_M = res.M_M;
+            areaState.M_U = res.M_U;
+
+            const lines = ["Die Koordinaten der Punkte:"];
+            pts.forEach((p, idx) => {
+                lines.push(`P${idx + 1} = (${formatNum(p.x)} / ${formatNum(p.y)})`);
+            });
+
+            lines.push(
+                "",
+                `Flächeninhalt des umspannenden ${res.aussenCnt}-Ecks:`,
+                `${formatNum(res.Flaeche)}`,
+                "",
+                `Die ${res.aussenCnt} aussen liegenden Punkte:`,
+                formatPointList(res.outerIndices),
+                "",
+                "Die Punkte, die auf dem Umkreis",
+                `(M = (${formatNum(res.M_U.x)} / ${formatNum(res.M_U.y)}), r = ${formatNum(res.M_U.r)}) liegen:`,
+                formatPointList(res.randIndizes),
+                "",
+                "Die Mittelpunkte:",
+                `M_U = (${formatNum(res.M_U.x)} / ${formatNum(res.M_U.y)}), r = ${formatNum(res.M_U.r)}`,
+                `M_A = (${formatNum(res.M_A.x)} / ${formatNum(res.M_A.y)})`,
+                `M_M = (${formatNum(res.M_M.x)} / ${formatNum(res.M_M.y)})`
+            );
+
+            document.getElementById('area-output-text').value = lines.join("\n");
+            drawAreaCanvas();
+        }
+
+        drawAreaCanvas();
+    </script>
+</body>
+</html>
