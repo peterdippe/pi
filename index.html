@@ -416,6 +416,23 @@
         #mapsMathContainer { height: 540px; width: 100%; border-radius: 14px; border: 2px solid var(--border-sand); z-index: 10; cursor: crosshair; }
         #dominanzMapContainer { height: 560px; width: 100%; border-radius: 14px; border: 2px solid var(--border-sand); z-index: 10; }
 
+        /* Berg-Atlas: Marker & Bezugsgipfel */
+        .domPeakDot { border-radius: 50%; background: #10b981; border: 2px solid #065f46; box-shadow: 0 0 0 1px #fff; }
+        .domPeakDot.active { background: #fbbf24; border-color: #d97706; }
+        .domHigherPeak { display: flex; align-items: center; justify-content: center; }
+        .domHigherCore { display: block; width: 16px; height: 16px; border-radius: 50%; background: #ef4444; border: 3px solid #fff; box-shadow: 0 0 0 2px #ef4444; animation: domPulse 1.1s ease-in-out infinite; }
+        @keyframes domPulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.35); opacity: .65; } }
+        .domHigherTip { font-weight: 700; }
+        .dom-higher-btn {
+            width: 100%; text-align: left; cursor: pointer; border: 2px solid #ef4444;
+            background: #fef2f2; color: #991b1b; font-family: inherit; font-weight: 800;
+            font-size: 13.5px; padding: 11px 13px; border-radius: 12px; transition: all .18s ease;
+            display: flex; align-items: center; justify-content: space-between; gap: 8px;
+        }
+        .dom-higher-btn:hover { background: #ef4444; color: #fff; transform: translateY(-1px); }
+        .dom-higher-btn .dom-higher-h { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 12px; opacity: .85; }
+        .dom-note { font-size: 11.8px; color: #64748b; line-height: 1.5; margin: 7px 0 0; }
+
         /* Tetris */
         .tetris-shell { background: linear-gradient(135deg, #0b1b17, #122d25); color: var(--text-cream); }
         .tetris-options { display:flex; flex-wrap:wrap; align-items:center; gap:14px; padding:12px 14px; margin-bottom:16px; background:rgba(255,255,255,0.06); border:1px solid var(--border-green); border-radius:12px; font-size:13px; }
@@ -1238,7 +1255,7 @@ Das umschließende Polygon, der kleinste Umkreis nach Welzl sowie die Mittelpunk
             </div>
 
             <div class="sand-card">
-                <!-- Obere Steuerleiste: Kartenwahl & Live-Klick-Modus -->
+                <!-- Obere Steuerleiste -->
                 <div class="toolbar-box" style="margin-bottom:16px;">
                     <div style="display:flex; flex-wrap:wrap; align-items:center; gap:6px;">
                         <strong style="font-size:12.5px; margin-right:4px;">Kartenansicht:</strong>
@@ -1247,104 +1264,36 @@ Das umschließende Polygon, der kleinste Umkreis nach Welzl sowie die Mittelpunk
                         <button onclick="setDominanzLayer('google-sat')" id="dom-layer-google-sat" class="layer-btn">Google Satellit</button>
                         <button onclick="setDominanzLayer('google-streets')" id="dom-layer-google-streets" class="layer-btn">Google Straßen</button>
                     </div>
-
                     <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
-                        <button class="btn btn-emerald" style="padding:8px 14px; font-size:12.5px;" onclick="openDominanzInfo()">
-                            ❓ Was ist Dominanz?
-                        </button>
-                        <button id="dom-custom-mode-btn" class="btn btn-amber" style="padding:8px 14px; font-size:12.5px;" onclick="toggleDominanzCustomClick()">
-                            📍 Eigenen Punkt auf Karte testen: AUS
-                        </button>
+                        <label style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; cursor:pointer;">
+                            <input type="checkbox" id="dom-show-circle" checked> <span id="dom-circle-label">Dominanzradius</span>
+                        </label>
+                        <button class="btn btn-emerald" style="padding:8px 14px; font-size:12.5px;" onclick="openDominanzInfo()">❓ Was ist Dominanz?</button>
+                        <button class="btn btn-dark" style="padding:8px 12px; font-size:12.5px;" onclick="dominanzWorldView()">🌍 Weltansicht</button>
                     </div>
                 </div>
 
-                <!-- Region-Auswahl: Kontinent -> Land. Auswahl zoomt die Karte passend. -->
-                <div class="toolbar-box" style="margin-bottom:16px; gap:10px;">
-                    <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
-                        <strong style="font-size:12.5px; margin-right:4px;">Region wählen:</strong>
-                        <select id="dom-continent-select" class="form-input" style="max-width:200px;" onchange="onContinentChange()"></select>
-                        <select id="dom-country-select" class="form-input" style="max-width:200px;" onchange="onCountryChange()"></select>
-                    </div>
-                    <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
-                        <span class="badge" id="dom-zoom-badge" style="background:#065f46; color:#fff;">Zoom: 5</span>
-                        <span class="badge" id="dom-visible-badge" style="background:#92400e; color:#fff;">Sichtbar: 0 Gipfel</span>
-                    </div>
+                <div style="font-size:11.5px; color:#64748b; margin-bottom:12px;">
+                    <span id="dom-count">lade Gipfel …</span> · Daten aus Wikidata/Wikipedia · Start: Zugspitze
                 </div>
 
-                <!-- Farblegende: Punktfarbe & -groesse nach Berghoehe -->
-                <div class="dom-legend" id="dom-legend">
-                    <strong style="font-size:12px; margin-right:4px;">Legende (Höhe ü. NHN):</strong>
-                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#dc2626; width:16px; height:16px;"></span> &ge; 4000 m</span>
-                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#ea580c; width:14px; height:14px;"></span> 2000–4000 m</span>
-                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#d97706; width:12px; height:12px;"></span> 1000–2000 m</span>
-                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#059669; width:10px; height:10px;"></span> 500–1000 m</span>
-                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#0d9488; width:8px; height:8px;"></span> &lt; 500 m</span>
-                    <span class="dom-legend-hint">Gipfel werden live aus OpenStreetMap geladen – beim Reinzoomen erscheinen auch kleinere.</span>
-                </div>
-
-                <!-- Hauptbereich: Links Karte, Rechts Gipfel-Details & Suche -->
+                <!-- Hauptbereich: Links Karte, Rechts Suche & Gipfel-Details -->
                 <div class="dominanz-layout">
                     <!-- Karte -->
                     <div>
                         <div id="dominanzMapContainer"></div>
+                        <div id="dom-status" style="font-size:12px; color:#b45309; margin-top:8px; min-height:16px;"></div>
                     </div>
 
-                    <!-- Rechte Spalte: Aktiver Gipfel + Durchsuchbare Gipfelliste -->
+                    <!-- Rechte Spalte: Suche + aktiver Gipfel -->
                     <div style="display:flex; flex-direction:column; gap:14px;">
-                        
-                        <!-- Info-Box zum ausgewählten Berg -->
-                        <div id="dom-info-card" style="background:#fff; border:2px solid var(--emerald-dark); border-radius:16px; padding:16px;">
-                            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-                                <span class="eyebrow-dark" id="dom-peak-region">Sächsische Schweiz</span>
-                                <span class="badge" style="background:#059669; color:#fff; font-size:11px;" id="dom-peak-coords">50.930° N, 14.084° O</span>
-                            </div>
-                            <h3 style="font-size:24px; font-weight:800; margin:4px 0 12px;" id="dom-peak-name">Lilienstein</h3>
-
-                            <div class="person-grid-2" style="margin:0 0 10px;">
-                                <div class="person-box" style="background:#ecfdf5; border-color:#a7f3d0;">
-                                    <span class="person-role">Höhe ü. NHN</span>
-                                    <div class="person-name" style="font-size:18px;" id="dom-peak-elev">415 m</div>
-                                </div>
-                                <div class="person-box" style="background:#fffbeb; border-color:#fde68a;">
-                                    <span class="person-role" style="color:var(--amber);">Dominanz (Radius)</span>
-                                    <div class="person-name" style="font-size:18px;" id="dom-peak-dom">4,6 km</div>
-                                </div>
-                            </div>
-
-                            <div class="person-grid-2" style="margin:0;">
-                                <div class="person-box">
-                                    <span class="person-role">Schartenhöhe</span>
-                                    <div class="person-name" id="dom-peak-prom">165 m</div>
-                                </div>
-                                <div class="person-box">
-                                    <span class="person-role">Dominanz-Fläche</span>
-                                    <div class="person-name" id="dom-peak-area">66,5 km²</div>
-                                </div>
-                            </div>
-
-                            <div style="margin-top:10px; padding:9px 12px; border-radius:10px; background:var(--bg-sand-light); font-size:12.5px;">
-                                🎯 <strong>Nächsthöherer Bezugspunkt:</strong> <span id="dom-peak-ref">Waitzdorfer Höhe (423 m)</span>
-                            </div>
-
-                            <!-- Wikipedia-Kurzbeschreibung + Link -->
-                            <div style="margin-top:12px; border-top:1px dashed var(--border-sand); padding-top:11px;">
-                                <span class="eyebrow-dark" style="display:block; margin-bottom:5px;">📖 Aus Wikipedia</span>
-                                <p id="dom-peak-wiki" style="font-size:12.8px; line-height:1.55; color:#334155; margin:0 0 8px;">Lade Kurzbeschreibung …</p>
-                                <a id="dom-peak-wiki-link" href="#" target="_blank" rel="noopener" class="btn btn-dark" style="font-size:12px; padding:7px 12px;">Zum Wikipedia-Artikel ↗</a>
-                            </div>
-                        </div>
-
-                        <!-- Filter & Gipfelliste -->
+                        <!-- Suche: filtert geladene Gipfel + Wikidata-Online-Suche -->
                         <div style="background:var(--bg-sand-light); border:1px solid var(--border-sand); border-radius:16px; padding:14px;">
-                            <div style="display:flex; gap:8px; margin-bottom:10px;">
-                                <input type="text" id="dom-search-input" class="form-input" placeholder="🔍 Berg, Land oder Region suchen..." oninput="renderDominanzList()">
-                            </div>
-                            <div style="font-size:11.5px; color:#64748b; margin-bottom:8px;">
-                                Die Liste folgt der Regionsauswahl oben. Tipp: Je weiter du in die Karte hineinzoomst, desto kleinere Gipfel tauchen auf.
-                            </div>
-                            <div id="dom-peak-list" class="peak-list"></div>
+                            <input type="text" id="dom-search-input" class="form-input" placeholder="🔍 Berg suchen (weltweit, z. B. Fuji, Denali …)" autocomplete="off">
+                            <div id="dom-results" class="peak-list" style="margin-top:10px;"></div>
                         </div>
-
+                        <!-- Info-Box zum ausgewählten Berg (inkl. anklickbarem Nächsthöherem) -->
+                        <div id="dom-detail" style="background:#fff; border:2px solid var(--emerald-dark); border-radius:16px; padding:16px;"></div>
                     </div>
                 </div>
             </div>
@@ -1371,9 +1320,13 @@ Das umschließende Polygon, der kleinste Umkreis nach Welzl sowie die Mittelpunk
                         wenige Kilometer.
                     </p>
                     <p style="font-size:13px; color:#475569;">
-                        Verwandte Begriffe: die <em>Schartenhöhe</em> (Prominenz) misst den
-                        Höhenunterschied zur tiefsten Einschartung, die <em>Dominanz</em> die
-                        horizontale Distanz.
+                        In dieser Karte reicht der Kreis genau bis zum <strong>Bezugsgipfel</strong>
+                        (dem nächsthöheren Berg) – sein Radius ist der Abstand zwischen den
+                        beiden Gipfeln. Der eigentliche Dominanzwert steht separat in der
+                        Infokarte und kann kleiner sein, weil der gleich hohe Geländepunkt
+                        meist am Hang liegt. Über das rote Feld
+                        „Nächsthöherer Berg“ kannst du dich Schritt für Schritt nach oben
+                        klicken – am Ende landest du beim Mount Everest.
                     </p>
                     <p style="margin-bottom:4px;">
                         🔗 Mehr dazu bei Wikipedia:
@@ -1915,352 +1868,81 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         }
 
         // -----------------------------------------------------------------
-        // 6. BERG-DOMINANZ-ATLAS (GIPFEL, DOMINANZ-KREIS & LIVE-HÖHENABFRAGE)
+        // 6. BERG-DOMINANZ-ATLAS (Wikidata/Wikipedia, Start = Zugspitze)
         // -----------------------------------------------------------------
-        // Berg-Datenbank. Jeder Gipfel: continent -> country -> region Hierarchie.
-        // wiki = Titel des deutschen Wikipedia-Artikels (fuer Kurzbeschreibung + Link).
-        const PEAK_DB = [
-            // === EUROPA / Deutschland / Sächsische Schweiz ===
-            { id: 'lilienstein', name: 'Lilienstein', continent: 'Europa', country: 'Deutschland', region: 'Sächsische Schweiz', lat: 50.9303, lng: 14.0844, elev: 415, prom: 165, dom: 4.6, refName: 'Waitzdorfer Höhe (423 m)', refLat: 50.9610, refLng: 14.1290, wiki: 'Lilienstein' },
-            { id: 'koenigstein', name: 'Festung Königstein', continent: 'Europa', country: 'Deutschland', region: 'Sächsische Schweiz', lat: 50.9192, lng: 14.0567, elev: 360, prom: 115, dom: 1.9, refName: 'Lilienstein (415 m)', refLat: 50.9303, refLng: 14.0844, wiki: 'Festung Königstein' },
-            { id: 'pfaffenstein', name: 'Pfaffenstein', continent: 'Europa', country: 'Deutschland', region: 'Sächsische Schweiz', lat: 50.8994, lng: 14.0794, elev: 435, prom: 135, dom: 3.1, refName: 'Großer Zschirnstein-Massiv', refLat: 50.8690, refLng: 14.1510, wiki: 'Pfaffenstein (Sächsische Schweiz)' },
-            { id: 'gohrisch', name: 'Gohrisch', continent: 'Europa', country: 'Deutschland', region: 'Sächsische Schweiz', lat: 50.9039, lng: 14.1114, elev: 448, prom: 118, dom: 2.3, refName: 'Papststein (451 m)', refLat: 50.9006, refLng: 14.1286, wiki: 'Gohrisch (Berg)' },
-            { id: 'papststein', name: 'Papststein', continent: 'Europa', country: 'Deutschland', region: 'Sächsische Schweiz', lat: 50.9006, lng: 14.1286, elev: 451, prom: 110, dom: 2.8, refName: 'Katzstein (474 m)', refLat: 50.8760, refLng: 14.1390, wiki: 'Papststein' },
-            { id: 'zschirnstein', name: 'Großer Zschirnstein', continent: 'Europa', country: 'Deutschland', region: 'Sächsische Schweiz', lat: 50.8542, lng: 14.1764, elev: 560, prom: 170, dom: 6.4, refName: 'Hoher Schneeberg (723 m)', refLat: 50.7931, refLng: 14.1069, wiki: 'Großer Zschirnstein' },
-            { id: 'winterberg', name: 'Großer Winterberg', continent: 'Europa', country: 'Deutschland', region: 'Sächsische Schweiz', lat: 50.8961, lng: 14.2594, elev: 556, prom: 192, dom: 9.8, refName: 'Rosenberg / Růžovský vrch (619 m)', refLat: 50.8333, refLng: 14.3311, wiki: 'Großer Winterberg' },
-            { id: 'kaiserkrone', name: 'Zirkelstein', continent: 'Europa', country: 'Deutschland', region: 'Sächsische Schweiz', lat: 50.8703, lng: 14.2383, elev: 384, prom: 90, dom: 1.4, refName: 'Kaiserkrone (351 m) / Winterberg', refLat: 50.8961, refLng: 14.2594, wiki: 'Zirkelstein' },
-            { id: 'rauenstein', name: 'Rauenstein', continent: 'Europa', country: 'Deutschland', region: 'Sächsische Schweiz', lat: 50.9253, lng: 14.0211, elev: 304, prom: 80, dom: 1.6, refName: 'Lilienstein (415 m)', refLat: 50.9303, refLng: 14.0844, wiki: 'Rauenstein (Sächsische Schweiz)' },
-            { id: 'barbarine', name: 'Pfaffenstein / Barbarine', continent: 'Europa', country: 'Deutschland', region: 'Sächsische Schweiz', lat: 50.8980, lng: 14.0810, elev: 426, prom: 40, dom: 0.3, refName: 'Pfaffenstein-Hauptmasse', refLat: 50.8994, refLng: 14.0794, wiki: 'Barbarine' },
-
-            // === EUROPA / Deutschland / Erzgebirge ===
-            { id: 'kahleberg', name: 'Kahleberg (Altenberg)', continent: 'Europa', country: 'Deutschland', region: 'Erzgebirge', lat: 50.7514, lng: 13.7331, elev: 905, prom: 175, dom: 16.5, refName: 'Loučná / Wieselstein (956 m)', refLat: 50.6483, refLng: 13.6106, wiki: 'Kahleberg' },
-            { id: 'fichtelberg', name: 'Fichtelberg', continent: 'Europa', country: 'Deutschland', region: 'Erzgebirge', lat: 50.4286, lng: 12.9542, elev: 1215, prom: 135, dom: 3.7, refName: 'Keilberg / Klínovec (1244 m)', refLat: 50.3958, refLng: 12.9678, wiki: 'Fichtelberg' },
-            { id: 'auersberg', name: 'Auersberg', continent: 'Europa', country: 'Deutschland', region: 'Erzgebirge', lat: 50.4967, lng: 12.7000, elev: 1019, prom: 160, dom: 12.0, refName: 'Fichtelberg (1215 m)', refLat: 50.4286, refLng: 12.9542, wiki: 'Auersberg (Erzgebirge)' },
-
-            // === EUROPA / Deutschland / Zittauer Gebirge, Harz, Bayern, Schwarzwald, Alpen (DE) ===
-            { id: 'lausche', name: 'Lausche (Zittauer Gebirge)', continent: 'Europa', country: 'Deutschland', region: 'Zittauer Gebirge', lat: 50.8489, lng: 14.6469, elev: 793, prom: 398, dom: 23.4, refName: 'Jeschken / Ještěd (1012 m)', refLat: 50.7328, refLng: 14.9850, wiki: 'Lausche' },
-            { id: 'brocken', name: 'Brocken (Harz)', continent: 'Europa', country: 'Deutschland', region: 'Harz', lat: 51.7992, lng: 10.6156, elev: 1141, prom: 856, dom: 224.0, refName: 'Fichtelberg (1215 m)', refLat: 50.4286, refLng: 12.9542, wiki: 'Brocken' },
-            { id: 'wurmberg', name: 'Wurmberg', continent: 'Europa', country: 'Deutschland', region: 'Harz', lat: 51.7583, lng: 10.6186, elev: 971, prom: 110, dom: 5.0, refName: 'Brocken (1141 m)', refLat: 51.7992, refLng: 10.6156, wiki: 'Wurmberg' },
-            { id: 'arber', name: 'Großer Arber', continent: 'Europa', country: 'Deutschland', region: 'Bayerischer Wald', lat: 49.1125, lng: 13.1361, elev: 1456, prom: 1031, dom: 146.5, refName: 'Alpenrand (Chiemgauer Alpen)', refLat: 47.7050, refLng: 12.3300, wiki: 'Großer Arber' },
-            { id: 'feldberg', name: 'Feldberg (Schwarzwald)', continent: 'Europa', country: 'Deutschland', region: 'Schwarzwald', lat: 47.8739, lng: 8.0036, elev: 1493, prom: 929, dom: 97.0, refName: 'Schweizer Voralpen (Rossberg)', refLat: 47.0810, refLng: 8.5540, wiki: 'Feldberg (Schwarzwald)' },
-            { id: 'belchen', name: 'Belchen (Schwarzwald)', continent: 'Europa', country: 'Deutschland', region: 'Schwarzwald', lat: 47.8217, lng: 7.8339, elev: 1414, prom: 350, dom: 12.0, refName: 'Feldberg (1493 m)', refLat: 47.8739, refLng: 8.0036, wiki: 'Belchen (Schwarzwald)' },
-            { id: 'zugspitze', name: 'Zugspitze', continent: 'Europa', country: 'Deutschland', region: 'Bayerische Alpen', lat: 47.4211, lng: 10.9853, elev: 2962, prom: 1746, dom: 25.8, refName: 'Acherkogel (3008 m, Ötztaler Alpen)', refLat: 47.1892, refLng: 10.9558, wiki: 'Zugspitze' },
-            { id: 'watzmann', name: 'Watzmann', continent: 'Europa', country: 'Deutschland', region: 'Bayerische Alpen', lat: 47.5550, lng: 12.9230, elev: 2713, prom: 1151, dom: 14.4, refName: 'Hochkönig (2941 m)', refLat: 47.4206, refLng: 13.0617, wiki: 'Watzmann' },
-
-            // === EUROPA / Österreich ===
-            { id: 'grossglockner', name: 'Großglockner', continent: 'Europa', country: 'Österreich', region: 'Hohe Tauern', lat: 47.0744, lng: 12.6939, elev: 3798, prom: 2428, dom: 175.0, refName: 'Piz Bernina-Gebiet', refLat: 46.3828, refLng: 9.9083, wiki: 'Großglockner' },
-            { id: 'grossvenediger', name: 'Großvenediger', continent: 'Europa', country: 'Österreich', region: 'Hohe Tauern', lat: 47.1092, lng: 12.3464, elev: 3657, prom: 1165, dom: 11.0, refName: 'Großglockner (3798 m)', refLat: 47.0744, refLng: 12.6939, wiki: 'Großvenediger' },
-            { id: 'wildspitze', name: 'Wildspitze', continent: 'Europa', country: 'Österreich', region: 'Ötztaler Alpen', lat: 46.8858, lng: 10.8672, elev: 3768, prom: 2261, dom: 15.0, refName: 'Piz Zupò (3996 m)', refLat: 46.3708, refLng: 9.9208, wiki: 'Wildspitze' },
-
-            // === EUROPA / Schweiz ===
-            { id: 'montblanc', name: 'Mont Blanc', continent: 'Europa', country: 'Frankreich', region: 'Grajische Alpen', lat: 45.8325, lng: 6.8644, elev: 4805, prom: 4697, dom: 2812.0, refName: 'Kaukasus (Elbrus-Region)', refLat: 43.3550, refLng: 42.4392, wiki: 'Mont Blanc' },
-            { id: 'dufourspitze', name: 'Dufourspitze (Monte Rosa)', continent: 'Europa', country: 'Schweiz', region: 'Walliser Alpen', lat: 45.9369, lng: 7.8669, elev: 4634, prom: 2165, dom: 78.0, refName: 'Mont Blanc (4805 m)', refLat: 45.8325, refLng: 6.8644, wiki: 'Dufourspitze' },
-            { id: 'matterhorn', name: 'Matterhorn', continent: 'Europa', country: 'Schweiz', region: 'Walliser Alpen', lat: 45.9763, lng: 7.6586, elev: 4478, prom: 1042, dom: 13.9, refName: 'Weisshorn (4506 m)', refLat: 46.1019, refLng: 7.7169, wiki: 'Matterhorn' },
-            { id: 'jungfrau', name: 'Jungfrau', continent: 'Europa', country: 'Schweiz', region: 'Berner Alpen', lat: 46.5367, lng: 7.9625, elev: 4158, prom: 695, dom: 12.0, refName: 'Finsteraarhorn (4274 m)', refLat: 46.5372, refLng: 8.1261, wiki: 'Jungfrau' },
-            { id: 'piz_bernina', name: 'Piz Bernina', continent: 'Europa', country: 'Schweiz', region: 'Bernina-Gruppe', lat: 46.3828, lng: 9.9083, elev: 4049, prom: 2234, dom: 138.0, refName: 'Mont Blanc (4805 m)', refLat: 45.8325, refLng: 6.8644, wiki: 'Piz Bernina' },
-
-            // === EUROPA / weitere Länder ===
-            { id: 'schneekoppe', name: 'Schneekoppe (Śnieżka)', continent: 'Europa', country: 'Tschechien', region: 'Riesengebirge', lat: 50.7361, lng: 15.7397, elev: 1603, prom: 1203, dom: 290.0, refName: 'Hohe Tatra (Rysy)', refLat: 49.1795, refLng: 20.0881, wiki: 'Schneekoppe' },
-            { id: 'klinovec', name: 'Keilberg (Klínovec)', continent: 'Europa', country: 'Tschechien', region: 'Erzgebirge', lat: 50.3958, lng: 12.9678, elev: 1244, prom: 748, dom: 133.0, refName: 'Großer Arber (1456 m)', refLat: 49.1125, refLng: 13.1361, wiki: 'Klínovec' },
-            { id: 'gerlach', name: 'Gerlachovský štít', continent: 'Europa', country: 'Slowakei', region: 'Hohe Tatra', lat: 49.1636, lng: 20.1339, elev: 2655, prom: 2355, dom: 400.0, refName: 'Alpen (Großglockner)', refLat: 47.0744, refLng: 12.6939, wiki: 'Gerlachovský štít' },
-            { id: 'rysy', name: 'Rysy', continent: 'Europa', country: 'Polen', region: 'Hohe Tatra', lat: 49.1795, lng: 20.0881, elev: 2503, prom: 203, dom: 7.0, refName: 'Gerlachovský štít (2655 m)', refLat: 49.1636, refLng: 20.1339, wiki: 'Rysy' },
-            { id: 'mulhacen', name: 'Mulhacén', continent: 'Europa', country: 'Spanien', region: 'Sierra Nevada', lat: 37.0531, lng: -3.3111, elev: 3479, prom: 3285, dom: 1142.0, refName: 'Alpen (Mont Blanc)', refLat: 45.8325, refLng: 6.8644, wiki: 'Mulhacén' },
-            { id: 'etna', name: 'Ätna', continent: 'Europa', country: 'Italien', region: 'Sizilien', lat: 37.7510, lng: 14.9934, elev: 3357, prom: 3357, dom: 560.0, refName: 'Apennin / Alpen', refLat: 42.4719, refLng: 13.5664, wiki: 'Ätna' },
-            { id: 'olympus', name: 'Olymp (Mytikas)', continent: 'Europa', country: 'Griechenland', region: 'Olymp-Massiv', lat: 40.0885, lng: 22.3586, elev: 2918, prom: 2353, dom: 280.0, refName: 'Alpen', refLat: 46.5367, refLng: 7.9625, wiki: 'Olymp (Berg)' },
-            { id: 'galdhopiggen', name: 'Galdhøpiggen', continent: 'Europa', country: 'Norwegen', region: 'Jotunheimen', lat: 61.6361, lng: 8.3125, elev: 2469, prom: 2372, dom: 1570.0, refName: 'Alpen (Mont Blanc)', refLat: 45.8325, refLng: 6.8644, wiki: 'Galdhøpiggen' },
-            { id: 'bennevis', name: 'Ben Nevis', continent: 'Europa', country: 'Vereinigtes Königreich', region: 'Grampian Mountains', lat: 56.7969, lng: -5.0036, elev: 1345, prom: 1345, dom: 739.0, refName: 'Skandinavisches Gebirge', refLat: 61.6361, refLng: 8.3125, wiki: 'Ben Nevis' },
-            { id: 'elbrus', name: 'Elbrus', continent: 'Europa', country: 'Russland', region: 'Kaukasus', lat: 43.3550, lng: 42.4392, elev: 5642, prom: 4741, dom: 2473.0, refName: 'Damāvand (5610 m, Asien)', refLat: 35.9550, refLng: 52.1100, wiki: 'Elbrus' },
-
-            // === ASIEN ===
-            { id: 'everest', name: 'Mount Everest', continent: 'Asien', country: 'Nepal', region: 'Himalaya', lat: 27.9881, lng: 86.9250, elev: 8849, prom: 8849, dom: 0.0, refName: 'Höchster Punkt der Erde', refLat: 27.9881, refLng: 86.9250, wiki: 'Mount Everest' },
-            { id: 'k2', name: 'K2', continent: 'Asien', country: 'Pakistan', region: 'Karakorum', lat: 35.8800, lng: 76.5131, elev: 8611, prom: 4020, dom: 1316.0, refName: 'Mount Everest (8849 m)', refLat: 27.9881, refLng: 86.9250, wiki: 'K2' },
-            { id: 'kangchen', name: 'Kangchendzönga', continent: 'Asien', country: 'Nepal', region: 'Himalaya', lat: 27.7025, lng: 88.1475, elev: 8586, prom: 3922, dom: 124.0, refName: 'Mount Everest (8849 m)', refLat: 27.9881, refLng: 86.9250, wiki: 'Kangchendzönga' },
-            { id: 'damavand', name: 'Damāvand', continent: 'Asien', country: 'Iran', region: 'Elburs-Gebirge', lat: 35.9550, lng: 52.1100, elev: 5610, prom: 4667, dom: 2740.0, refName: 'Hindukusch (Noshaq)', refLat: 36.4342, refLng: 71.8278, wiki: 'Damavand' },
-            { id: 'fuji', name: 'Fuji', continent: 'Asien', country: 'Japan', region: 'Honshū', lat: 35.3606, lng: 138.7274, elev: 3776, prom: 3776, dom: 2077.0, refName: 'Festland-Asien', refLat: 42.0000, refLng: 128.0000, wiki: 'Fuji (Vulkan)' },
-
-            // === AFRIKA ===
-            { id: 'kilimanjaro', name: 'Kilimandscharo (Kibo)', continent: 'Afrika', country: 'Tansania', region: 'Kilimandscharo-Massiv', lat: -3.0758, lng: 37.3533, elev: 5895, prom: 5885, dom: 5510.0, refName: 'Kaukasus (Elbrus)', refLat: 43.3550, refLng: 42.4392, wiki: 'Kilimandscharo' },
-            { id: 'mount_kenya', name: 'Mount Kenya (Batian)', continent: 'Afrika', country: 'Kenia', region: 'Mount-Kenya-Massiv', lat: -0.1522, lng: 37.3083, elev: 5199, prom: 3825, dom: 323.0, refName: 'Kilimandscharo (5895 m)', refLat: -3.0758, refLng: 37.3533, wiki: 'Mount Kenya' },
-            { id: 'toubkal', name: 'Toubkal', continent: 'Afrika', country: 'Marokko', region: 'Hoher Atlas', lat: 31.0603, lng: -7.9147, elev: 4167, prom: 3755, dom: 2070.0, refName: 'Alpen (Teide / Sierra Nevada)', refLat: 28.2724, refLng: -16.6425, wiki: 'Toubkal' },
-            { id: 'teide', name: 'Pico del Teide', continent: 'Afrika', country: 'Spanien', region: 'Kanarische Inseln', lat: 28.2724, lng: -16.6425, elev: 3715, prom: 3715, dom: 894.0, refName: 'Atlasgebirge (Toubkal)', refLat: 31.0603, refLng: -7.9147, wiki: 'Pico del Teide' },
-
-            // === NORDAMERIKA ===
-            { id: 'denali', name: 'Denali', continent: 'Nordamerika', country: 'USA', region: 'Alaska Range', lat: 63.0692, lng: -151.0070, elev: 6190, prom: 6144, dom: 7450.0, refName: 'Aconcagua (6961 m)', refLat: -32.6533, refLng: -70.0109, wiki: 'Denali' },
-            { id: 'whitney', name: 'Mount Whitney', continent: 'Nordamerika', country: 'USA', region: 'Sierra Nevada (USA)', lat: 36.5785, lng: -118.2923, elev: 4421, prom: 3072, dom: 1646.0, refName: 'Denali (6190 m)', refLat: 63.0692, refLng: -151.0070, wiki: 'Mount Whitney' },
-            { id: 'rainier', name: 'Mount Rainier', continent: 'Nordamerika', country: 'USA', region: 'Kaskadenkette', lat: 46.8523, lng: -121.7603, elev: 4392, prom: 4023, dom: 1183.0, refName: 'Mount Whitney (4421 m)', refLat: 36.5785, refLng: -118.2923, wiki: 'Mount Rainier' },
-            { id: 'orizaba', name: 'Pico de Orizaba', continent: 'Nordamerika', country: 'Mexiko', region: 'Transmexikanisches Vulkanband', lat: 19.0300, lng: -97.2683, elev: 5636, prom: 4922, dom: 2430.0, refName: 'Denali (6190 m)', refLat: 63.0692, refLng: -151.0070, wiki: 'Pico de Orizaba' },
-
-            // === SÜDAMERIKA ===
-            { id: 'aconcagua', name: 'Aconcagua', continent: 'Südamerika', country: 'Argentinien', region: 'Anden', lat: -32.6533, lng: -70.0109, elev: 6961, prom: 6961, dom: 16520.0, refName: 'Mount Everest (8849 m)', refLat: 27.9881, refLng: 86.9250, wiki: 'Aconcagua' },
-            { id: 'chimborazo', name: 'Chimborazo', continent: 'Südamerika', country: 'Ecuador', region: 'Anden', lat: -1.4692, lng: -78.8175, elev: 6263, prom: 4118, dom: 575.0, refName: 'Huascarán (6768 m)', refLat: -9.1217, refLng: -77.6042, wiki: 'Chimborazo' },
-            { id: 'huascaran', name: 'Huascarán', continent: 'Südamerika', country: 'Peru', region: 'Cordillera Blanca', lat: -9.1217, lng: -77.6042, elev: 6768, prom: 2776, dom: 740.0, refName: 'Aconcagua (6961 m)', refLat: -32.6533, refLng: -70.0109, wiki: 'Huascarán' },
-
-            // === OZEANIEN / ANTARKTIS ===
-            { id: 'kosciuszko', name: 'Mount Kosciuszko', continent: 'Ozeanien', country: 'Australien', region: 'Snowy Mountains', lat: -36.4558, lng: 148.2636, elev: 2228, prom: 2228, dom: 2470.0, refName: 'Puncak Jaya', refLat: -4.0833, refLng: 137.1833, wiki: 'Mount Kosciuszko' },
-            { id: 'cook', name: 'Aoraki / Mount Cook', continent: 'Ozeanien', country: 'Neuseeland', region: 'Südalpen', lat: -43.5950, lng: 170.1419, elev: 3724, prom: 3724, dom: 2000.0, refName: 'Mount Kosciuszko', refLat: -36.4558, refLng: 148.2636, wiki: 'Aoraki/Mount Cook' },
-            { id: 'vinson', name: 'Mount Vinson', continent: 'Antarktis', country: 'Antarktis', region: 'Ellsworthgebirge', lat: -78.5254, lng: -85.6171, elev: 4892, prom: 4892, dom: 4900.0, refName: 'Aconcagua (6961 m)', refLat: -32.6533, refLng: -70.0109, wiki: 'Mount Vinson' }
-        ];
-
-        // Ungefaehre Zentren/Zoomstufen fuer Regionen (fuer "passenden Ausschnitt")
-        // Fallback: wenn nicht vorhanden, werden Grenzen aus den Gipfeln berechnet.
+        // Datenquelle: peaks.json (weltweite Gipfel mit Dominanz aus Wikidata),
+        // liegt als Datei neben der index.html. Robust auf http wie https.
+        const domEsc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        const domNum = (n, d = 0) => n == null ? '–' : new Intl.NumberFormat('de-DE', { maximumFractionDigits: d }).format(n);
+        const domNorm = s => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
         let dominanzMap = null;
         let dominanzLayers = {};
-        let dominanzOverlayGroup = null;
-        let dominanzMarkerGroup = null;
-        let selectedPeakId = 'lilienstein';
-        let dominanzCustomClickMode = false;
-        const wikiCache = {};  // Zwischenspeicher fuer Wikipedia-Kurzbeschreibungen
-
-        // --- Live-Gipfeldaten aus OpenStreetMap (Overpass) ---
-        // livePeaks: aktuell im Kartenausschnitt geladene Gipfel (dynamisch).
-        // peakCache: schon aufgeloeste Gipfel (per osm-id), damit Auswahl/Klick stabil bleibt.
-        let livePeaks = [];
-        const peakCache = {};
-        let selectedPeak = null;      // aktuell gewaehltes Gipfel-Objekt (DB oder live)
-        let liveLoadToken = 0;        // verwirft veraltete Antworten
-        let liveLoadTimer = null;     // Debounce fuer moveend/zoomend
-        // Protokoll-relative URLs: auf einer http-Seite wird http genutzt (kein
-        // Mixed-Content-Block am Handy), auf https entsprechend https.
-        const OVERPASS_ENDPOINTS = [
-            '//overpass-api.de/api/interpreter',
-            '//overpass.kumi.systems/api/interpreter',
-            '//maps.mail.ru/osm/tools/overpass/api/interpreter'
-        ];
-        let overpassIdx = 0;
-
-        // Fuege alle kuratierten DB-Gipfel in den Cache ein (stabile Auswahl + Fallback)
-        PEAK_DB.forEach(p => { peakCache['db:' + p.id] = { ...p, key: 'db:' + p.id }; });
-
-        function haversineKm(lat1, lon1, lat2, lon2) {
-            const R = 6371.0;
-            const dLat = (lat2 - lat1) * Math.PI / 180.0;
-            const dLon = (lon2 - lon1) * Math.PI / 180.0;
-            const a = Math.sin(dLat / 2) ** 2 +
-                      Math.cos(lat1 * Math.PI / 180.0) * Math.cos(lat2 * Math.PI / 180.0) * Math.sin(dLon / 2) ** 2;
-            return 2 * R * Math.asin(Math.sqrt(a));
-        }
+        let domPeaks = [];                 // geladene Gipfel (peaks.json + online dazugeholte)
+        let domActive = null;              // aktuell gewaehlter Gipfel
+        let domReference = null;           // aktueller Bezugsgipfel (naechsthoeherer)
+        let domCircle = null;              // Dominanz-/Bezugskreis (Leaflet)
+        let domSelMarker = null;           // Marker des gewaehlten Gipfels
+        let domRefMarker = null;           // Marker des Bezugsgipfels (auf dem Kreis)
+        let domMarkers = null;             // Layergroup der uebrigen Gipfel
+        let domGen = 0, domSearchGen = 0, domSearchTimer = null;
+        let domInitDone = false;
 
         function initDominanzMapIfNeeded() {
             if (dominanzMap || typeof L === 'undefined') return;
-
-            // Voreinstellung: Sachsen / Sächsische Schweiz
-            dominanzMap = L.map('dominanzMapContainer', {
-                center: [50.95, 14.00],
-                zoom: 10
-            });
-
+            dominanzMap = L.map('dominanzMapContainer', { zoomControl: true, minZoom: 2, maxZoom: 17 })
+                           .setView([30, 15], 3);
             dominanzLayers = {
-                'topo': L.tileLayer('//{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-                    maxZoom: 17,
-                    attribution: '© OpenTopoMap'
-                }),
-                'osm': L.tileLayer('//{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    maxZoom: 19,
-                    attribution: '© OpenStreetMap'
-                }),
-                'google-sat': L.tileLayer('//mt1.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
-                    maxZoom: 20,
-                    attribution: '© Google Satellite'
-                }),
-                'google-streets': L.tileLayer('//mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-                    maxZoom: 20,
-                    attribution: '© Google Maps'
-                })
+                'topo': L.tileLayer('//{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, attribution: '© OpenTopoMap (CC-BY-SA), © OpenStreetMap' }),
+                'osm': L.tileLayer('//{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }),
+                'google-sat': L.tileLayer('//mt1.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', { maxZoom: 20, attribution: '© Google Satellite' }),
+                'google-streets': L.tileLayer('//mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 20, attribution: '© Google Maps' })
             };
-
             dominanzLayers['topo'].addTo(dominanzMap);
-            dominanzOverlayGroup = L.layerGroup().addTo(dominanzMap);
-            dominanzMarkerGroup = L.layerGroup().addTo(dominanzMap);
+            domMarkers = L.layerGroup().addTo(dominanzMap);
+            L.control.scale({ imperial: false }).addTo(dominanzMap);
+            dominanzMap.on('moveend', domPaint);
 
-            dominanzMap.on('click', (e) => {
-                if (!dominanzCustomClickMode) return;
-                evaluateCustomDominanzPoint(e.latlng.lat, e.latlng.lng);
-            });
-
-            // Bei jeder Zoom-/Verschiebe-Aktion Gipfel fuer den Ausschnitt live nachladen
-            dominanzMap.on('zoomend moveend', () => {
-                updateDominanzZoomBadge();
-                scheduleLivePeakLoad();
-            });
-
-            buildRegionSelectors();
-            updateDominanzZoomBadge();
-            renderDominanzList();
-            selectDominanzPeak('db:lilienstein', false);
-            // Karte bleibt auf Sachsen; Gipfel direkt live laden
-            scheduleLivePeakLoad();
-        }
-
-        // ---------- Live-Laden der Gipfel aus OpenStreetMap (Overpass) ----------
-        // Debounce: erst 450 ms nach der letzten Karteninteraktion abfragen.
-        function scheduleLivePeakLoad() {
-            clearTimeout(liveLoadTimer);
-            liveLoadTimer = setTimeout(loadLivePeaks, 450);
-        }
-
-        // Wie viele Gipfel duerfen maximal gleichzeitig auf der Karte liegen?
-        // Niedriger Zoom = wenige grosse Berge, hoher Zoom = mehr Details.
-        function maxPeaksForZoom(zoom) {
-            if (zoom <= 4)  return 25;
-            if (zoom <= 6)  return 45;
-            if (zoom <= 8)  return 80;
-            if (zoom <= 10) return 140;
-            if (zoom <= 12) return 220;
-            return 320;
-        }
-
-        function loadLivePeaks() {
-            if (!dominanzMap) return;
-            const zoom = dominanzMap.getZoom();
-            const b = dominanzMap.getBounds();
-            const minElev = minElevForZoom(zoom);
-            const token = ++liveLoadToken;
-            setLiveStatus('loading');
-
-            // Overpass-Bbox: (sued, west, nord, ost)
-            const bbox = `${b.getSouth().toFixed(4)},${b.getWest().toFixed(4)},${b.getNorth().toFixed(4)},${b.getEast().toFixed(4)}`;
-            // Nur benannte Gipfel abfragen (spart Datenmenge). Limit grosszuegig,
-            // die eigentliche Ausduennung passiert clientseitig nach Hoehe.
-            const query = `[out:json][timeout:25];(node["natural"="peak"]["name"](${bbox}););out body 2500;`;
-            const endpoint = OVERPASS_ENDPOINTS[overpassIdx % OVERPASS_ENDPOINTS.length];
-
-            fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'data=' + encodeURIComponent(query)
-            })
-            .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
-            .then(data => {
-                if (token !== liveLoadToken) return; // veraltete Antwort verwerfen
-                const parsed = (data.elements || [])
-                    .map(parseOverpassPeak)
-                    .filter(Boolean);
-                mergeLivePeaks(parsed, minElev, zoom);
-                setLiveStatus('ok');
-            })
-            .catch(() => {
-                if (token !== liveLoadToken) return;
-                // Endpoint wechseln und auf DB-Fallback zurueckfallen
-                overpassIdx++;
-                mergeLivePeaks([], minElev, zoom, true);
-                setLiveStatus('error');
-            });
-        }
-
-        // Overpass-Element -> einheitliches Gipfel-Objekt
-        function parseOverpassPeak(el) {
-            if (el.type !== 'node' || !el.tags || !el.tags.name) return null;
-            const t = el.tags;
-            let elev = null;
-            if (t.ele) {
-                const m = ('' + t.ele).replace(',', '.').match(/-?\d+(\.\d+)?/);
-                if (m) elev = Math.round(parseFloat(m[0]));
-            }
-            // Wikipedia-Tag: "de:Titel" oder "en:Title"
-            let wiki = null, wikiLang = 'de';
-            if (t.wikipedia && t.wikipedia.includes(':')) {
-                const [lang, ...rest] = t.wikipedia.split(':');
-                wikiLang = lang; wiki = rest.join(':');
-            }
-            return {
-                key: 'osm:' + el.id,
-                id: 'osm:' + el.id,
-                name: t.name,
-                region: t.region || '', country: '', continent: '',
-                lat: el.lat, lng: el.lon,
-                elev: elev != null ? elev : 0,
-                hasElev: elev != null,
-                prom: null, dom: null,
-                refName: null, refLat: null, refLng: null,
-                wiki, wikiLang,
-                source: 'osm'
+            // Suche
+            const si = document.getElementById('dom-search-input');
+            si.oninput = () => { clearTimeout(domSearchTimer); domSearchTimer = setTimeout(domSearch, 300); };
+            si.onkeydown = e => {
+                if (e.key === 'Enter') document.querySelector('#dom-results button')?.click();
+                if (e.key === 'Escape') { si.value = ''; domSearch(); }
             };
-        }
-
-        // Live-Ergebnis + DB-Gipfel zusammenfuehren, nach Hoehe ausduennen & cappen
-        function mergeLivePeaks(osmPeaks, minElev, zoom, fallbackOnly = false) {
-            const b = dominanzMap.getBounds().pad(0.05);
-            // DB-Gipfel im Ausschnitt (immer verlaesslich, mit Dominanzdaten)
-            const dbInView = PEAK_DB
-                .filter(p => b.contains([p.lat, p.lng]))
-                .map(p => ({ ...peakCache['db:' + p.id] }));
-
-            // Zusammenfuehren, Duplikate (gleicher Name & nah beieinander) vermeiden
-            const combined = [...dbInView];
-            const seen = dbInView.map(p => p.name.toLowerCase());
-            osmPeaks.forEach(p => {
-                const dup = seen.some((n, i) =>
-                    n === p.name.toLowerCase() &&
-                    Math.abs(dbInView[i].lat - p.lat) < 0.03 &&
-                    Math.abs(dbInView[i].lng - p.lng) < 0.03);
-                if (!dup) { combined.push(p); peakCache[p.key] = p; }
-            });
-
-            // Nach Hoehe filtern (Gipfel ohne Hoehe nur ab Zoom 11 zeigen)
-            let filtered = combined.filter(p =>
-                (p.hasElev === false ? zoom >= 11 : (p.elev || 0) >= minElev));
-
-            // Nach Hoehe sortieren und auf das Zoom-Limit kappen (groesste zuerst)
-            filtered.sort((a, b2) => (b2.elev || 0) - (a.elev || 0));
-            const cap = maxPeaksForZoom(zoom);
-            if (filtered.length > cap) filtered = filtered.slice(0, cap);
-
-            // ausgewaehlten Gipfel immer behalten
-            if (selectedPeak && !filtered.some(p => p.key === selectedPeak.key)) {
-                filtered.push(selectedPeak);
-            }
-
-            livePeaks = filtered;
-            renderDominanzMarkers();
-            renderDominanzList();
-        }
-
-        function setLiveStatus(state) {
-            const vb = document.getElementById('dom-visible-badge');
-            if (!vb) return;
-            if (state === 'loading') vb.dataset.loading = '1';
-            else delete vb.dataset.loading;
-        }
-
-        // --- Zoomabhaengige Mindesthoehe: beim Rauszoomen nur grosse Berge ---
-        // Gibt die minimale Berghoehe (m) zurueck, die bei aktuellem Zoom gezeigt wird.
-        function minElevForZoom(zoom) {
-            if (zoom <= 3)  return 5500;
-            if (zoom <= 4)  return 4000;
-            if (zoom <= 5)  return 3000;
-            if (zoom <= 6)  return 2000;
-            if (zoom <= 7)  return 1200;
-            if (zoom <= 8)  return 800;
-            if (zoom <= 9)  return 600;
-            if (zoom <= 10) return 450;
-            if (zoom <= 11) return 350;
-            return 0; // ab Zoom 12: alle Gipfel
-        }
-
-        // Farbe & Radius eines Markers nach Hoehe
-        function peakStyleByElev(elev, isSelected) {
-            let color, fill, baseR;
-            if (elev >= 4000)      { color = '#991b1b'; fill = '#dc2626'; baseR = 9; }
-            else if (elev >= 2000) { color = '#9a3412'; fill = '#ea580c'; baseR = 8; }
-            else if (elev >= 1000) { color = '#92400e'; fill = '#d97706'; baseR = 7; }
-            else if (elev >= 500)  { color = '#065f46'; fill = '#059669'; baseR = 6; }
-            else                   { color = '#115e59'; fill = '#0d9488'; baseR = 5; }
-            return {
-                radius: isSelected ? baseR + 3 : baseR,
-                color: isSelected ? '#d97706' : color,
-                weight: isSelected ? 3 : 2,
-                fillColor: isSelected ? '#fbbf24' : fill,
-                fillOpacity: 0.95
+            document.getElementById('dom-show-circle').onchange = () => {
+                if (!domCircle) return;
+                document.getElementById('dom-show-circle').checked ? domCircle.addTo(dominanzMap) : dominanzMap.removeLayer(domCircle);
             };
+
+            loadDominanzData();
         }
 
-        function updateDominanzZoomBadge() {
-            if (!dominanzMap) return;
-            const z = dominanzMap.getZoom();
-            const badge = document.getElementById('dom-zoom-badge');
-            if (badge) badge.textContent = 'Zoom: ' + z;
+        function loadDominanzData() {
+            if (domInitDone) return;
+            setDomStatus('Bergdaten werden geladen …');
+            // peaks.json liegt neben der index.html (relativ -> funktioniert auf http & https)
+            fetch('peaks.json', { signal: AbortSignal.timeout(20000) })
+                .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+                .then(data => {
+                    domPeaks = data;
+                    domInitDone = true;
+                    setDomStatus('');
+                    const cnt = document.getElementById('dom-count');
+                    if (cnt) cnt.textContent = domNum(domPeaks.filter(p => p.isolation != null).length) + ' Gipfel mit Dominanz';
+                    domPaint();
+                    domSearch();
+                    const z = domPeaks.find(p => p.name === 'Zugspitze') || domPeaks.find(p => p.id === 'Q3375');
+                    if (z) domSelect(z);
+                })
+                .catch(() => {
+                    setDomStatus('Bergdaten (peaks.json) konnten nicht geladen werden. Bitte Seite neu laden.');
+                    const cnt = document.getElementById('dom-count');
+                    if (cnt) cnt.textContent = 'Daten nicht erreichbar';
+                });
         }
+
+        function setDomStatus(txt) { const el = document.getElementById('dom-status'); if (el) el.textContent = txt; }
 
         function setDominanzLayer(key) {
             initDominanzMapIfNeeded();
@@ -2271,328 +1953,267 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             document.getElementById('dom-layer-' + key).classList.add('active');
         }
 
-        function toggleDominanzCustomClick() {
-            dominanzCustomClickMode = !dominanzCustomClickMode;
-            const btn = document.getElementById('dom-custom-mode-btn');
-            if (dominanzCustomClickMode) {
-                btn.textContent = '📍 Eigenen Punkt auf Karte testen: AN (Jetzt auf Karte klicken!)';
-                btn.className = 'btn btn-emerald';
-            } else {
-                btn.textContent = '📍 Eigenen Punkt auf Karte testen: AUS';
-                btn.className = 'btn btn-amber';
-            }
+        function dominanzWorldView() { if (dominanzMap) dominanzMap.setView([25, 10], 2); }
+
+        const domIcon = (sel = false) => L.divIcon({ className: 'domPeakDot' + (sel ? ' active' : ''), iconSize: sel ? [16, 16] : [10, 10] });
+
+        // Hintergrund-Gipfel im Ausschnitt zeichnen (Dichte je Zoom begrenzt)
+        function domPaint() {
+            if (!domMarkers || !dominanzMap) return;
+            domMarkers.clearLayers();
+            const b = dominanzMap.getBounds();
+            const cap = dominanzMap.getZoom() > 7 ? 350 : 200;
+            domPeaks
+                .filter(p => b.contains([p.lat, p.lon]) && p.id !== domActive?.id && p.id !== domReference?.id)
+                .sort((a, c) => (c.height || 0) - (a.height || 0))
+                .slice(0, cap)
+                .forEach(p => L.marker([p.lat, p.lon], { icon: domIcon(), title: p.name })
+                    .bindTooltip(domEsc(p.name))
+                    .on('click', () => domSelect(p))
+                    .addTo(domMarkers));
         }
 
-        function renderDominanzMarkers() {
-            if (!dominanzMarkerGroup || !dominanzMap) return;
-            dominanzMarkerGroup.clearLayers();
-            let shown = 0;
-
-            livePeaks.forEach(p => {
-                const isSelected = p.key === selectedPeakId;
-                const style = peakStyleByElev(p.elev || 0, isSelected);
-                const marker = L.circleMarker([p.lat, p.lng], style);
-                const elevTxt = p.hasElev === false ? '? m' : `${(p.elev || 0).toLocaleString('de-DE')} m`;
-                marker.bindTooltip(`⛰️ ${p.name} (${elevTxt})`, { direction: 'top' });
-                marker.on('click', () => selectDominanzPeak(p.key, true));
-                marker.addTo(dominanzMarkerGroup);
-                shown++;
-            });
-
-            const vb = document.getElementById('dom-visible-badge');
-            if (vb) vb.textContent = `Sichtbar: ${shown} Gipfel`;
+        function domDistanceKm(a, b) {
+            const rad = Math.PI / 180, dLat = (b.lat - a.lat) * rad, dLon = (b.lon - a.lon) * rad;
+            const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLon / 2) ** 2;
+            return 6371.0088 * 2 * Math.atan2(Math.sqrt(Math.min(1, h)), Math.sqrt(Math.max(0, 1 - h)));
         }
 
-        function selectDominanzPeak(peakId, fly = true) {
-            // Gipfel aus Cache / aktueller Live-Liste holen
-            let p = peakCache[peakId] || livePeaks.find(x => x.key === peakId);
-            if (!p) return;
-            selectedPeakId = peakId;
-            selectedPeak = p;
-
-            // Dominanz/Schartenhoehe fuer Live-Gipfel ohne Werte abschaetzen
-            ensurePeakMetrics(p);
-
-            renderDominanzMarkers();
-            renderDominanzList();
-            drawDominanzVisualization(p, fly);
+        // Geodaetischer Kreis; mit target zeigt der Startpunkt des Kreises zum Bezugsgipfel
+        function domGeodesic(p, r, target) {
+            const pts = [], R = 6371008.8, d = r / R, a = p.lat * Math.PI / 180, b = p.lon * Math.PI / 180;
+            const bearing = target ? Math.atan2(
+                Math.sin((target.lon - p.lon) * Math.PI / 180) * Math.cos(target.lat * Math.PI / 180),
+                Math.cos(a) * Math.sin(target.lat * Math.PI / 180) - Math.sin(a) * Math.cos(target.lat * Math.PI / 180) * Math.cos((target.lon - p.lon) * Math.PI / 180)
+            ) : 0;
+            for (let i = 0; i <= 180; i++) {
+                const t = bearing + i * 2 * Math.PI / 180;
+                const lat = Math.asin(Math.sin(a) * Math.cos(d) + Math.cos(a) * Math.sin(d) * Math.cos(t));
+                const lon = b + Math.atan2(Math.sin(t) * Math.sin(d) * Math.cos(a), Math.cos(d) - Math.sin(a) * Math.sin(lat));
+                let deg = lon * 180 / Math.PI;
+                while (deg - p.lon > 180) deg -= 360;
+                while (deg - p.lon < -180) deg += 360;
+                pts.push([lat * 180 / Math.PI, deg]);
+            }
+            return L.featureGroup([
+                L.polygon(pts, { color: '#ffffff', weight: 9, opacity: .95, fill: false, interactive: false }),
+                L.polygon(pts, { color: '#9a3412', weight: 5, opacity: 1, fillColor: '#f97316', fillOpacity: .16, interactive: false }),
+                L.polygon(pts, { color: '#ffad47', weight: 3, opacity: 1, fill: false, interactive: false })
+            ]);
         }
 
-        // Fuer OSM-Gipfel ohne Dominanz/Bezug: naechsten hoeheren Gipfel grob schaetzen
-        function ensurePeakMetrics(p) {
-            if (p.dom != null && p.refName) return;
-            // Kandidaten: DB + aktuell geladene Gipfel
-            const pool = [...PEAK_DB, ...livePeaks];
-            let nearestHigher = null, minDist = Infinity;
-            for (const q of pool) {
-                if (q.key === p.key) continue;
-                if ((q.elev || 0) > (p.elev || 0)) {
-                    const d = haversineKm(p.lat, p.lng, q.lat, q.lng);
-                    if (d < minDist) { minDist = d; nearestHigher = q; }
-                }
+        // Naechstgelegener hoeherer Gipfel im geladenen Datensatz (Naeherung)
+        function domNearestHigher(p) {
+            if (p.id === 'Q513' || !Number.isFinite(p.height)) return null;
+            let best = null, min = Infinity;
+            for (const c of domPeaks) {
+                if (c.id === p.id || !Number.isFinite(c.height) || c.height <= p.height) continue;
+                const d = domDistanceKm(p, c);
+                if (d > 0.01 && d < min) { best = c; min = d; }
             }
-            if (nearestHigher) {
-                p.dom = Math.round(minDist * 10) / 10;
-                p.refName = `${nearestHigher.name} (${(nearestHigher.elev||0).toLocaleString('de-DE')} m)`;
-                p.refLat = nearestHigher.lat; p.refLng = nearestHigher.lng;
-                p.estimated = true;
-            } else {
-                p.dom = p.dom != null ? p.dom : 0;
-                p.refName = p.refName || 'Kein höherer Gipfel in Reichweite';
-            }
-            if (p.prom == null) p.prom = Math.max(0, Math.round((p.elev || 0) * 0.3));
+            return best;
         }
 
-        function drawDominanzVisualization(p, fly) {
-            if (!dominanzOverlayGroup) return;
-            dominanzOverlayGroup.clearLayers();
-
-            const domVal = (typeof p.dom === 'number' && isFinite(p.dom)) ? p.dom : 0;
-            const domMeters = Math.max(domVal * 1000.0, 300); // Mindestradius fuer Sichtbarkeit
-            const domAreaKm2 = Math.PI * (domVal ** 2);
-
-            // 1. Dominanz-Kreis (Radius = Dominanz)
-            const circle = L.circle([p.lat, p.lng], {
-                radius: domMeters,
-                color: '#059669',
-                weight: 2.5,
-                dashArray: '8, 6',
-                fillColor: '#10b981',
-                fillOpacity: 0.14
-            }).addTo(dominanzOverlayGroup);
-
-            // 2. Verbindungslinie zum nächsthöheren Bezugspunkt
-            if (p.refLat && p.refLng) {
-                L.polyline([[p.lat, p.lng], [p.refLat, p.refLng]], {
-                    color: '#d97706',
-                    weight: 2.5,
-                    dashArray: '5, 5'
-                }).bindTooltip(`Dominanz: ${p.dom.toLocaleString('de-DE')} km bis ${p.refName}`, { permanent: false })
-                  .addTo(dominanzOverlayGroup);
-
-                L.circleMarker([p.refLat, p.refLng], {
-                    radius: 6,
-                    color: '#b45309',
-                    weight: 2,
-                    fillColor: '#f59e0b',
-                    fillOpacity: 0.9
-                }).bindTooltip(`🎯 Bezugspunkt: ${p.refName}`, { permanent: true, direction: 'right' })
-                  .addTo(dominanzOverlayGroup);
-            }
-
-            // Info-Karte rechts aktualisieren
-            const regLabel = p.continent && p.country
-                ? `${p.region} · ${p.country}`
-                : (p.region || '');
-            const regShown = regLabel || (p.source === 'osm' ? 'OpenStreetMap-Gipfel' : '');
-            document.getElementById('dom-peak-region').textContent = regShown;
-            document.getElementById('dom-peak-coords').textContent = `${p.lat.toFixed(3)}° N, ${p.lng.toFixed(3)}° O`;
-            document.getElementById('dom-peak-name').textContent = `⛰️ ${p.name}`;
-            const estMark = p.estimated ? ' ≈' : '';
-            document.getElementById('dom-peak-elev').textContent = (p.hasElev === false)
-                ? 'unbekannt' : `${(p.elev || 0).toLocaleString('de-DE')} m`;
-            document.getElementById('dom-peak-dom').textContent =
-                `${estMark}${domVal.toLocaleString('de-DE', { maximumFractionDigits: 2 })} km`;
-            document.getElementById('dom-peak-prom').textContent =
-                (p.prom != null ? `${estMark}${p.prom.toLocaleString('de-DE')} m` : '–');
-            document.getElementById('dom-peak-area').textContent =
-                `${estMark}${domAreaKm2.toLocaleString('de-DE', { maximumFractionDigits: 1 })} km²`;
-            document.getElementById('dom-peak-ref').textContent = p.refName || '–';
-
-            // Wikipedia-Kurzbeschreibung laden (nur fuer DB-Gipfel mit wiki-Titel)
-            loadWikiSummary(p);
-
-            if (fly && dominanzMap) {
-                dominanzMap.fitBounds(circle.getBounds(), { padding: [28, 28], maxZoom: 14 });
-            }
-        }
-
-        // Holt eine Kurzbeschreibung + Artikel-Link aus der deutschen Wikipedia.
-        function loadWikiSummary(p) {
-            const txtEl = document.getElementById('dom-peak-wiki');
-            const linkEl = document.getElementById('dom-peak-wiki-link');
-            if (!txtEl || !linkEl) return;
-
-            const title = p.wiki || p.name;
-            if (!title || p.id === 'custom') {
-                txtEl.textContent = (p.id === 'custom')
-                    ? 'Freier Kartenpunkt – kein Wikipedia-Artikel.'
-                    : 'Kein Wikipedia-Artikel in den OSM-Daten hinterlegt – Suche öffnet unten.';
-                // Fallback: Wikipedia-Suche nach dem Namen
-                if (p.name && p.id !== 'custom') {
-                    linkEl.style.display = '';
-                    linkEl.textContent = 'Auf Wikipedia suchen ↗';
-                    linkEl.href = '//de.wikipedia.org/w/index.php?search=' + encodeURIComponent(p.name);
-                } else {
-                    linkEl.style.display = 'none';
-                }
+        // Bezugsgipfel anzeigen: Kreis bis zum Bezugsgipfel + Marker auf dem Kreis
+        // + anklickbares Feld "Naechsthoeherer Berg" (fuehrt Schritt fuer Schritt zum Everest)
+        function domOfferHigher(p, next, token) {
+            if (token !== domGen) return;
+            const box = document.getElementById('dom-higher');
+            if (!box) return;
+            if (!next) {
+                box.innerHTML = '<p class="dom-note">' +
+                    (p.id === 'Q513' ? '🏔️ Mount Everest – höchster Berg der Erde. Kein höherer Bezugsgipfel.' :
+                     p.height == null ? 'Für die Bezugssuche wird eine bekannte Gipfelhöhe benötigt.' :
+                     'Kein höherer Gipfel im Datensatz gefunden.') + '</p>';
                 return;
             }
+            domReference = next;
+            if (domCircle) dominanzMap.removeLayer(domCircle);
+            domCircle = domGeodesic(p, domDistanceKm(p, next) * 1000, next);
+            if (document.getElementById('dom-show-circle').checked) domCircle.addTo(dominanzMap);
+            document.getElementById('dom-circle-label').textContent = 'Kreis zum Bezugsgipfel';
 
-            // Sprache des Artikels (OSM liefert oft "de" oder "en" etc.)
-            const lang = (p.wikiLang && /^[a-z]{2,3}$/.test(p.wikiLang)) ? p.wikiLang : 'de';
-            const host = lang + '.wikipedia.org';
-            const cacheKey = lang + ':' + title;
-            linkEl.textContent = 'Zum Wikipedia-Artikel ↗';
-            linkEl.href = 'https://' + host + '/wiki/' + encodeURIComponent(title.replace(/ /g, '_'));
-            linkEl.style.display = '';
+            if (domRefMarker) dominanzMap.removeLayer(domRefMarker);
+            let lon = next.lon;
+            while (lon - p.lon > 180) lon -= 360;
+            while (lon - p.lon < -180) lon += 360;
+            domRefMarker = L.marker([next.lat, lon], {
+                icon: L.divIcon({ className: 'domHigherPeak', html: '<span class="domHigherCore"></span>', iconSize: [22, 22] }),
+                title: 'Nächsthöherer Berg: ' + next.name, zIndexOffset: 1000
+            }).bindTooltip(domEsc(next.name), { permanent: true, direction: 'top', className: 'domHigherTip', offset: [0, -10] })
+              .on('click', () => domSelect(next)).addTo(dominanzMap);
 
-            if (wikiCache[cacheKey]) { txtEl.textContent = wikiCache[cacheKey]; return; }
+            box.innerHTML =
+                '<button type="button" class="dom-higher-btn">⬆️ Nächsthöherer Berg: ' + domEsc(next.name) +
+                ' <span class="dom-higher-h">' + domNum(next.height) + ' m</span> →</button>' +
+                '<p class="dom-note">' + domNum(domDistanceKm(p, next), 2) +
+                ' km bis zum Bezugsgipfel (Kreisradius). Klick dich weiter – irgendwann landest du beim Mount Everest.</p>';
+            box.querySelector('button').onclick = () => domSelect(next);
 
-            txtEl.textContent = 'Lade Kurzbeschreibung …';
-            const api = '//' + host + '/api/rest_v1/page/summary/' + encodeURIComponent(title);
-            fetch(api)
-                .then(r => r.ok ? r.json() : Promise.reject())
-                .then(data => {
-                    const extract = (data && data.extract) ? data.extract : null;
-                    const text = extract || 'Keine Kurzbeschreibung gefunden – öffne den Artikel für Details.';
-                    wikiCache[cacheKey] = text;
-                    // Nur aktualisieren, wenn weiterhin dieser Gipfel gewaehlt ist
-                    if (selectedPeakId === p.key) txtEl.textContent = text;
-                    if (data && data.content_urls && data.content_urls.desktop && data.content_urls.desktop.page) {
-                        linkEl.href = data.content_urls.desktop.page;
-                    }
-                })
-                .catch(() => {
-                    txtEl.textContent = 'Kurzbeschreibung konnte nicht geladen werden – öffne den Artikel direkt.';
-                });
+            const bounds = domCircle ? domCircle.getBounds() : L.latLngBounds([[p.lat, p.lon]]);
+            bounds.extend([next.lat, lon]);
+            dominanzMap.fitBounds(bounds.pad(0.25), { maxZoom: 14, animate: false });
+            domPaint();
         }
 
-        function evaluateCustomDominanzPoint(lat, lng) {
-            fetch(`//api.open-meteo.com/v1/elevation?latitude=${lat.toFixed(5)}&longitude=${lng.toFixed(5)}`)
-                .then(r => r.json())
-                .then(data => {
-                    const elev = (data && data.elevation && data.elevation.length > 0) ? Math.round(data.elevation[0]) : 350;
-                    // Nächstgelegenen höheren Gipfel aus unserer Datenbank bestimmen
-                    let nearestHigher = null;
-                    let minDist = Infinity;
-                    for (const pk of PEAK_DB) {
-                        if (pk.elev > elev) {
-                            const d = haversineKm(lat, lng, pk.lat, pk.lng);
-                            if (d < minDist) {
-                                minDist = d;
-                                nearestHigher = pk;
-                            }
+        // Gipfel auswaehlen: Marker + Dominanzkreis + Infokarte + Bezugsgipfel
+        function domSelect(p, known) {
+            if (!dominanzMap) return;
+            if (domRefMarker) { dominanzMap.removeLayer(domRefMarker); domRefMarker = null; }
+            domReference = null;
+            document.getElementById('dom-circle-label').textContent = 'Dominanzradius';
+            domActive = p;
+            const token = ++domGen;
+            document.getElementById('dom-results').innerHTML = '';
+            document.getElementById('dom-search-input').value = p.name;
+            setDomStatus('');
+
+            if (domCircle) dominanzMap.removeLayer(domCircle);
+            if (domSelMarker) dominanzMap.removeLayer(domSelMarker);
+            domCircle = (p.isolation > 0) ? domGeodesic(p, p.isolation * 1000) : null;
+            if (domCircle && document.getElementById('dom-show-circle').checked) domCircle.addTo(dominanzMap);
+            domSelMarker = L.marker([p.lat, p.lon], { icon: domIcon(true), title: p.name }).addTo(dominanzMap);
+            if (domCircle) dominanzMap.fitBounds(domCircle.getBounds().pad(0.35), { maxZoom: 14, animate: false });
+            else dominanzMap.setView([p.lat, p.lon], 8);
+            domPaint();
+
+            const wikiSearch = '//de.wikipedia.org/wiki/Special:Search?search=' + encodeURIComponent(p.name);
+            document.getElementById('dom-detail').innerHTML =
+                '<div id="dom-photo"></div>' +
+                '<div id="dom-range" class="eyebrow-dark" style="display:block; margin-bottom:4px;">' + domEsc(p.range || 'Gebirge wird geprüft …') + '</div>' +
+                '<h3 style="font-size:24px; font-weight:800; margin:0 0 12px;">⛰️ ' + domEsc(p.name) + '</h3>' +
+                '<div class="person-grid-2" style="margin:0 0 10px;">' +
+                  '<div class="person-box" style="background:#ecfdf5; border-color:#a7f3d0;"><span class="person-role">Höhe ü. NHN</span><div class="person-name" style="font-size:18px;">' + domNum(p.height) + ' m</div></div>' +
+                  '<div class="person-box" style="background:#fffbeb; border-color:#fde68a;"><span class="person-role" style="color:var(--amber);">Dominanz</span><div class="person-name" style="font-size:18px;">' + (p.isolation != null ? domNum(p.isolation, 2) + ' km' : '–') + '</div></div>' +
+                '</div>' +
+                '<div id="dom-higher" style="margin:4px 0 10px;"><p class="dom-note">Bezugsgipfel wird geprüft …</p></div>' +
+                '<p id="dom-summary" style="font-size:12.8px; line-height:1.55; color:#334155; margin:0 0 10px;"></p>' +
+                (p.isolation == null ? '<p class="dom-note">' + (p.id === 'Q513' ? 'Höchster Berg der Erde: kein höherer Berg und kein endlicher Dominanzkreis.' : 'Für diesen Berg ist in Wikidata kein Dominanzwert hinterlegt.') + '</p>' : '') +
+                '<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:4px;">' +
+                  '<a class="btn btn-dark" id="dom-wiki" href="' + wikiSearch + '" target="_blank" rel="noopener" style="font-size:12px; padding:7px 12px;">Auf Wikipedia weiterlesen ↗</a>' +
+                  '<a class="btn btn-sand" href="//www.wikidata.org/wiki/' + domEsc(p.id) + '" target="_blank" rel="noopener" style="font-size:12px; padding:7px 12px;">Wikidata ↗</a>' +
+                '</div>';
+
+            // sofort Naeherung anbieten (naechstgelegener hoeherer Gipfel im Datensatz)
+            domOfferHigher(p, domNearestHigher(p), token);
+            // dann aus Wikidata/Wikipedia verfeinern (Gebirge, Foto, Kurztext, Bezugsgipfel)
+            domEnrich(p, token, known);
+        }
+
+        async function domGetJSON(url) {
+            const r = await fetch(url, { signal: AbortSignal.timeout(15000) });
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+        }
+        const domClaim = (e, prop) => e.claims?.[prop]?.filter(c => c.rank !== 'deprecated')
+            .sort((a, b) => (b.rank === 'preferred') - (a.rank === 'preferred'))[0]?.mainsnak.datavalue?.value;
+        async function domEntity(id) {
+            return (await domGetJSON('//www.wikidata.org/w/api.php?action=wbgetentities&ids=' + id + '&props=labels|claims|sitelinks&languages=de|en&format=json&origin=*')).entities[id];
+        }
+        function domPeakFromEntity(e, id) {
+            const c = domClaim(e, 'P625'); if (!c) return null;
+            const h = domClaim(e, 'P2044'), iso = domClaim(e, 'P2659'), unit = iso?.unit?.split('/').pop();
+            return { id, name: e.labels.de?.value || e.labels.en?.value || id, lat: c.latitude, lon: c.longitude,
+                     height: h ? +h.amount : null, isolation: iso ? +iso.amount * (unit === 'Q11573' ? .001 : unit === 'Q253276' ? 1.609344 : 1) : null, range: null };
+        }
+
+        // Online-Details nachladen; Everest (Q513) braucht keinen Bezug mehr
+        async function domEnrich(p, token, known) {
+            try {
+                const e = known || await domEntity(p.id);
+                if (token !== domGen) return;
+                const range = domClaim(e, 'P4552');
+                if (!p.range && range) {
+                    const re = await domEntity(range.id);
+                    if (token === domGen) { const r = re.labels.de?.value || re.labels.en?.value || 'Gebirge nicht angegeben'; p.range = r; const el = document.getElementById('dom-range'); if (el) el.textContent = r; }
+                } else if (!p.range) { const el = document.getElementById('dom-range'); if (el) el.textContent = 'Gebirge nicht angegeben'; }
+
+                const site = e.sitelinks.dewiki || e.sitelinks.enwiki, lang = e.sitelinks.dewiki ? 'de' : 'en';
+                if (site) {
+                    const url = '//' + lang + '.wikipedia.org/wiki/' + encodeURIComponent(site.title);
+                    const wk = document.getElementById('dom-wiki'); if (wk) wk.href = url;
+                    const r = await domGetJSON('//' + lang + '.wikipedia.org/w/api.php?action=query&titles=' + encodeURIComponent(site.title) + '&prop=extracts|pageimages&exintro=1&explaintext=1&piprop=thumbnail&pithumbsize=650&format=json&origin=*');
+                    if (token !== domGen) return;
+                    const page = Object.values(r.query.pages)[0]; const text = page.extract || '';
+                    const sm = document.getElementById('dom-summary');
+                    if (sm) sm.textContent = text.length > 320 ? text.slice(0, 317).replace(/\s+\S*$/, '') + ' …' : text;
+                    if (page.thumbnail) { const ph = document.getElementById('dom-photo'); if (ph) ph.innerHTML = '<img src="' + domEsc(page.thumbnail.source) + '" alt="' + domEsc(p.name) + '" style="width:100%; border-radius:12px; margin-bottom:10px;">'; }
+                }
+                if (p.id === 'Q513') return;
+
+                // Bezugsgipfel laut Wikipedia-Infobox (isolation_parent / DOMINANZ-BEZUG)
+                const article = e.sitelinks.dewiki || e.sitelinks.enwiki;
+                if (article) {
+                    const w = await domGetJSON('//' + lang + '.wikipedia.org/w/api.php?action=parse&page=' + encodeURIComponent(article.title) + '&prop=wikitext&format=json&origin=*');
+                    if (token !== domGen) return;
+                    const field = (w.parse?.wikitext?.['*'] || '').match(/\|\s*(?:isolation_parent|DOMINANZ-BEZUG)\s*=([^\n]+)/i);
+                    const link = field?.[1]?.match(/\[\[([^\]|#]+)(?:\|([^\]]+))?\]\]/);
+                    if (link) {
+                        const data = await domGetJSON('//' + lang + '.wikipedia.org/w/api.php?action=query&titles=' + encodeURIComponent(link[1]) + '&redirects=1&prop=pageprops&format=json&origin=*');
+                        if (token !== domGen) return;
+                        const id = Object.values(data.query.pages)[0]?.pageprops?.wikibase_item;
+                        if (id && id !== p.id) {
+                            let next = domPeaks.find(x => x.id === id);
+                            if (!next) { const eNext = await domEntity(id); if (token !== domGen) return; next = domPeakFromEntity(eNext, id); if (next) domPeaks.push(next); }
+                            if (next && (next.height == null || p.height == null || next.height > p.height)) domOfferHigher(p, next, token);
                         }
                     }
-                    const customPeak = {
-                        key: 'custom', id: 'custom',
-                        name: 'Gewählter Kartenpunkt',
-                        continent: '', country: '',
-                        region: 'Live-Höhenabfrage (Open-Meteo)',
-                        source: 'custom',
-                        lat,
-                        lng,
-                        elev,
-                        hasElev: true,
-                        prom: Math.round(elev * 0.25),
-                        dom: nearestHigher ? Math.round(minDist * 100) / 100 : 500,
-                        refName: nearestHigher ? `${nearestHigher.name} (${nearestHigher.elev} m)` : 'Kein höherer Gipfel in Reichweite',
-                        refLat: nearestHigher ? nearestHigher.lat : null,
-                        refLng: nearestHigher ? nearestHigher.lng : null
-                    };
-                    selectedPeakId = 'custom';
-                    selectedPeak = customPeak;
-                    drawDominanzVisualization(customPeak, true);
-                })
-                .catch(() => {});
-        }
-
-        // -------- Region-Auswahl: nur Kontinent -> Land --------
-        // Die Dropdowns dienen als Sprungmarken: Auswahl zoomt die Karte auf das
-        // Gebiet, danach laedt Overpass dort live ALLE Gipfel nach.
-        const CONTINENT_ORDER = ['Europa', 'Asien', 'Afrika', 'Nordamerika', 'Südamerika', 'Ozeanien', 'Antarktis'];
-
-        function buildRegionSelectors() {
-            const contSel = document.getElementById('dom-continent-select');
-            if (!contSel) return;
-            const continents = [...new Set(PEAK_DB.map(p => p.continent))]
-                .sort((a, b) => CONTINENT_ORDER.indexOf(a) - CONTINENT_ORDER.indexOf(b));
-            contSel.innerHTML = continents.map(c => `<option value="${c}">${c}</option>`).join('');
-            // Default: Europa (damit direkt Deutschland/Sachsen vorgewaehlt werden kann)
-            contSel.value = continents.includes('Europa') ? 'Europa' : continents[0];
-            rebuildCountrySelect();
-            // Default-Land Deutschland (fuer Sachsen-Voreinstellung)
-            const countrySel = document.getElementById('dom-country-select');
-            if ([...countrySel.options].some(o => o.value === 'Deutschland')) countrySel.value = 'Deutschland';
-        }
-
-        function rebuildCountrySelect() {
-            const cont = document.getElementById('dom-continent-select').value;
-            const countrySel = document.getElementById('dom-country-select');
-            const countries = [...new Set(PEAK_DB.filter(p => p.continent === cont).map(p => p.country))]
-                .sort((a, b) => a.localeCompare(b, 'de'));
-            countrySel.innerHTML = countries.map(c => `<option value="${c}">${c}</option>`).join('');
-        }
-
-        function onContinentChange() {
-            rebuildCountrySelect();
-            applyRegionSelection();
-        }
-        function onCountryChange() {
-            applyRegionSelection();
-        }
-
-        // Liefert die DB-Gipfel des gewaehlten Landes (als Sprungmarken fuer den Ausschnitt)
-        function currentRegionPool() {
-            const cont = document.getElementById('dom-continent-select').value;
-            const country = document.getElementById('dom-country-select').value;
-            return PEAK_DB.filter(p => p.continent === cont && p.country === country);
-        }
-
-        // Karte auf das gewaehlte Land zoomen; Gipfel werden danach per
-        // Overpass live fuer den neuen Ausschnitt nachgeladen (zoomend/moveend).
-        function applyRegionSelection() {
-            if (!dominanzMap) return;
-            const pool = currentRegionPool();
-            if (pool.length === 0) { scheduleLivePeakLoad(); return; }
-
-            if (pool.length === 1) {
-                dominanzMap.setView([pool[0].lat, pool[0].lng], 10);
-            } else {
-                const bounds = L.latLngBounds(pool.map(p => [p.lat, p.lng]));
-                dominanzMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 11 });
+                }
+            } catch (err) {
+                if (token === domGen && !p.range) { const el = document.getElementById('dom-range'); if (el) el.textContent = 'Gebirge nicht angegeben'; }
             }
-            updateDominanzZoomBadge();
-            scheduleLivePeakLoad();
         }
 
-        // Liste zeigt die aktuell auf der Karte sichtbaren (live geladenen) Gipfel,
-        // optional eingeschraenkt durch das Suchfeld.
-        function renderDominanzList() {
-            const q = (document.getElementById('dom-search-input').value || '').toLowerCase();
-            const listEl = document.getElementById('dom-peak-list');
-            if (!listEl) return;
+        // Suche: Treffer im Datensatz + Wikidata-Online-Suche
+        function domRenderResults(items, remote = false) {
+            const box = document.getElementById('dom-results');
+            box.innerHTML = items.map((p, i) =>
+                '<div class="peak-item" data-i="' + i + '"><div><div style="font-weight:800; font-size:14px; color:var(--text-dark);">⛰️ ' + domEsc(p.name) + '</div></div>' +
+                '<div style="text-align:right;"><div style="font-family:\'JetBrains Mono\',monospace; font-weight:700; font-size:13px; color:var(--emerald-dark);">' + (p.height ? domNum(p.height) + ' m' : (remote ? 'Wikidata ↗' : '')) + '</div></div></div>'
+            ).join('');
+            box.querySelectorAll('.peak-item').forEach((b, i) => b.onclick = () => remote ? domLoadEntity(items[i].id) : domSelect(items[i]));
+        }
 
-            const filtered = livePeaks.filter(p => {
-                if (!q) return true;
-                return p.name.toLowerCase().includes(q)
-                    || (p.region && p.region.toLowerCase().includes(q))
-                    || (p.country && p.country.toLowerCase().includes(q));
-            }).sort((a, b) => (b.elev || 0) - (a.elev || 0));
-
-            if (filtered.length === 0) {
-                listEl.innerHTML = '<div style="padding:14px; text-align:center; color:#64748b; font-size:13px;">Noch keine Gipfel geladen – bewege oder zoome die Karte.</div>';
-                return;
+        async function domSearch() {
+            const q = document.getElementById('dom-search-input').value.trim();
+            const token = ++domSearchGen;
+            if (!q) { domRenderResults(domPeaks.filter(p => ['Q3375','Q513','Q43512','Q3926','Q46190'].includes(p.id))); return; }
+            const local = domPeaks.filter(p => domNorm(p.name).includes(domNorm(q)))
+                .sort((a, b) => domNorm(a.name).indexOf(domNorm(q)) - domNorm(b.name).indexOf(domNorm(q))).slice(0, 7);
+            domRenderResults(local);
+            if (local.length >= 5) return;
+            try {
+                const r = await domGetJSON('//www.wikidata.org/w/api.php?action=wbsearchentities&search=' + encodeURIComponent(q) + '&language=de&uselang=de&limit=10&format=json&origin=*');
+                if (token !== domSearchGen) return;
+                const more = r.search.filter(p => !local.some(x => x.id === p.id) && /berg|gipfel|mountain|peak|vulkan|volcano|summit/i.test(p.description || ''))
+                    .map(p => ({ id: p.id, name: p.label }));
+                const combined = [...local, ...more].slice(0, 9);
+                if (combined.length) {
+                    domRenderResults(combined);
+                    document.getElementById('dom-results').querySelectorAll('.peak-item').forEach((b, i) =>
+                        b.onclick = () => domPeaks.find(p => p.id === combined[i].id) ? domSelect(domPeaks.find(p => p.id === combined[i].id)) : domLoadEntity(combined[i].id));
+                } else {
+                    document.getElementById('dom-results').innerHTML = '<div style="padding:12px; text-align:center; color:#64748b; font-size:13px;">Keine Treffer. Anderen Namen versuchen.</div>';
+                }
+            } catch {
+                if (!local.length && token === domSearchGen)
+                    document.getElementById('dom-results').innerHTML = '<div style="padding:12px; text-align:center; color:#64748b; font-size:13px;">Online-Suche nicht erreichbar – Suche im geladenen Datensatz.</div>';
             }
+        }
 
-            listEl.innerHTML = filtered.map(p => {
-                const sub = p.source === 'osm'
-                    ? (p.region ? p.region : 'OpenStreetMap')
-                    : `${p.region} · ${p.country}`;
-                const elevTxt = (p.hasElev === false) ? '?' : (p.elev || 0).toLocaleString('de-DE');
-                return `
-                <div class="peak-item ${p.key === selectedPeakId ? 'active' : ''}" onclick="selectDominanzPeak('${p.key}', true)">
-                    <div>
-                        <div style="font-weight:800; font-size:14px; color:var(--text-dark);">⛰️ ${p.name}</div>
-                        <div style="font-size:11.5px; color:#64748b;">${sub}</div>
-                    </div>
-                    <div style="text-align:right; shrink:0;">
-                        <div style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:13px; color:var(--emerald-dark);">${elevTxt} m</div>
-                        <div style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--amber);">${p.source === 'osm' ? 'OSM' : 'kuratiert'}</div>
-                    </div>
-                </div>`;
-            }).join('');
+        async function domLoadEntity(id) {
+            setDomStatus('Berg wird geladen …');
+            try {
+                const e = await domEntity(id), c = domClaim(e, 'P625');
+                if (!c) throw new Error('Keine Koordinaten');
+                const p = domPeakFromEntity(e, id);
+                if (!p) throw new Error('kein Gipfel');
+                if (!domPeaks.some(x => x.id === id)) domPeaks.push(p);
+                setDomStatus('');
+                domSelect(p, e);
+            } catch {
+                setDomStatus('Dieser Treffer hat keine verfügbaren Bergkoordinaten.');
+            }
         }
 
         // Info-Modal: Was ist Dominanz?
