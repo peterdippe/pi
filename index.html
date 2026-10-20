@@ -2011,7 +2011,8 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             domMarkers = L.layerGroup().addTo(dominanzMap);
             L.control.scale({ imperial: false }).addTo(dominanzMap);
             dominanzMap.on('moveend zoomend', domPaint);
-            // Klick: entweder eigenen Punkt messen, sonst normal
+            // Klick auf freie Kartenflaeche: im Pick-Modus eigenen Punkt messen.
+            // (Marker-Klicks rufen domSelect und stoppen die Weitergabe, s.u.)
             dominanzMap.on('click', (e) => {
                 if (domPickMode) measureDomPoint(e.latlng.lat, e.latlng.lng);
             });
@@ -2066,12 +2067,15 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                 .then(data => {
                     if (token !== domGen) return;
                     const elev = (data && data.elevation && data.elevation.length) ? Math.round(data.elevation[0]) : null;
-                    // naechsten hoeheren Gipfel suchen
+                    // naechsten hoeheren Gipfel suchen (Hoehe noetig; sonst keine Bezugssuche)
                     let best = null, bestd = Infinity;
-                    for (const q of domPeaks) {
-                        if (elev != null && (q.height || 0) <= elev) continue;
-                        const d = domDistanceKm(lat, lon, q.lat, q.lon);
-                        if (d < bestd && d > 0.001) { bestd = d; best = q; }
+                    if (elev != null) {
+                        const pt = { lat, lon };
+                        for (const q of domPeaks) {
+                            if ((q.height || 0) <= elev) continue;
+                            const d = domDistanceKm(pt, { lat: q.lat, lon: q.lon });
+                            if (d < bestd && d > 0.001) { bestd = d; best = q; }
+                        }
                     }
                     const p = {
                         id: 'pick', name: 'Gewählter Kartenpunkt', lat, lon,
@@ -2318,6 +2322,13 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         // Gipfel auswaehlen: Marker + Dominanzkreis + Infokarte + Bezugsgipfel
         function domSelect(p, known) {
             if (!dominanzMap) return;
+            // Beim Auswaehlen eines echten Gipfels den Mess-Modus beenden
+            if (domPickMode) {
+                domPickMode = false;
+                const pb = document.getElementById('dom-pick-btn');
+                if (pb) { pb.textContent = '📍 Eigenen Punkt setzen: AUS'; pb.className = 'btn btn-amber'; }
+                dominanzMap.getContainer().style.cursor = '';
+            }
             if (domRefMarker) { dominanzMap.removeLayer(domRefMarker); domRefMarker = null; }
             if (domPickMarker) { dominanzMap.removeLayer(domPickMarker); domPickMarker = null; }
             domReference = null;
