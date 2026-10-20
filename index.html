@@ -1901,7 +1901,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             dominanzLayers['topo'].addTo(dominanzMap);
             domMarkers = L.layerGroup().addTo(dominanzMap);
             L.control.scale({ imperial: false }).addTo(dominanzMap);
-            dominanzMap.on('moveend', domPaint);
+            dominanzMap.on('moveend zoomend', domPaint);
 
             // Suche
             const si = document.getElementById('dom-search-input');
@@ -1941,10 +1941,16 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                     setDomStatus('');
                     const cnt = document.getElementById('dom-count');
                     if (cnt) cnt.textContent = domNum(domPeaks.filter(p => p.isolation != null).length) + ' Gipfel mit Dominanz';
-                    domPaint();
+                    // Kartengroesse sicherstellen, dann Zugspitze waehlen und Marker zeichnen.
+                    // Mehrfaches Nachzeichnen faengt den Fall ab, dass die Karte beim
+                    // ersten Lauf noch keine gueltige Groesse/Bounds hatte.
+                    if (dominanzMap) dominanzMap.invalidateSize();
                     domSearch();
                     const z = domPeaks.find(p => p.name === 'Zugspitze') || domPeaks.find(p => p.id === 'Q3375');
                     if (z) domSelect(z);
+                    domPaint();
+                    setTimeout(() => { if (dominanzMap) dominanzMap.invalidateSize(); domPaint(); }, 300);
+                    setTimeout(() => { if (dominanzMap) dominanzMap.invalidateSize(); domPaint(); }, 700);
                 })
                 .catch(() => {
                     setDomStatus('Bergdaten (peaks.json) konnten nicht geladen werden. Bitte Seite neu laden.');
@@ -2084,7 +2090,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             domCircle = (p.isolation > 0) ? domGeodesic(p, p.isolation * 1000) : null;
             if (domCircle && document.getElementById('dom-show-circle').checked) domCircle.addTo(dominanzMap);
             domSelMarker = L.marker([p.lat, p.lon], { icon: domIcon(true), title: p.name }).addTo(dominanzMap);
-            if (domCircle) dominanzMap.fitBounds(domCircle.getBounds().pad(0.35), { maxZoom: 14, animate: false });
+            if (domCircle) dominanzMap.fitBounds(domCircle.getBounds().pad(0.4), { maxZoom: 12, animate: false });
             else dominanzMap.setView([p.lat, p.lon], 8);
             domPaint();
 
