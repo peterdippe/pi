@@ -210,11 +210,13 @@
         /* MAIN CONTENT */
         .main-content {
             flex: 1;
-            padding: 32px 38px;
-            max-width: 1340px;
-            margin: 0 auto;
+            padding: 32px 40px;
+            max-width: none;        /* volle Bildschirmbreite auf allen Seiten */
+            margin: 0;
             width: 100%;
         }
+        /* Ab sehr breiten Schirmen etwas mehr Luft an den Seiten */
+        @media (min-width: 1700px) { .main-content { padding: 36px 64px; } }
 
         .page-section { display: none; animation: fadeIn 0.28s ease-out; }
         .page-section.active { display: block; }
@@ -247,8 +249,8 @@
         .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
         .hero-grid { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 30px; align-items: center; }
         .home-bottom-grid { display: grid; grid-template-columns: 1.35fr 0.85fr; gap: 24px; }
-        .area-layout { display: grid; grid-template-columns: 1.65fr 1fr; gap: 20px; align-items: stretch; }
-        .dominanz-layout { display: grid; grid-template-columns: 1.55fr 1fr; gap: 20px; align-items: start; }
+        .area-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 22px; align-items: stretch; }
+        .dominanz-layout { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(320px, 1fr); gap: 22px; align-items: start; }
 
         /* Berg-Atlas: Legende */
         .dom-legend {
@@ -417,12 +419,25 @@
         #dominanzMapContainer { height: 560px; width: 100%; border-radius: 14px; border: 2px solid var(--border-sand); z-index: 10; }
 
         /* Berg-Atlas: Marker & Bezugsgipfel */
-        .domPeakDot { border-radius: 50%; background: #10b981; border: 2px solid #065f46; box-shadow: 0 0 0 1px #fff; }
-        .domPeakDot.active { background: #fbbf24; border-color: #d97706; }
+        .domPeakDot { border-radius: 50%; border: 1.5px solid rgba(0,0,0,0.45); box-shadow: 0 0 0 1px rgba(255,255,255,0.65); }
+        /* gewaehlter Berg = schwarzer Punkt */
+        .domSelDot { display:block; width:18px; height:18px; border-radius:50%; background:#111; border:3px solid #fff; box-shadow:0 0 0 2px #111; }
+        /* Bezugsberg = weisser Punkt */
         .domHigherPeak { display: flex; align-items: center; justify-content: center; }
-        .domHigherCore { display: block; width: 16px; height: 16px; border-radius: 50%; background: #ef4444; border: 3px solid #fff; box-shadow: 0 0 0 2px #ef4444; animation: domPulse 1.1s ease-in-out infinite; }
-        @keyframes domPulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.35); opacity: .65; } }
+        .domHigherCore { display: block; width: 18px; height: 18px; border-radius: 50%; background: #fff; border: 3px solid #111; box-shadow: 0 0 0 2px #fff; animation: domPulse 1.1s ease-in-out infinite; }
+        @keyframes domPulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.3); opacity: .7; } }
         .domHigherTip { font-weight: 700; }
+
+        /* Berg-Atlas: Farblegende */
+        .dom-legend {
+            display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+            background: var(--bg-sand-light); border: 1px solid var(--border-sand);
+            border-radius: 12px; padding: 10px 14px; margin-bottom: 12px;
+            font-size: 12px; color: var(--text-dark);
+        }
+        .dom-legend-item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+        .dom-legend-dot { display: inline-block; width: 13px; height: 13px; border-radius: 50%; border: 1.5px solid rgba(0,0,0,0.3); }
+        .dom-legend-sep { color: var(--border-sand); font-weight: 700; }
         .dom-higher-btn {
             width: 100%; text-align: left; cursor: pointer; border: 2px solid #ef4444;
             background: #fef2f2; color: #991b1b; font-family: inherit; font-weight: 800;
@@ -1273,8 +1288,24 @@ Das umschließende Polygon, der kleinste Umkreis nach Welzl sowie die Mittelpunk
                     </div>
                 </div>
 
+                <!-- Farblegende (Höhenklassen) über der Karte -->
+                <div class="dom-legend" id="dom-legend">
+                    <strong style="font-size:12px; margin-right:2px;">Höhe ü. NN:</strong>
+                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#1a6b2e;"></span> 500–1000 m</span>
+                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#5bd16a;"></span> 1000–2000 m</span>
+                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#f2d307;"></span> 2000–3000 m</span>
+                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#d9a406;"></span> 3000–4000 m</span>
+                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#f27405;"></span> 4000–5000 m</span>
+                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#f2766e;"></span> 5000–6000 m</span>
+                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#e01b1b;"></span> 6000–7000 m</span>
+                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#8b2fc9;"></span> &gt; 7000 m</span>
+                    <span class="dom-legend-sep">|</span>
+                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#111;"></span> gewählter Berg</span>
+                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#fff; border-color:#111;"></span> Bezugsberg</span>
+                </div>
+
                 <div style="font-size:11.5px; color:#64748b; margin-bottom:12px;">
-                    <span id="dom-count">lade Gipfel …</span> · Daten aus Wikidata/Wikipedia · Start: Zugspitze
+                    <span id="dom-count">lade Gipfel …</span> · <span id="dom-visible"></span> Daten aus Wikidata/Wikipedia · Start: Zugspitze
                 </div>
 
                 <!-- Hauptbereich: Links Karte, Rechts Suche & Gipfel-Details -->
@@ -1972,22 +2003,63 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
 
         function dominanzWorldView() { if (dominanzMap) dominanzMap.setView([25, 10], 2); }
 
-        const domIcon = (sel = false) => L.divIcon({ className: 'domPeakDot' + (sel ? ' active' : ''), iconSize: sel ? [16, 16] : [10, 10] });
+        // Farbe nach Hoehenklasse (8 Stufen, exakt laut Legende)
+        function domColorForHeight(h) {
+            if (h == null) return '#94a3b8';     // unbekannt -> grau
+            if (h > 7000) return '#8b2fc9';        // violett
+            if (h >= 6000) return '#e01b1b';       // rot
+            if (h >= 5000) return '#f2766e';       // hellrot
+            if (h >= 4000) return '#f27405';       // orange
+            if (h >= 3000) return '#d9a406';       // dunkelgelb
+            if (h >= 2000) return '#f2d307';       // gelb
+            if (h >= 1000) return '#5bd16a';       // hellgruen
+            return '#1a6b2e';                      // dunkelgruen (500-1000 m)
+        }
+        // Punktgroesse leicht nach Hoehe skaliert
+        function domRadiusForHeight(h) {
+            if (h == null) return 5;
+            if (h > 7000) return 9;
+            if (h >= 5000) return 8;
+            if (h >= 3000) return 7;
+            if (h >= 2000) return 6;
+            return 5;
+        }
 
-        // Hintergrund-Gipfel im Ausschnitt zeichnen (Dichte je Zoom begrenzt)
+        // Maximale Punktzahl je Zoomstufe (gegen Ueberladung bei ~88.000 Bergen)
+        function domMaxForZoom(z) {
+            if (z <= 3)  return 60;
+            if (z <= 4)  return 110;
+            if (z <= 5)  return 180;
+            if (z <= 6)  return 260;
+            if (z <= 7)  return 360;
+            if (z <= 8)  return 480;
+            if (z <= 10) return 650;
+            return 850;
+        }
+
+        // Hintergrund-Gipfel im Ausschnitt zeichnen.
+        // Dichte je Zoom begrenzt; beim Rauszoomen haben HOHE Berge Vorrang
+        // (Sortierung nach Hoehe absteigend + Cap).
         function domPaint() {
             if (!domMarkers || !dominanzMap) return;
             domMarkers.clearLayers();
-            const b = dominanzMap.getBounds();
-            const cap = dominanzMap.getZoom() > 7 ? 350 : 200;
-            domPeaks
+            const b = dominanzMap.getBounds().pad(0.08);
+            const cap = domMaxForZoom(dominanzMap.getZoom());
+            const shown = domPeaks
                 .filter(p => b.contains([p.lat, p.lon]) && p.id !== domActive?.id && p.id !== domReference?.id)
                 .sort((a, c) => (c.height || 0) - (a.height || 0))
-                .slice(0, cap)
-                .forEach(p => L.marker([p.lat, p.lon], { icon: domIcon(), title: p.name })
-                    .bindTooltip(domEsc(p.name))
-                    .on('click', () => domSelect(p))
-                    .addTo(domMarkers));
+                .slice(0, cap);
+            shown.forEach(p => {
+                const r = domRadiusForHeight(p.height);
+                L.circleMarker([p.lat, p.lon], {
+                    radius: r, color: 'rgba(0,0,0,0.45)', weight: 1,
+                    fillColor: domColorForHeight(p.height), fillOpacity: 0.95
+                }).bindTooltip(domEsc(p.name) + (p.height != null ? ' (' + domNum(p.height) + ' m)' : ''))
+                  .on('click', () => domSelect(p))
+                  .addTo(domMarkers);
+            });
+            const vis = document.getElementById('dom-visible');
+            if (vis) vis.textContent = shown.length + ' sichtbar ·';
         }
 
         function domDistanceKm(a, b) {
@@ -2012,10 +2084,10 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                 while (deg - p.lon < -180) deg += 360;
                 pts.push([lat * 180 / Math.PI, deg]);
             }
+            // Kreis um den aktuellen Berg: blau gestrichelt (weisser Halo fuer Kontrast)
             return L.featureGroup([
-                L.polygon(pts, { color: '#ffffff', weight: 9, opacity: .95, fill: false, interactive: false }),
-                L.polygon(pts, { color: '#9a3412', weight: 5, opacity: 1, fillColor: '#f97316', fillOpacity: .16, interactive: false }),
-                L.polygon(pts, { color: '#ffad47', weight: 3, opacity: 1, fill: false, interactive: false })
+                L.polygon(pts, { color: '#ffffff', weight: 6, opacity: .9, fill: false, interactive: false }),
+                L.polygon(pts, { color: '#2563eb', weight: 3, opacity: 1, dashArray: '10, 8', fillColor: '#3b82f6', fillOpacity: .10, interactive: false })
             ]);
         }
 
@@ -2089,7 +2161,11 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             if (domSelMarker) dominanzMap.removeLayer(domSelMarker);
             domCircle = (p.isolation > 0) ? domGeodesic(p, p.isolation * 1000) : null;
             if (domCircle && document.getElementById('dom-show-circle').checked) domCircle.addTo(dominanzMap);
-            domSelMarker = L.marker([p.lat, p.lon], { icon: domIcon(true), title: p.name }).addTo(dominanzMap);
+            // gewaehlter Berg = schwarzer Punkt
+            domSelMarker = L.marker([p.lat, p.lon], {
+                icon: L.divIcon({ className: 'domSelWrap', html: '<span class="domSelDot"></span>', iconSize: [18, 18] }),
+                title: p.name, zIndexOffset: 1100
+            }).addTo(dominanzMap);
             if (domCircle) dominanzMap.fitBounds(domCircle.getBounds().pad(0.4), { maxZoom: 12, animate: false });
             else dominanzMap.setView([p.lat, p.lon], 8);
             domPaint();
