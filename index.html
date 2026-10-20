@@ -214,20 +214,24 @@
             max-width: none;        /* volle Bildschirmbreite auf allen Seiten */
             margin: 0;
             width: 100%;
-            /* Volle Hoehe ausnutzen: Inhalt fuellt mindestens den Viewport */
-            min-height: 100vh;
+            /* Exakt an die Fensterhoehe binden: nie hoeher als der Viewport,
+               Padding eingerechnet -> kein aeusserer Scrollbalken. */
+            height: 100vh;
             display: flex;
             flex-direction: column;
             box-sizing: border-box;
+            overflow: hidden;
         }
         /* Ab sehr breiten Schirmen etwas mehr Luft an den Seiten */
         @media (min-width: 1700px) { .main-content { padding: 36px 64px; } }
 
         .page-section { display: none; animation: fadeIn 0.28s ease-out; }
-        /* Aktive Seite fuellt die verfuegbare Hoehe der main-content-Spalte */
-        .page-section.active { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
-        /* Seiten, die eine Karte/ein Tool enthalten, lassen ihr Haupt-Layout
-           den Restplatz in der Hoehe fuellen (Karten werden hoeher). */
+        /* Aktive Seite fuellt exakt die main-content-Hoehe. Inhalt, der nicht
+           passt, scrollt INNERHALB der Seite (kein Scrollbalken am Fensterrand). */
+        .page-section.active { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+        /* Karten-/Tool-Seiten fuellen die Hoehe und scrollen NICHT selbst -
+           dort uebernimmt das innere Layout (Karte waechst, Seitenspalte scrollt). */
+        #page-area-maps.active, #page-dominanz.active, #page-area-pur.active { overflow: hidden; }
         .page-section.active > .section-header { flex: 0 0 auto; }
         .page-section.active .fill-height { flex: 1 1 auto; min-height: 0; }
 
@@ -506,7 +510,8 @@
         #areaCanvas {
             width: 100%;
             height: auto;
-            max-width: 760px;
+            max-width: 100%;
+            aspect-ratio: 200 / 140;   /* passend zum 200x140-Koordinatensystem */
             background: #ffffff;
             border-radius: 12px;
             border: 2px solid var(--border-sand);
@@ -1441,7 +1446,7 @@ Das umschließende Polygon, der kleinste Umkreis nach Welzl sowie die Mittelpunk
                 </div>
 
                 <div class="area-layout">
-                    <div><canvas id="areaCanvas" width="760" height="580"></canvas></div>
+                    <div><canvas id="areaCanvas" width="1000" height="700"></canvas></div>
                     <div>
                         <textarea id="area-output-text" class="output-textarea" readonly>Klicke oben auf „Start“, um mit der Maus Punkte im Koordinatensystem (130 x 100) zu sammeln.
 
@@ -3003,12 +3008,12 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         }
 
         // -----------------------------------------------------------------
-        // 9. PURE MATH (Klassisches 130x100 Koordinatensystem)
+        // 9. PURE MATH (Koordinatensystem 200 breit x 140 hoch)
         // -----------------------------------------------------------------
         const canvas = document.getElementById('areaCanvas');
         const ctx = canvas.getContext('2d');
         const PAD = { left: 48, right: 22, top: 22, bottom: 42 };
-        const X_MAX = 130, Y_MAX = 100;
+        const X_MAX = 200, Y_MAX = 140;
         let areaState = { collecting: false, points: [], hullEdges: [], M_A: null, M_M: null, M_U: null };
 
         function toCanvasX(x) { return PAD.left + (x / X_MAX) * (canvas.width - PAD.left - PAD.right); }
