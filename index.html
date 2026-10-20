@@ -427,6 +427,8 @@
         .domHigherCore { display: block; width: 18px; height: 18px; border-radius: 50%; background: #fff; border: 3px solid #111; box-shadow: 0 0 0 2px #fff; animation: domPulse 1.1s ease-in-out infinite; }
         @keyframes domPulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.3); opacity: .7; } }
         .domHigherTip { font-weight: 700; }
+        /* Eigener Mess-Punkt = blauer Punkt */
+        .domPickDot { display:block; width:16px; height:16px; border-radius:50%; background:#2563eb; border:3px solid #fff; box-shadow:0 0 0 2px #2563eb; }
 
         /* Berg-Atlas: Farblegende */
         .dom-legend {
@@ -1278,16 +1280,14 @@ Das umschließende Polygon, der kleinste Umkreis nach Welzl sowie die Mittelpunk
                 <!-- Obere Steuerleiste -->
                 <div class="toolbar-box" style="margin-bottom:16px;">
                     <div style="display:flex; flex-wrap:wrap; align-items:center; gap:6px;">
-                        <strong style="font-size:12.5px; margin-right:4px;">Kartenansicht:</strong>
-                        <button onclick="setDominanzLayer('topo')" id="dom-layer-topo" class="layer-btn active">⛰️ Topografisch</button>
-                        <button onclick="setDominanzLayer('osm')" id="dom-layer-osm" class="layer-btn">OpenStreetMap</button>
-                        <button onclick="setDominanzLayer('google-sat')" id="dom-layer-google-sat" class="layer-btn">Google Satellit</button>
-                        <button onclick="setDominanzLayer('google-streets')" id="dom-layer-google-streets" class="layer-btn">Google Straßen</button>
-                    </div>
-                    <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
-                        <label style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; cursor:pointer;">
+                        <strong style="font-size:12.5px; margin-right:4px;">🗺️ Karte:</strong>
+                        <select id="dom-layer-select" class="form-input" style="max-width:200px;" onchange="setDominanzLayer(this.value)"></select>
+                        <label style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; cursor:pointer; margin-left:4px;">
                             <input type="checkbox" id="dom-show-circle" checked> <span id="dom-circle-label">Dominanzradius</span>
                         </label>
+                    </div>
+                    <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
+                        <button id="dom-pick-btn" class="btn btn-amber" style="padding:8px 12px; font-size:12.5px;" onclick="toggleDomPickMode()">📍 Eigenen Punkt setzen: AUS</button>
                         <button class="btn btn-emerald" style="padding:8px 14px; font-size:12.5px;" onclick="openDominanzInfo()">❓ Was ist Dominanz?</button>
                         <button class="btn btn-dark" style="padding:8px 12px; font-size:12.5px;" onclick="dominanzWorldView()">🌍 Weltansicht</button>
                     </div>
@@ -1594,7 +1594,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                 'google-streets': L.tileLayer('//mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 20, attribution: '© Google Maps' }),
                 'google-sat':     L.tileLayer('//mt1.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', { maxZoom: 20, attribution: '© Google Satellit' }),
                 'topo':           L.tileLayer('//{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, attribution: '© OpenTopoMap' }),
-                'carto-voyager':  L.tileLayer('//{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 20, subdomains: 'abcd', attribution: '© OpenStreetMap, © CARTO' }),
                 'esri-sat':       L.tileLayer('//server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Esri, Maxar, Earthstar Geographics' })
             };
         }
@@ -1604,11 +1603,21 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             'google-streets': 'Google Maps',
             'google-sat': 'Google Satellit',
             'topo': 'Topografie',
-            'carto-voyager': 'CARTO Voyager (hell)',
             'esri-sat': 'Esri Luftbild (3D-artig)'
         };
         // Reihenfolge im Dropdown (Standard zuerst)
-        const LAYER_ORDER = ['osm', 'google-streets', 'google-sat', 'topo', 'carto-voyager', 'esri-sat'];
+        const LAYER_ORDER = ['osm', 'google-streets', 'google-sat', 'topo', 'esri-sat'];
+        // Externe Kartenlinks je Ebene fuer "Groessere Karte & Route"
+        function externalMapUrl(key, lat, lon, z) {
+            z = z || 17;
+            switch (key) {
+                case 'google-streets': return `https://www.google.com/maps/@${lat},${lon},${z}z`;
+                case 'google-sat':     return `https://www.google.com/maps/@${lat},${lon},${z}z/data=!3m1!1e3`;
+                case 'topo':           return `https://www.opentopomap.org/#map=${z}/${lat}/${lon}`;
+                case 'esri-sat':       return `https://www.arcgis.com/apps/mapviewer/index.html?center=${lon},${lat}&level=${z}`;
+                default:               return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=${z}/${lat}/${lon}`;
+            }
+        }
 
         function fillLayerSelect(selId, current) {
             const sel = document.getElementById(selId);
@@ -1631,6 +1640,14 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             setHomeLocation(homeLocId);
         }
 
+        let homeLayerKey = 'osm';  // aktuell gewaehlte Kartenebene der Startseite
+
+        function updateHomeRouteLink() {
+            const loc = HOME_LOCATIONS.find(l => l.id === homeLocId);
+            const link = document.getElementById('home-route-link');
+            if (loc && link) link.href = externalMapUrl(homeLayerKey, loc.lat, loc.lon, 17);
+        }
+
         function setHomeLocation(id) {
             const loc = HOME_LOCATIONS.find(l => l.id === id);
             if (!loc || !homeMap) return;
@@ -1641,16 +1658,17 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             homeMarker.bindPopup(`<b>${loc.fam}</b><br>${loc.addr}<br>${loc.plz}`).openPopup();
             const t = document.getElementById('home-loc-title');
             if (t) t.textContent = '📍 ' + loc.addr + ', ' + loc.plz;
-            const link = document.getElementById('home-route-link');
-            if (link) link.href = 'https://www.openstreetmap.org/?mlat=' + loc.lat + '&mlon=' + loc.lon + '#map=17/' + loc.lat + '/' + loc.lon;
             const sel = document.getElementById('home-loc-select');
             if (sel && sel.value !== id) sel.value = id;
+            updateHomeRouteLink();
         }
 
         function setHomeLayer(key) {
             if (!homeMap || !homeLayers[key]) return;
             Object.values(homeLayers).forEach(l => homeMap.removeLayer(l));
             homeLayers[key].addTo(homeMap);
+            homeLayerKey = key;
+            updateHomeRouteLink();
         }
         window.addEventListener('DOMContentLoaded', () => {
             initHomeMap();
@@ -1970,6 +1988,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
 
         let dominanzMap = null;
         let dominanzLayers = {};
+        let domLayerKey = 'topo';  // aktuell gewaehlte Kartenebene im Atlas
         let domPeaks = [];                 // geladene Gipfel (peaks.json + online dazugeholte)
         let domActive = null;              // aktuell gewaehlter Gipfel
         let domReference = null;           // aktueller Bezugsgipfel (naechsthoeherer)
@@ -1984,16 +2003,18 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             if (dominanzMap || typeof L === 'undefined') return;
             dominanzMap = L.map('dominanzMapContainer', { zoomControl: true, minZoom: 2, maxZoom: 17 })
                            .setView([30, 15], 3);
-            dominanzLayers = {
-                'topo': L.tileLayer('//{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, attribution: '© OpenTopoMap (CC-BY-SA), © OpenStreetMap' }),
-                'osm': L.tileLayer('//{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }),
-                'google-sat': L.tileLayer('//mt1.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', { maxZoom: 20, attribution: '© Google Satellite' }),
-                'google-streets': L.tileLayer('//mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 20, attribution: '© Google Maps' })
-            };
+            // Gemeinsame Kartenebenen (wie Startseite) + Topografie als Default
+            dominanzLayers = buildLayerSet();
             dominanzLayers['topo'].addTo(dominanzMap);
+            domLayerKey = 'topo';
+            fillLayerSelect('dom-layer-select', 'topo');
             domMarkers = L.layerGroup().addTo(dominanzMap);
             L.control.scale({ imperial: false }).addTo(dominanzMap);
             dominanzMap.on('moveend zoomend', domPaint);
+            // Klick: entweder eigenen Punkt messen, sonst normal
+            dominanzMap.on('click', (e) => {
+                if (domPickMode) measureDomPoint(e.latlng.lat, e.latlng.lng);
+            });
 
             // Suche
             const si = document.getElementById('dom-search-input');
@@ -2008,6 +2029,93 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             };
 
             loadDominanzData();
+        }
+
+        // --- Eigener Punkt: Dominanz per Kartenklick messen ---
+        let domPickMode = false;
+        let domPickMarker = null;
+        function toggleDomPickMode() {
+            domPickMode = !domPickMode;
+            const btn = document.getElementById('dom-pick-btn');
+            if (!dominanzMap) return;
+            if (domPickMode) {
+                btn.textContent = '📍 Eigenen Punkt setzen: AN (auf Karte klicken)';
+                btn.className = 'btn btn-emerald';
+                dominanzMap.getContainer().style.cursor = 'crosshair';
+                setDomStatus('Klicke auf die Karte, um die Dominanz eines beliebigen Punkts zu messen.');
+            } else {
+                btn.textContent = '📍 Eigenen Punkt setzen: AUS';
+                btn.className = 'btn btn-amber';
+                dominanzMap.getContainer().style.cursor = '';
+                setDomStatus('');
+            }
+        }
+
+        // Fuer einen beliebigen Kartenpunkt: Hoehe live abfragen (Open-Meteo),
+        // naechsten hoeheren Gipfel im Datensatz finden, Dominanz = Distanz dahin.
+        function measureDomPoint(lat, lon) {
+            const token = ++domGen;
+            setDomStatus('Höhe & Dominanz werden berechnet …');
+            if (domPickMarker) dominanzMap.removeLayer(domPickMarker);
+            domPickMarker = L.marker([lat, lon], {
+                icon: L.divIcon({ className: 'domPickWrap', html: '<span class="domPickDot"></span>', iconSize: [16, 16] }),
+                title: 'Gewählter Punkt', zIndexOffset: 1200
+            }).addTo(dominanzMap);
+            fetch(`//api.open-meteo.com/v1/elevation?latitude=${lat.toFixed(5)}&longitude=${lon.toFixed(5)}`)
+                .then(r => r.ok ? r.json() : Promise.reject())
+                .then(data => {
+                    if (token !== domGen) return;
+                    const elev = (data && data.elevation && data.elevation.length) ? Math.round(data.elevation[0]) : null;
+                    // naechsten hoeheren Gipfel suchen
+                    let best = null, bestd = Infinity;
+                    for (const q of domPeaks) {
+                        if (elev != null && (q.height || 0) <= elev) continue;
+                        const d = domDistanceKm(lat, lon, q.lat, q.lon);
+                        if (d < bestd && d > 0.001) { bestd = d; best = q; }
+                    }
+                    const p = {
+                        id: 'pick', name: 'Gewählter Kartenpunkt', lat, lon,
+                        height: elev, isolation: best ? round2(bestd) : null, isoCalc: true,
+                        range: 'Live-Messung (Open-Meteo)',
+                        refName: best ? best.name : null, refLat: best ? best.lat : null, refLon: best ? best.lon : null
+                    };
+                    if (token !== domGen) return;
+                    renderPickResult(p, best);
+                    setDomStatus('');
+                })
+                .catch(() => { if (token === domGen) setDomStatus('Höhenabfrage nicht erreichbar – bitte erneut versuchen.'); });
+        }
+        function round2(x) { return Math.round(x * 100) / 100; }
+
+        // Zeigt das Ergebnis der Punktmessung: Kreis bis zum naechsten hoeheren
+        // Gipfel (blau gestrichelt) + Infokarte.
+        function renderPickResult(p, ref) {
+            domActive = p; domReference = ref || null;
+            if (domSelMarker) { dominanzMap.removeLayer(domSelMarker); domSelMarker = null; }
+            if (domRefMarker) { dominanzMap.removeLayer(domRefMarker); domRefMarker = null; }
+            if (domCircle) { dominanzMap.removeLayer(domCircle); domCircle = null; }
+            if (ref && p.isolation) {
+                domCircle = domGeodesic({lat:p.lat, lon:p.lon}, p.isolation * 1000, {lat:ref.lat, lon:ref.lon});
+                if (document.getElementById('dom-show-circle').checked) domCircle.addTo(dominanzMap);
+                let lon = ref.lon;
+                while (lon - p.lon > 180) lon -= 360; while (lon - p.lon < -180) lon += 360;
+                domRefMarker = L.marker([ref.lat, lon], {
+                    icon: L.divIcon({ className: 'domHigherPeak', html: '<span class="domHigherCore"></span>', iconSize: [22,22] }),
+                    title: 'Nächsthöherer Berg: ' + ref.name, zIndexOffset: 1000
+                }).bindTooltip(domEsc(ref.name), { permanent: true, direction: 'top', className: 'domHigherTip', offset: [0,-10] })
+                  .on('click', () => domSelect(ref)).addTo(dominanzMap);
+                const b = domCircle.getBounds(); b.extend([ref.lat, lon]);
+                dominanzMap.fitBounds(b.pad(0.25), { maxZoom: 13, animate: false });
+            }
+            document.getElementById('dom-detail').innerHTML =
+                '<div class="eyebrow-dark" style="display:block; margin-bottom:4px;">📍 Live-Messung (Open-Meteo)</div>' +
+                '<h3 style="font-size:22px; font-weight:800; margin:0 0 12px;">Gewählter Kartenpunkt</h3>' +
+                '<div class="person-grid-2" style="margin:0 0 10px;">' +
+                  '<div class="person-box" style="background:#ecfdf5; border-color:#a7f3d0;"><span class="person-role">Höhe (geschätzt)</span><div class="person-name" style="font-size:18px;">' + (p.height != null ? domNum(p.height) + ' m' : '–') + '</div></div>' +
+                  '<div class="person-box" style="background:#fffbeb; border-color:#fde68a;"><span class="person-role" style="color:var(--amber);">Dominanz ≈</span><div class="person-name" style="font-size:18px;">' + (p.isolation != null ? domNum(p.isolation, 2) + ' km' : '–') + '</div></div>' +
+                '</div>' +
+                (ref ? '<p class="dom-note">Nächsthöherer Gipfel: <b>' + domEsc(ref.name) + '</b> (' + domNum(ref.height) + ' m) – ' + domNum(p.isolation, 2) + ' km entfernt.</p>' : '<p class="dom-note">Kein höherer Gipfel im Datensatz gefunden.</p>') +
+                '<p class="dom-note">Koordinaten: ' + p.lat.toFixed(4) + '°, ' + p.lon.toFixed(4) + '°. Höhe live via Open-Meteo, Dominanz näherungsweise (Distanz zum nächsten höheren Gipfel).</p>';
         }
 
         // Hoehen-Plausibilisierung: Werte oberhalb des Mount Everest (8849 m) sind
@@ -2055,11 +2163,12 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
 
         function setDominanzLayer(key) {
             initDominanzMapIfNeeded();
-            if (!dominanzMap) return;
+            if (!dominanzMap || !dominanzLayers[key]) return;
             Object.values(dominanzLayers).forEach(l => dominanzMap.removeLayer(l));
             dominanzLayers[key].addTo(dominanzMap);
-            document.querySelectorAll('[id^="dom-layer-"]').forEach(b => b.classList.remove('active'));
-            document.getElementById('dom-layer-' + key).classList.add('active');
+            domLayerKey = key;
+            const sel = document.getElementById('dom-layer-select');
+            if (sel && sel.value !== key) sel.value = key;
         }
 
         function dominanzWorldView() { if (dominanzMap) dominanzMap.setView([25, 10], 2); }
@@ -2210,6 +2319,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         function domSelect(p, known) {
             if (!dominanzMap) return;
             if (domRefMarker) { dominanzMap.removeLayer(domRefMarker); domRefMarker = null; }
+            if (domPickMarker) { dominanzMap.removeLayer(domPickMarker); domPickMarker = null; }
             domReference = null;
             document.getElementById('dom-circle-label').textContent = 'Dominanzradius';
             domActive = p;
