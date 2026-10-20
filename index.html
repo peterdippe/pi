@@ -1286,7 +1286,7 @@ Das umschließende Polygon, der kleinste Umkreis nach Welzl sowie die Mittelpunk
                     <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#d97706; width:12px; height:12px;"></span> 1000–2000 m</span>
                     <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#059669; width:10px; height:10px;"></span> 500–1000 m</span>
                     <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#0d9488; width:8px; height:8px;"></span> &lt; 500 m</span>
-                    <span class="dom-legend-hint">Beim Reinzoomen erscheinen auch kleinere Gipfel.</span>
+                    <span class="dom-legend-hint">Gipfel werden live aus OpenStreetMap geladen – beim Reinzoomen erscheinen auch kleinere.</span>
                 </div>
 
                 <!-- Hauptbereich: Links Karte, Rechts Gipfel-Details & Suche -->
@@ -2019,6 +2019,24 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         let dominanzCustomClickMode = false;
         const wikiCache = {};  // Zwischenspeicher fuer Wikipedia-Kurzbeschreibungen
 
+        // --- Live-Gipfeldaten aus OpenStreetMap (Overpass) ---
+        // livePeaks: aktuell im Kartenausschnitt geladene Gipfel (dynamisch).
+        // peakCache: schon aufgeloeste Gipfel (per osm-id), damit Auswahl/Klick stabil bleibt.
+        let livePeaks = [];
+        const peakCache = {};
+        let selectedPeak = null;      // aktuell gewaehltes Gipfel-Objekt (DB oder live)
+        let liveLoadToken = 0;        // verwirft veraltete Antworten
+        let liveLoadTimer = null;     // Debounce fuer moveend/zoomend
+        const OVERPASS_ENDPOINTS = [
+            'https://overpass-api.de/api/interpreter',
+            'https://overpass.kumi.systems/api/interpreter',
+            'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
+        ];
+        let overpassIdx = 0;
+
+        // Fuege alle kuratierten DB-Gipfel in den Cache ein (stabile Auswahl + Fallback)
+        PEAK_DB.forEach(p => { peakCache['db:' + p.id] = { ...p, key: 'db:' + p.id }; });
+
         function haversineKm(lat1, lon1, lat2, lon2) {
             const R = 6371.0;
             const dLat = (lat2 - lat1) * Math.PI / 180.0;
@@ -2064,17 +2082,148 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                 evaluateCustomDominanzPoint(e.latlng.lat, e.latlng.lng);
             });
 
-            // Bei jeder Zoom-/Verschiebe-Aktion die Punktdichte neu bestimmen
+            // Bei jeder Zoom-/Verschiebe-Aktion Gipfel fuer den Ausschnitt live nachladen
             dominanzMap.on('zoomend moveend', () => {
                 updateDominanzZoomBadge();
-                renderDominanzMarkers();
+                scheduleLivePeakLoad();
             });
 
             buildRegionSelectors();
             updateDominanzZoomBadge();
+            renderDominanzList();
+            selectDominanzPeak('db:lilienstein', false);
+            scheduleLivePeakLoad();
+        }
+
+        // ---------- Live-Laden der Gipfel aus OpenStreetMap (Overpass) ----------
+        // Debounce: erst 450 ms nach der letzten Karteninteraktion abfragen.
+        function scheduleLivePeakLoad() {
+            clearTimeout(liveLoadTimer);
+            liveLoadTimer = setTimeout(loadLivePeaks, 450);
+        }
+
+        // Wie viele Gipfel duerfen maximal gleichzeitig auf der Karte liegen?
+        // Niedriger Zoom = wenige grosse Berge, hoher Zoom = mehr Details.
+        function maxPeaksForZoom(zoom) {
+            if (zoom <= 4)  return 25;
+            if (zoom <= 6)  return 45;
+            if (zoom <= 8)  return 80;
+            if (zoom <= 10) return 140;
+            if (zoom <= 12) return 220;
+            return 320;
+        }
+
+        function loadLivePeaks() {
+            if (!dominanzMap) return;
+            const zoom = dominanzMap.getZoom();
+            const b = dominanzMap.getBounds();
+            const minElev = minElevForZoom(zoom);
+            const token = ++liveLoadToken;
+            setLiveStatus('loading');
+
+            // Overpass-Bbox: (sued, west, nord, ost)
+            const bbox = `${b.getSouth().toFixed(4)},${b.getWest().toFixed(4)},${b.getNorth().toFixed(4)},${b.getEast().toFixed(4)}`;
+            // Nur benannte Gipfel abfragen (spart Datenmenge). Limit grosszuegig,
+            // die eigentliche Ausduennung passiert clientseitig nach Hoehe.
+            const query = `[out:json][timeout:25];(node["natural"="peak"]["name"](${bbox}););out body 2500;`;
+            const endpoint = OVERPASS_ENDPOINTS[overpassIdx % OVERPASS_ENDPOINTS.length];
+
+            fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'data=' + encodeURIComponent(query)
+            })
+            .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+            .then(data => {
+                if (token !== liveLoadToken) return; // veraltete Antwort verwerfen
+                const parsed = (data.elements || [])
+                    .map(parseOverpassPeak)
+                    .filter(Boolean);
+                mergeLivePeaks(parsed, minElev, zoom);
+                setLiveStatus('ok');
+            })
+            .catch(() => {
+                if (token !== liveLoadToken) return;
+                // Endpoint wechseln und auf DB-Fallback zurueckfallen
+                overpassIdx++;
+                mergeLivePeaks([], minElev, zoom, true);
+                setLiveStatus('error');
+            });
+        }
+
+        // Overpass-Element -> einheitliches Gipfel-Objekt
+        function parseOverpassPeak(el) {
+            if (el.type !== 'node' || !el.tags || !el.tags.name) return null;
+            const t = el.tags;
+            let elev = null;
+            if (t.ele) {
+                const m = ('' + t.ele).replace(',', '.').match(/-?\d+(\.\d+)?/);
+                if (m) elev = Math.round(parseFloat(m[0]));
+            }
+            // Wikipedia-Tag: "de:Titel" oder "en:Title"
+            let wiki = null, wikiLang = 'de';
+            if (t.wikipedia && t.wikipedia.includes(':')) {
+                const [lang, ...rest] = t.wikipedia.split(':');
+                wikiLang = lang; wiki = rest.join(':');
+            }
+            return {
+                key: 'osm:' + el.id,
+                id: 'osm:' + el.id,
+                name: t.name,
+                region: t.region || '', country: '', continent: '',
+                lat: el.lat, lng: el.lon,
+                elev: elev != null ? elev : 0,
+                hasElev: elev != null,
+                prom: null, dom: null,
+                refName: null, refLat: null, refLng: null,
+                wiki, wikiLang,
+                source: 'osm'
+            };
+        }
+
+        // Live-Ergebnis + DB-Gipfel zusammenfuehren, nach Hoehe ausduennen & cappen
+        function mergeLivePeaks(osmPeaks, minElev, zoom, fallbackOnly = false) {
+            const b = dominanzMap.getBounds().pad(0.05);
+            // DB-Gipfel im Ausschnitt (immer verlaesslich, mit Dominanzdaten)
+            const dbInView = PEAK_DB
+                .filter(p => b.contains([p.lat, p.lng]))
+                .map(p => ({ ...peakCache['db:' + p.id] }));
+
+            // Zusammenfuehren, Duplikate (gleicher Name & nah beieinander) vermeiden
+            const combined = [...dbInView];
+            const seen = dbInView.map(p => p.name.toLowerCase());
+            osmPeaks.forEach(p => {
+                const dup = seen.some((n, i) =>
+                    n === p.name.toLowerCase() &&
+                    Math.abs(dbInView[i].lat - p.lat) < 0.03 &&
+                    Math.abs(dbInView[i].lng - p.lng) < 0.03);
+                if (!dup) { combined.push(p); peakCache[p.key] = p; }
+            });
+
+            // Nach Hoehe filtern (Gipfel ohne Hoehe nur ab Zoom 11 zeigen)
+            let filtered = combined.filter(p =>
+                (p.hasElev === false ? zoom >= 11 : (p.elev || 0) >= minElev));
+
+            // Nach Hoehe sortieren und auf das Zoom-Limit kappen (groesste zuerst)
+            filtered.sort((a, b2) => (b2.elev || 0) - (a.elev || 0));
+            const cap = maxPeaksForZoom(zoom);
+            if (filtered.length > cap) filtered = filtered.slice(0, cap);
+
+            // ausgewaehlten Gipfel immer behalten
+            if (selectedPeak && !filtered.some(p => p.key === selectedPeak.key)) {
+                filtered.push(selectedPeak);
+            }
+
+            livePeaks = filtered;
             renderDominanzMarkers();
             renderDominanzList();
-            selectDominanzPeak('lilienstein', false);
+        }
+
+        function setLiveStatus(state) {
+            const vb = document.getElementById('dom-visible-badge');
+            if (!vb) return;
+            if (state === 'loading') vb.dataset.loading = '1';
+            else delete vb.dataset.loading;
         }
 
         // --- Zoomabhaengige Mindesthoehe: beim Rauszoomen nur grosse Berge ---
@@ -2140,23 +2289,15 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         function renderDominanzMarkers() {
             if (!dominanzMarkerGroup || !dominanzMap) return;
             dominanzMarkerGroup.clearLayers();
-
-            const zoom = dominanzMap.getZoom();
-            const minElev = minElevForZoom(zoom);
-            const bounds = dominanzMap.getBounds().pad(0.25);
             let shown = 0;
 
-            PEAK_DB.forEach(p => {
-                const isSelected = p.id === selectedPeakId;
-                // Zoomabhaengig ausduennen: kleine Berge erst beim Reinzoomen.
-                // Der aktuell gewaehlte Gipfel bleibt immer sichtbar.
-                const inView = bounds.contains([p.lat, p.lng]);
-                if (!isSelected && (p.elev < minElev || !inView)) return;
-
-                const style = peakStyleByElev(p.elev, isSelected);
+            livePeaks.forEach(p => {
+                const isSelected = p.key === selectedPeakId;
+                const style = peakStyleByElev(p.elev || 0, isSelected);
                 const marker = L.circleMarker([p.lat, p.lng], style);
-                marker.bindTooltip(`⛰️ ${p.name} (${p.elev.toLocaleString('de-DE')} m)`, { direction: 'top' });
-                marker.on('click', () => selectDominanzPeak(p.id, true));
+                const elevTxt = p.hasElev === false ? '? m' : `${(p.elev || 0).toLocaleString('de-DE')} m`;
+                marker.bindTooltip(`⛰️ ${p.name} (${elevTxt})`, { direction: 'top' });
+                marker.on('click', () => selectDominanzPeak(p.key, true));
                 marker.addTo(dominanzMarkerGroup);
                 shown++;
             });
@@ -2166,21 +2307,52 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         }
 
         function selectDominanzPeak(peakId, fly = true) {
-            const p = PEAK_DB.find(x => x.id === peakId);
+            // Gipfel aus Cache / aktueller Live-Liste holen
+            let p = peakCache[peakId] || livePeaks.find(x => x.key === peakId);
             if (!p) return;
             selectedPeakId = peakId;
+            selectedPeak = p;
+
+            // Dominanz/Schartenhoehe fuer Live-Gipfel ohne Werte abschaetzen
+            ensurePeakMetrics(p);
 
             renderDominanzMarkers();
             renderDominanzList();
             drawDominanzVisualization(p, fly);
         }
 
+        // Fuer OSM-Gipfel ohne Dominanz/Bezug: naechsten hoeheren Gipfel grob schaetzen
+        function ensurePeakMetrics(p) {
+            if (p.dom != null && p.refName) return;
+            // Kandidaten: DB + aktuell geladene Gipfel
+            const pool = [...PEAK_DB, ...livePeaks];
+            let nearestHigher = null, minDist = Infinity;
+            for (const q of pool) {
+                if (q.key === p.key) continue;
+                if ((q.elev || 0) > (p.elev || 0)) {
+                    const d = haversineKm(p.lat, p.lng, q.lat, q.lng);
+                    if (d < minDist) { minDist = d; nearestHigher = q; }
+                }
+            }
+            if (nearestHigher) {
+                p.dom = Math.round(minDist * 10) / 10;
+                p.refName = `${nearestHigher.name} (${(nearestHigher.elev||0).toLocaleString('de-DE')} m)`;
+                p.refLat = nearestHigher.lat; p.refLng = nearestHigher.lng;
+                p.estimated = true;
+            } else {
+                p.dom = p.dom != null ? p.dom : 0;
+                p.refName = p.refName || 'Kein höherer Gipfel in Reichweite';
+            }
+            if (p.prom == null) p.prom = Math.max(0, Math.round((p.elev || 0) * 0.3));
+        }
+
         function drawDominanzVisualization(p, fly) {
             if (!dominanzOverlayGroup) return;
             dominanzOverlayGroup.clearLayers();
 
-            const domMeters = p.dom * 1000.0;
-            const domAreaKm2 = Math.PI * (p.dom ** 2);
+            const domVal = (typeof p.dom === 'number' && isFinite(p.dom)) ? p.dom : 0;
+            const domMeters = Math.max(domVal * 1000.0, 300); // Mindestradius fuer Sichtbarkeit
+            const domAreaKm2 = Math.PI * (domVal ** 2);
 
             // 1. Dominanz-Kreis (Radius = Dominanz)
             const circle = L.circle([p.lat, p.lng], {
@@ -2215,14 +2387,20 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             const regLabel = p.continent && p.country
                 ? `${p.region} · ${p.country}`
                 : (p.region || '');
-            document.getElementById('dom-peak-region').textContent = regLabel;
+            const regShown = regLabel || (p.source === 'osm' ? 'OpenStreetMap-Gipfel' : '');
+            document.getElementById('dom-peak-region').textContent = regShown;
             document.getElementById('dom-peak-coords').textContent = `${p.lat.toFixed(3)}° N, ${p.lng.toFixed(3)}° O`;
             document.getElementById('dom-peak-name').textContent = `⛰️ ${p.name}`;
-            document.getElementById('dom-peak-elev').textContent = `${p.elev.toLocaleString('de-DE')} m`;
-            document.getElementById('dom-peak-dom').textContent = `${p.dom.toLocaleString('de-DE', { maximumFractionDigits: 2 })} km`;
-            document.getElementById('dom-peak-prom').textContent = `${p.prom.toLocaleString('de-DE')} m`;
-            document.getElementById('dom-peak-area').textContent = `${domAreaKm2.toLocaleString('de-DE', { maximumFractionDigits: 1 })} km²`;
-            document.getElementById('dom-peak-ref').textContent = p.refName;
+            const estMark = p.estimated ? ' ≈' : '';
+            document.getElementById('dom-peak-elev').textContent = (p.hasElev === false)
+                ? 'unbekannt' : `${(p.elev || 0).toLocaleString('de-DE')} m`;
+            document.getElementById('dom-peak-dom').textContent =
+                `${estMark}${domVal.toLocaleString('de-DE', { maximumFractionDigits: 2 })} km`;
+            document.getElementById('dom-peak-prom').textContent =
+                (p.prom != null ? `${estMark}${p.prom.toLocaleString('de-DE')} m` : '–');
+            document.getElementById('dom-peak-area').textContent =
+                `${estMark}${domAreaKm2.toLocaleString('de-DE', { maximumFractionDigits: 1 })} km²`;
+            document.getElementById('dom-peak-ref').textContent = p.refName || '–';
 
             // Wikipedia-Kurzbeschreibung laden (nur fuer DB-Gipfel mit wiki-Titel)
             loadWikiSummary(p);
@@ -2240,32 +2418,40 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
 
             const title = p.wiki || p.name;
             if (!title || p.id === 'custom') {
-                txtEl.textContent = p.id === 'custom'
+                txtEl.textContent = (p.id === 'custom')
                     ? 'Freier Kartenpunkt – kein Wikipedia-Artikel.'
-                    : 'Keine Wikipedia-Zuordnung hinterlegt.';
-                linkEl.style.display = 'none';
+                    : 'Kein Wikipedia-Artikel in den OSM-Daten hinterlegt – Suche öffnet unten.';
+                // Fallback: Wikipedia-Suche nach dem Namen
+                if (p.name && p.id !== 'custom') {
+                    linkEl.style.display = '';
+                    linkEl.textContent = 'Auf Wikipedia suchen ↗';
+                    linkEl.href = 'https://de.wikipedia.org/w/index.php?search=' + encodeURIComponent(p.name);
+                } else {
+                    linkEl.style.display = 'none';
+                }
                 return;
             }
 
-            const artUrl = 'https://de.wikipedia.org/wiki/' + encodeURIComponent(title.replace(/ /g, '_'));
-            linkEl.href = artUrl;
+            // Sprache des Artikels (OSM liefert oft "de" oder "en" etc.)
+            const lang = (p.wikiLang && /^[a-z]{2,3}$/.test(p.wikiLang)) ? p.wikiLang : 'de';
+            const host = lang + '.wikipedia.org';
+            const cacheKey = lang + ':' + title;
+            linkEl.textContent = 'Zum Wikipedia-Artikel ↗';
+            linkEl.href = 'https://' + host + '/wiki/' + encodeURIComponent(title.replace(/ /g, '_'));
             linkEl.style.display = '';
 
-            if (wikiCache[title]) {
-                txtEl.textContent = wikiCache[title];
-                return;
-            }
+            if (wikiCache[cacheKey]) { txtEl.textContent = wikiCache[cacheKey]; return; }
 
             txtEl.textContent = 'Lade Kurzbeschreibung …';
-            const api = 'https://de.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(title);
+            const api = 'https://' + host + '/api/rest_v1/page/summary/' + encodeURIComponent(title);
             fetch(api)
                 .then(r => r.ok ? r.json() : Promise.reject())
                 .then(data => {
                     const extract = (data && data.extract) ? data.extract : null;
                     const text = extract || 'Keine Kurzbeschreibung gefunden – öffne den Artikel für Details.';
-                    wikiCache[title] = text;
+                    wikiCache[cacheKey] = text;
                     // Nur aktualisieren, wenn weiterhin dieser Gipfel gewaehlt ist
-                    if (selectedPeakId === p.id || p.id === 'custom') txtEl.textContent = text;
+                    if (selectedPeakId === p.key) txtEl.textContent = text;
                     if (data && data.content_urls && data.content_urls.desktop && data.content_urls.desktop.page) {
                         linkEl.href = data.content_urls.desktop.page;
                     }
@@ -2293,19 +2479,23 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                         }
                     }
                     const customPeak = {
-                        id: 'custom',
+                        key: 'custom', id: 'custom',
                         name: 'Gewählter Kartenpunkt',
                         continent: '', country: '',
                         region: 'Live-Höhenabfrage (Open-Meteo)',
+                        source: 'custom',
                         lat,
                         lng,
                         elev,
+                        hasElev: true,
                         prom: Math.round(elev * 0.25),
                         dom: nearestHigher ? Math.round(minDist * 100) / 100 : 500,
-                        refName: nearestHigher ? `${nearestHigher.name} (${nearestHigher.elev} m)` : 'Kein höherer Gipfel in DB',
+                        refName: nearestHigher ? `${nearestHigher.name} (${nearestHigher.elev} m)` : 'Kein höherer Gipfel in Reichweite',
                         refLat: nearestHigher ? nearestHigher.lat : null,
                         refLng: nearestHigher ? nearestHigher.lng : null
                     };
+                    selectedPeakId = 'custom';
+                    selectedPeak = customPeak;
                     drawDominanzVisualization(customPeak, true);
                 })
                 .catch(() => {});
@@ -2371,13 +2561,12 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             );
         }
 
-        // Karte passend zur Auswahl zoomen; danach ergeben sich die Punkte
-        // automatisch aus der zoomabhaengigen Dichte.
+        // Karte passend zur Auswahl zoomen; die Gipfel werden danach per
+        // Overpass live fuer den neuen Ausschnitt nachgeladen (zoomend/moveend).
         function applyRegionSelection() {
-            renderDominanzList();
             if (!dominanzMap) return;
             const pool = currentRegionPool();
-            if (pool.length === 0) return;
+            if (pool.length === 0) { scheduleLivePeakLoad(); return; }
 
             if (pool.length === 1) {
                 dominanzMap.setView([pool[0].lat, pool[0].lng], 11);
@@ -2385,39 +2574,46 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                 const bounds = L.latLngBounds(pool.map(p => [p.lat, p.lng]));
                 dominanzMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 });
             }
-            // Markerneuzeichnung kommt via moveend/zoomend; sofort nachziehen:
-            setTimeout(() => { updateDominanzZoomBadge(); renderDominanzMarkers(); }, 60);
+            updateDominanzZoomBadge();
+            scheduleLivePeakLoad();
         }
 
+        // Liste zeigt die aktuell auf der Karte sichtbaren (live geladenen) Gipfel,
+        // optional eingeschraenkt durch das Suchfeld.
         function renderDominanzList() {
             const q = (document.getElementById('dom-search-input').value || '').toLowerCase();
             const listEl = document.getElementById('dom-peak-list');
             if (!listEl) return;
 
-            const filtered = currentRegionPool().filter(p => {
+            const filtered = livePeaks.filter(p => {
+                if (!q) return true;
                 return p.name.toLowerCase().includes(q)
-                    || p.region.toLowerCase().includes(q)
-                    || (p.country && p.country.toLowerCase().includes(q))
-                    || (p.continent && p.continent.toLowerCase().includes(q));
-            }).sort((a, b) => b.elev - a.elev);
+                    || (p.region && p.region.toLowerCase().includes(q))
+                    || (p.country && p.country.toLowerCase().includes(q));
+            }).sort((a, b) => (b.elev || 0) - (a.elev || 0));
 
             if (filtered.length === 0) {
-                listEl.innerHTML = '<div style="padding:14px; text-align:center; color:#64748b; font-size:13px;">Keine Gipfel für diese Auswahl.</div>';
+                listEl.innerHTML = '<div style="padding:14px; text-align:center; color:#64748b; font-size:13px;">Noch keine Gipfel geladen – bewege oder zoome die Karte.</div>';
                 return;
             }
 
-            listEl.innerHTML = filtered.map(p => `
-                <div class="peak-item ${p.id === selectedPeakId ? 'active' : ''}" onclick="selectDominanzPeak('${p.id}', true)">
+            listEl.innerHTML = filtered.map(p => {
+                const sub = p.source === 'osm'
+                    ? (p.region ? p.region : 'OpenStreetMap')
+                    : `${p.region} · ${p.country}`;
+                const elevTxt = (p.hasElev === false) ? '?' : (p.elev || 0).toLocaleString('de-DE');
+                return `
+                <div class="peak-item ${p.key === selectedPeakId ? 'active' : ''}" onclick="selectDominanzPeak('${p.key}', true)">
                     <div>
                         <div style="font-weight:800; font-size:14px; color:var(--text-dark);">⛰️ ${p.name}</div>
-                        <div style="font-size:11.5px; color:#64748b;">${p.region} · ${p.country} · Dom: ${p.dom} km</div>
+                        <div style="font-size:11.5px; color:#64748b;">${sub}</div>
                     </div>
                     <div style="text-align:right; shrink:0;">
-                        <div style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:13px; color:var(--emerald-dark);">${p.elev.toLocaleString('de-DE')} m</div>
-                        <div style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--amber);">Prom: ${p.prom} m</div>
+                        <div style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:13px; color:var(--emerald-dark);">${elevTxt} m</div>
+                        <div style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--amber);">${p.source === 'osm' ? 'OSM' : 'kuratiert'}</div>
                     </div>
-                </div>
-            `).join('');
+                </div>`;
+            }).join('');
         }
 
         // Info-Modal: Was ist Dominanz?
