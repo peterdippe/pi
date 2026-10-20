@@ -229,13 +229,14 @@
         /* Aktive Seite fuellt exakt die main-content-Hoehe. Inhalt, der nicht
            passt, scrollt INNERHALB der Seite (kein Scrollbalken am Fensterrand). */
         .page-section.active { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
-        #page-home.active { overflow-y: hidden; }
+        #page-home.active { overflow-y: auto; }
         #page-home .hero-card { flex: 0 0 auto; }
         #page-home .home-bottom-grid { flex: 1 1 auto; min-height: 0; }
         #page-home #osm-map { height: 100%; min-height: 220px; }
         /* Karten-/Tool-Seiten fuellen die Hoehe und scrollen NICHT selbst -
            dort uebernimmt das innere Layout (Karte waechst, Seitenspalte scrollt). */
-        #page-area-maps.active, #page-dominanz.active, #page-area-pur.active { overflow: hidden; }
+        #page-area-maps.active, #page-dominanz.active { overflow: hidden; }
+        #page-area-pur.active { overflow-y: auto; }
         .page-section.active > .section-header { flex: 0 0 auto; }
         .page-section.active .fill-height { flex: 1 1 auto; min-height: 0; }
 
@@ -470,8 +471,8 @@
         #osm-map { height: 350px; width: 100%; border-radius: 16px; border: 2px solid var(--border-sand); z-index: 10; }
         /* Karten fuellen die verfuegbare Hoehe (mit sinnvollem Minimum),
            statt einer festen Pixelhoehe -> nutzt grosse Bildschirme aus. */
-        #mapsMathContainer { flex: 1 1 auto; min-height: 460px; height: auto; width: 100%; border-radius: 14px; border: 2px solid var(--border-sand); z-index: 10; cursor: crosshair; }
-        #dominanzMapContainer { flex: 1 1 auto; min-height: 480px; height: auto; width: 100%; border-radius: 14px; border: 2px solid var(--border-sand); z-index: 10; }
+        #mapsMathContainer { flex: 1 1 auto; min-height: 280px; height: auto; width: 100%; border-radius: 14px; border: 2px solid var(--border-sand); z-index: 10; cursor: crosshair; }
+        #dominanzMapContainer { flex: 1 1 auto; min-height: 320px; height: auto; width: 100%; border-radius: 14px; border: 2px solid var(--border-sand); z-index: 10; }
 
         /* Berg-Atlas: Marker & Bezugsgipfel */
         .domPeakDot { border-radius: 50%; border: 1.5px solid rgba(0,0,0,0.45); box-shadow: 0 0 0 1px rgba(255,255,255,0.65); }
@@ -532,6 +533,7 @@
         #areaCanvas {
             width: 100%;
             height: auto;
+            max-height: 380px; /* Begrenzt die maximale Höhe auf Laptops */
             max-width: 100%;
             aspect-ratio: 200 / 130;   /* passend zum 200x130-Koordinatensystem */
             background: #ffffff;
