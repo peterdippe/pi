@@ -745,7 +745,7 @@
                         <span class="badge">Gipfel</span>
                     </button>
                     <button onclick="switchPage('area-pur')" id="subnav-area-pur" class="sub-nav-btn">
-                        <span>📏 Pur Math</span>
+                        <span>📏 Pure Math</span>
                         <span class="badge">130×100</span>
                     </button>
                 </div>
@@ -1202,7 +1202,7 @@
                 <div style="display:flex; flex-wrap:wrap; gap:8px;">
                     <button class="btn btn-emerald" onclick="switchPage('area-maps')">🌍 Maps Math</button>
                     <button class="btn btn-sand" onclick="switchPage('dominanz')">⛰️ Berg-Dominanz-Atlas</button>
-                    <button class="btn btn-sand" onclick="switchPage('area-pur')">📏 Pur Math</button>
+                    <button class="btn btn-sand" onclick="switchPage('area-pur')">📏 Pure Math</button>
                 </div>
             </div>
 
@@ -1265,7 +1265,7 @@ Das umschließende Polygon, der kleinste Umkreis nach Welzl sowie die Mittelpunk
                 <div style="display:flex; flex-wrap:wrap; gap:8px;">
                     <button class="btn btn-sand" onclick="switchPage('area-maps')">🌍 Maps Math</button>
                     <button class="btn btn-emerald" onclick="switchPage('dominanz')">⛰️ Berg-Dominanz-Atlas</button>
-                    <button class="btn btn-sand" onclick="switchPage('area-pur')">📏 Pur Math</button>
+                    <button class="btn btn-sand" onclick="switchPage('area-pur')">📏 Pure Math</button>
                 </div>
             </div>
 
@@ -1291,7 +1291,7 @@ Das umschließende Polygon, der kleinste Umkreis nach Welzl sowie die Mittelpunk
                 <!-- Farblegende (Höhenklassen) über der Karte -->
                 <div class="dom-legend" id="dom-legend">
                     <strong style="font-size:12px; margin-right:2px;">Höhe ü. NN:</strong>
-                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#1a6b2e;"></span> 500–1000 m</span>
+                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#1a6b2e;"></span> &lt; 1000 m</span>
                     <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#5bd16a;"></span> 1000–2000 m</span>
                     <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#f2d307;"></span> 2000–3000 m</span>
                     <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#d9a406;"></span> 3000–4000 m</span>
@@ -1372,18 +1372,18 @@ Das umschließende Polygon, der kleinste Umkreis nach Welzl sowie die Mittelpunk
 
 
         <!-- ===============================================================
-             8. MAP-TOOLS (3): "PUR MATH" (130x100 KOORDINATENSYSTEM)
+             8. MAP-TOOLS (3): "PURE MATH" (130x100 KOORDINATENSYSTEM)
              =============================================================== -->
         <section id="page-area-pur" class="page-section">
             <div class="section-header">
                 <div>
                     <span class="eyebrow">Map-Tools · Klassisches Koordinatensystem</span>
-                    <h2 style="font-size:32px; font-weight:800;">📏 Pur Math</h2>
+                    <h2 style="font-size:32px; font-weight:800;">📏 Pure Math</h2>
                 </div>
                 <div style="display:flex; flex-wrap:wrap; gap:8px;">
                     <button class="btn btn-sand" onclick="switchPage('area-maps')">🌍 Maps Math</button>
                     <button class="btn btn-sand" onclick="switchPage('dominanz')">⛰️ Berg-Dominanz-Atlas</button>
-                    <button class="btn btn-amber" onclick="switchPage('area-pur')">📏 Pur Math</button>
+                    <button class="btn btn-amber" onclick="switchPage('area-pur')">📏 Pure Math</button>
                 </div>
             </div>
 
@@ -1971,7 +1971,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                     domInitDone = true;
                     setDomStatus('');
                     const cnt = document.getElementById('dom-count');
-                    if (cnt) cnt.textContent = domNum(domPeaks.filter(p => p.isolation != null).length) + ' Gipfel mit Dominanz';
+                    if (cnt) cnt.textContent = domNum(domPeaks.length) + ' Gipfel weltweit';
                     // Kartengroesse sicherstellen, dann Zugspitze waehlen und Marker zeichnen.
                     // Mehrfaches Nachzeichnen faengt den Fall ab, dass die Karte beim
                     // ersten Lauf noch keine gueltige Groesse/Bounds hatte.
@@ -2177,11 +2177,12 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                 '<h3 style="font-size:24px; font-weight:800; margin:0 0 12px;">⛰️ ' + domEsc(p.name) + '</h3>' +
                 '<div class="person-grid-2" style="margin:0 0 10px;">' +
                   '<div class="person-box" style="background:#ecfdf5; border-color:#a7f3d0;"><span class="person-role">Höhe ü. NHN</span><div class="person-name" style="font-size:18px;">' + domNum(p.height) + ' m</div></div>' +
-                  '<div class="person-box" style="background:#fffbeb; border-color:#fde68a;"><span class="person-role" style="color:var(--amber);">Dominanz</span><div class="person-name" style="font-size:18px;">' + (p.isolation != null ? domNum(p.isolation, 2) + ' km' : '–') + '</div></div>' +
+                  '<div class="person-box" style="background:#fffbeb; border-color:#fde68a;"><span class="person-role" style="color:var(--amber);">Dominanz' + (p.isoCalc ? ' ≈' : '') + '</span><div class="person-name" style="font-size:18px;">' + (p.isolation != null ? domNum(p.isolation, 2) + ' km' : '–') + '</div></div>' +
                 '</div>' +
                 '<div id="dom-higher" style="margin:4px 0 10px;"><p class="dom-note">Bezugsgipfel wird geprüft …</p></div>' +
                 '<p id="dom-summary" style="font-size:12.8px; line-height:1.55; color:#334155; margin:0 0 10px;"></p>' +
-                (p.isolation == null ? '<p class="dom-note">' + (p.id === 'Q513' ? 'Höchster Berg der Erde: kein höherer Berg und kein endlicher Dominanzkreis.' : 'Für diesen Berg ist in Wikidata kein Dominanzwert hinterlegt.') + '</p>' : '') +
+                (p.isoCalc ? '<p class="dom-note">≈ Dominanz aus Koordinaten berechnet (Distanz zum nächsten höheren Gipfel im Datensatz).</p>' : '') +
+                (p.isolation == null ? '<p class="dom-note">' + (p.id === 'Q513' ? 'Höchster Berg der Erde: kein höherer Berg und kein endlicher Dominanzkreis.' : 'Kein höherer Gipfel im Datensatz.') + '</p>' : '') +
                 '<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:4px;">' +
                   '<a class="btn btn-dark" id="dom-wiki" href="' + wikiSearch + '" target="_blank" rel="noopener" style="font-size:12px; padding:7px 12px;">Auf Wikipedia weiterlesen ↗</a>' +
                   '<a class="btn btn-sand" href="//www.wikidata.org/wiki/' + domEsc(p.id) + '" target="_blank" rel="noopener" style="font-size:12px; padding:7px 12px;">Wikidata ↗</a>' +
@@ -2314,7 +2315,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         function closeDominanzInfo() { document.getElementById('dom-info-modal').classList.remove('open'); }
 
         // -----------------------------------------------------------------
-        // 7. GEOMETRIE-KERN FÜR MAPS MATH & PUR MATH (Welzl, Polygon in Klickreihenfolge)
+        // 7. GEOMETRIE-KERN FÜR MAPS MATH & PURE MATH (Welzl, Polygon, Konvexhülle)
         // -----------------------------------------------------------------
 
         // Fläche eines Polygons in Klick-Reihenfolge (Gaußsche Trapezformel / Shoelace).
@@ -2373,6 +2374,111 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                 [indexed[i], indexed[r]] = [indexed[r], indexed[i]];
             }
             return welzlRecursive(indexed, []);
+        }
+
+        // --- Original-Geometrie fuer PURE MATH (umschliessendes Polygon / Konvexhuelle) ---
+        function computeCentroid(hullPts) {
+            const n = hullPts.length;
+            if (n < 3) return { x: 0, y: 0 };
+            const cx = hullPts.reduce((s, p) => s + p.x, 0) / n;
+            const cy = hullPts.reduce((s, p) => s + p.y, 0) / n;
+            const sorted = [...hullPts].sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx));
+
+            let A2 = 0, Sx = 0, Sy = 0;
+            for (let i = 0; i < n; i++) {
+                const j = (i + 1) % n;
+                const cross = sorted[i].x * sorted[j].y - sorted[j].x * sorted[i].y;
+                A2 += cross;
+                Sx += (sorted[i].x + sorted[j].x) * cross;
+                Sy += (sorted[i].y + sorted[j].y) * cross;
+            }
+            const area = A2 / 2.0;
+            if (Math.abs(area) < 1e-12) return { x: cx, y: cy };
+            return { x: Sx / (6.0 * area), y: Sy / (6.0 * area) };
+        }
+
+        function solveGeometry2D(pts) {
+            const n = pts.length;
+            const Aussenkanten = Array.from({ length: n }, () => Array(n).fill(0));
+            for (let i = 0; i < n - 1; i++) {
+                for (let j = i + 1; j < n; j++) {
+                    let seite = 0;
+                    for (let k = 0; k < n; k++) {
+                        if (k !== i && k !== j) {
+                            const cross = (pts[k].y - pts[i].y) * (pts[j].x - pts[i].x) - (pts[j].y - pts[i].y) * (pts[k].x - pts[i].x);
+                            const sig = Math.sign(cross);
+                            if (seite !== 0 && Aussenkanten[i][j] !== 0) {
+                                if (seite !== sig) { Aussenkanten[i][j] = 0; Aussenkanten[j][i] = 0; }
+                                else { Aussenkanten[i][j] = 1; Aussenkanten[j][i] = 1; }
+                            }
+                            if (seite === 0) { seite = sig; Aussenkanten[i][j] = 1; Aussenkanten[j][i] = 1; }
+                        }
+                    }
+                }
+            }
+
+            const hullEdges = [];
+            for (let i = 0; i < n; i++) {
+                for (let j = i + 1; j < n; j++) {
+                    if (Aussenkanten[i][j] === 1) hullEdges.push([i, j]);
+                }
+            }
+
+            const Aussenpunkte = Array(n).fill(0);
+            let aussenCnt = 0, xM_a = 0, yM_a = 0;
+            const hullPts = [], outerIndices = [];
+
+            for (let i = 0; i < n; i++) {
+                if (Aussenkanten[i].some(val => val === 1)) {
+                    Aussenpunkte[i] = 1;
+                    aussenCnt++;
+                    xM_a += pts[i].x; yM_a += pts[i].y;
+                    hullPts.push(pts[i]); outerIndices.push(i);
+                }
+            }
+            if (aussenCnt > 0) { xM_a /= aussenCnt; yM_a /= aussenCnt; }
+            const M_A = { x: xM_a, y: yM_a };
+            const M_M = computeCentroid(hullPts);
+
+            let Flaeche = 0, p1 = 0;
+            while (p1 < n && Aussenpunkte[p1] !== 1) p1++;
+            for (let p2 = p1 + 1; p2 < n - 1; p2++) {
+                for (let p3 = p2 + 1; p3 < n; p3++) {
+                    if (Aussenkanten[p2][p3] === 1) {
+                        const a = Math.hypot(pts[p2].x - pts[p1].x, pts[p2].y - pts[p1].y);
+                        const b = Math.hypot(pts[p3].x - pts[p1].x, pts[p3].y - pts[p1].y);
+                        const c = Math.hypot(pts[p3].x - pts[p2].x, pts[p3].y - pts[p2].y);
+                        const s = 0.5 * (a + b + c);
+                        Flaeche += Math.sqrt(Math.max(0, s * (s - a) * (s - b) * (s - c)));
+                    }
+                }
+            }
+
+            const indexedPts = pts.map((p, idx) => ({ idx, x: p.x, y: p.y }));
+            for (let i = indexedPts.length - 1; i > 0; i--) {
+                const rIdx = Math.floor(Math.random() * (i + 1));
+                [indexedPts[i], indexedPts[rIdx]] = [indexedPts[rIdx], indexedPts[i]];
+            }
+            const circle = welzlRecursive(indexedPts, []);
+
+            const tol = Math.max(1e-3, circle.r * 1e-3);
+            let randIndizes = [];
+            for (let i = 0; i < n; i++) {
+                if (Math.abs(Math.hypot(pts[i].x - circle.x, pts[i].y - circle.y) - circle.r) <= tol) {
+                    randIndizes.push(i);
+                }
+            }
+            if (randIndizes.length < circle.support.length) {
+                randIndizes = [...circle.support].sort((a, b) => a - b);
+            }
+
+            return { hullEdges, aussenCnt, outerIndices, M_A, M_M, M_U: circle, Flaeche, randIndizes };
+        }
+
+        function formatPointList(indices) {
+            const labels = indices.map(i => `P${i + 1}`);
+            if (labels.length > 1) return labels.slice(0, -1).join(", ") + " und " + labels[labels.length - 1];
+            return labels[0] || "-";
         }
 
         function circleFrom2Points(p1, p2) {
@@ -2607,13 +2713,13 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         }
 
         // -----------------------------------------------------------------
-        // 9. PUR MATH (Klassisches 130x100 Koordinatensystem)
+        // 9. PURE MATH (Klassisches 130x100 Koordinatensystem)
         // -----------------------------------------------------------------
         const canvas = document.getElementById('areaCanvas');
         const ctx = canvas.getContext('2d');
         const PAD = { left: 48, right: 22, top: 22, bottom: 42 };
         const X_MAX = 130, Y_MAX = 100;
-        let areaState = { collecting: false, points: [], ordered: true, M_U: null, error: null };
+        let areaState = { collecting: false, points: [], hullEdges: [], M_A: null, M_M: null, M_U: null };
 
         function toCanvasX(x) { return PAD.left + (x / X_MAX) * (canvas.width - PAD.left - PAD.right); }
         function toCanvasY(y) { return canvas.height - PAD.bottom - (y / Y_MAX) * (canvas.height - PAD.top - PAD.bottom); }
@@ -2646,23 +2752,13 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
 
             ctx.save(); ctx.beginPath(); ctx.rect(PAD.left, PAD.top, plotW, plotH); ctx.clip();
 
-            // Polygon in Klick-Reihenfolge (P1->P2->...->Pn->P1); fuellen + Kanten
-            if (!areaState.collecting && areaState.points.length >= 2) {
-                const pts = areaState.points;
-                const err = areaState.error;
-                const edgeColor = err ? '#dc2626' : '#2563eb';
-                if (!err && pts.length >= 3) {
-                    ctx.beginPath();
-                    ctx.moveTo(toCanvasX(pts[0].x), toCanvasY(pts[0].y));
-                    for (let i = 1; i < pts.length; i++) ctx.lineTo(toCanvasX(pts[i].x), toCanvasY(pts[i].y));
-                    ctx.closePath();
-                    ctx.fillStyle = 'rgba(59,130,246,0.14)'; ctx.fill();
-                }
-                ctx.strokeStyle = edgeColor; ctx.lineWidth = 1.6; ctx.setLineDash([]);
-                for (let i = 0; i < pts.length; i++) {
-                    const a = pts[i], b = pts[(i + 1) % pts.length];
-                    ctx.beginPath(); ctx.moveTo(toCanvasX(a.x), toCanvasY(a.y)); ctx.lineTo(toCanvasX(b.x), toCanvasY(b.y)); ctx.stroke();
-                }
+            if (areaState.hullEdges.length > 0) {
+                ctx.strokeStyle = '#0000ff'; ctx.lineWidth = 1.3; ctx.setLineDash([5, 4]);
+                areaState.hullEdges.forEach(([i, j]) => {
+                    const p1 = areaState.points[i], p2 = areaState.points[j];
+                    ctx.beginPath(); ctx.moveTo(toCanvasX(p1.x), toCanvasY(p1.y)); ctx.lineTo(toCanvasX(p2.x), toCanvasY(p2.y)); ctx.stroke();
+                });
+                ctx.setLineDash([]);
             }
 
             if (areaState.M_U) {
@@ -2691,6 +2787,8 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                 ctx.fillStyle = textColor; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'left';
                 ctx.fillText(label, cx + 8, cy + 4);
             };
+            drawCenterMarker(areaState.M_A, 'M_A', '#d95319', '#00aa00');
+            drawCenterMarker(areaState.M_M, 'M_M', '#9333ea', '#9333ea');
             drawCenterMarker(areaState.M_U, 'M_U', '#d95319', '#00aa00');
 
             ctx.restore();
@@ -2732,9 +2830,9 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         });
 
         function areaStartCollection() {
-            areaState = { collecting: true, points: [], ordered: true, M_U: null, error: null };
+            areaState = { collecting: true, points: [], hullEdges: [], M_A: null, M_M: null, M_U: null };
             document.getElementById('area-calc-btn').classList.remove('hidden');
-            document.getElementById('area-output-text').value = "Sammle Koordinaten mit der Maus!\n\nDie Fläche ergibt sich aus der Reihenfolge der Klicks (P1→P2→…→P1).\n\nBeenden mit ENTER, Rechtsklick oder dem grünen Button.";
+            document.getElementById('area-output-text').value = "Sammle Koordinaten mit der Maus!\n\nBeenden mit ENTER, Rechtsklick oder dem grünen Button.";
             drawAreaCanvas();
         }
 
@@ -2744,39 +2842,23 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             areaState.collecting = false;
             document.getElementById('area-calc-btn').classList.add('hidden');
             const pts = areaState.points;
-            areaState.M_U = null; areaState.error = null;
             if (pts.length < 3) {
                 document.getElementById('area-output-text').value = `Zu wenige Punkte ausgewählt (${pts.length}). Bitte mindestens 3 Punkte klicken.`;
                 drawAreaCanvas(); return;
             }
-
-            // Selbstueberschneidung pruefen (Polygon in Klickreihenfolge)
-            const crossing = findSelfIntersection(pts);
-            if (crossing) {
-                areaState.error = crossing;
-                document.getElementById('area-output-text').value = [
-                    '⚠️ FEHLER: Die Kanten des Polygons überkreuzen sich!',
-                    '',
-                    `Die Kante P${crossing.a[0]}–P${crossing.a[1]} schneidet die Kante P${crossing.b[0]}–P${crossing.b[1]}.`,
-                    '',
-                    'Ein Flächeninhalt in Klick-Reihenfolge ist so nicht eindeutig definiert.',
-                    'Bitte klicke auf „Start“ und setze die Punkte so, dass sich',
-                    'keine Verbindungslinien kreuzen.'
-                ].join('\n');
-                drawAreaCanvas(); return;
-            }
-
-            const circle = circumcircleWelzl(pts);
-            areaState.M_U = circle;
-            const area = polygonAreaOrdered(pts);
+            const res = solveGeometry2D(pts);
+            areaState.hullEdges = res.hullEdges; areaState.M_A = res.M_A; areaState.M_M = res.M_M; areaState.M_U = res.M_U;
 
             const lines = ["Die Koordinaten der Punkte:"];
             pts.forEach((p, idx) => lines.push(`P${idx + 1} = (${formatNum(p.x)} / ${formatNum(p.y)})`));
             lines.push(
-                "", `Flächeninhalt des ${pts.length}-Ecks in Klick-Reihenfolge:`, `${formatNum(area)}`,
-                "", `Kantenfolge: ${pts.map((_, i) => 'P' + (i + 1)).join(' → ')} → P1`,
-                "", "Umkreis (kleinster umschließender Kreis):",
-                `M_U = (${formatNum(circle.x)} / ${formatNum(circle.y)}), r = ${formatNum(circle.r)}`
+                "", `Flächeninhalt des umspannenden ${res.aussenCnt}-Ecks:`, `${formatNum(res.Flaeche)}`,
+                "", `Die ${res.aussenCnt} aussen liegenden Punkte:`, formatPointList(res.outerIndices),
+                "", "Die Punkte, die auf dem Umkreis", `(M = (${formatNum(res.M_U.x)} / ${formatNum(res.M_U.y)}), r = ${formatNum(res.M_U.r)}) liegen:`, formatPointList(res.randIndizes),
+                "", "Die Mittelpunkte:",
+                `M_U = (${formatNum(res.M_U.x)} / ${formatNum(res.M_U.y)}), r = ${formatNum(res.M_U.r)}`,
+                `M_A = (${formatNum(res.M_A.x)} / ${formatNum(res.M_A.y)})`,
+                `M_M = (${formatNum(res.M_M.x)} / ${formatNum(res.M_M.y)})`
             );
             document.getElementById('area-output-text').value = lines.join("\n");
             drawAreaCanvas();
