@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dippe-Sippe | Familienhomepage aus Pirna</title>
+    <title>Dippe-Sippe | Familienhomepage aus Graupa</title>
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -229,6 +229,10 @@
         /* Aktive Seite fuellt exakt die main-content-Hoehe. Inhalt, der nicht
            passt, scrollt INNERHALB der Seite (kein Scrollbalken am Fensterrand). */
         .page-section.active { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+        #page-home.active { overflow-y: hidden; }
+        #page-home .hero-card { flex: 0 0 auto; }
+        #page-home .home-bottom-grid { flex: 1 1 auto; min-height: 0; }
+        #page-home #osm-map { height: 100%; min-height: 220px; }
         /* Karten-/Tool-Seiten fuellen die Hoehe und scrollen NICHT selbst -
            dort uebernimmt das innere Layout (Karte waechst, Seitenspalte scrollt). */
         #page-area-maps.active, #page-dominanz.active, #page-area-pur.active { overflow: hidden; }
@@ -281,7 +285,7 @@
         .dominanz-layout > div:last-child,
         .area-layout > div:last-child { overflow-y: auto; }
         /* Gipfelliste darf jetzt mitwachsen statt bei 330px zu stoppen */
-        .page-section.active .dominanz-layout .peak-list { max-height: none; flex: 1 1 auto; min-height: 120px; }
+        .page-section.active .dominanz-layout .peak-list { max-height: 190px; flex: 0 1 auto; min-height: 80px; }
 
         /* Berg-Atlas: Legende */
         .dom-legend {
@@ -511,7 +515,7 @@
             width: 100%;
             height: auto;
             max-width: 100%;
-            aspect-ratio: 200 / 140;   /* passend zum 200x140-Koordinatensystem */
+            aspect-ratio: 200 / 130;   /* passend zum 200x130-Koordinatensystem */
             background: #ffffff;
             border-radius: 12px;
             border: 2px solid var(--border-sand);
@@ -580,7 +584,7 @@
 
         /* DOMINANZ PEAK LISTE */
         .peak-list {
-            max-height: 330px;
+            max-height: 190px;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
@@ -843,9 +847,9 @@
                     </div>
 
                     <div class="scrabble-frame">
-                        <img src="ScrabbleFamilieDippe.jpeg"
-                             alt="Scrabble Familie Dippe"
-                             onerror="this.onerror=null; this.parentElement.innerHTML='<div style=\'padding:40px; text-align:center; color:#f4efe6;\'><h3 style=\'color:#fbbf24; margin-bottom:8px;\'>ScrabbleFamilieDippe.jpeg</h3><p style=\'font-size:13px; opacity:0.85;\'>Bitte stelle sicher, dass die Datei exakt <b>ScrabbleFamilieDippe.jpeg</b> heißt und im gleichen Ordner wie die index.html liegt.</p></div>';">
+                        <img src="DippeSippeWappen.jpg"
+                             alt="Wappen der Dippe-Sippe"
+                             onerror="this.onerror=null; this.parentElement.innerHTML='<div style=\'padding:40px; text-align:center; color:#f4efe6;\'><h3 style=\'color:#fbbf24; margin-bottom:8px;\'>DippeSippeWappen.jpg</h3><p style=\'font-size:13px; opacity:0.85;\'>Bitte stelle sicher, dass die Datei exakt <b>DippeSippeWappen.jpg</b> heißt und im gleichen Ordner wie die index.html liegt.</p></div>';">
                     </div>
                 </div>
             </div>
@@ -875,6 +879,10 @@
 
                 <div style="display:flex; flex-direction:column; gap:20px;">
                     <div class="hero-card" style="margin-bottom:0; padding:24px; flex:1; display:flex; flex-direction:column; justify-content:space-between;">
+                        <div class="scrabble-frame" style="margin-bottom:18px;">
+                            <img src="ScrabbleFamilieDippe.jpeg" alt="Scrabble Familie Dippe"
+                                 onerror="this.onerror=null; this.parentElement.innerHTML='<div style=\'padding:24px; text-align:center; color:var(--text-dark);\'><strong>ScrabbleFamilieDippe.jpeg</strong><br><span style=\'font-size:12px;\'>Bild nicht gefunden.</span></div>';">
+                        </div>
                         <div>
                             <span class="eyebrow">Cloud-Tresor</span>
                             <h3 style="font-size:21px; font-weight:800; margin-bottom:8px;">📸 Familienfotos & Alben</h3>
@@ -1446,7 +1454,7 @@ Das umschließende Polygon, der kleinste Umkreis nach Welzl sowie die Mittelpunk
                 </div>
 
                 <div class="area-layout">
-                    <div><canvas id="areaCanvas" width="1000" height="700"></canvas></div>
+                    <div><canvas id="areaCanvas" width="1000" height="650"></canvas></div>
                     <div>
                         <textarea id="area-output-text" class="output-textarea" readonly>Klicke oben auf „Start“, um mit der Maus Punkte im Koordinatensystem (130 x 100) zu sammeln.
 
@@ -3008,12 +3016,12 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         }
 
         // -----------------------------------------------------------------
-        // 9. PURE MATH (Koordinatensystem 200 breit x 140 hoch)
+        // 9. PURE MATH (Koordinatensystem 200 breit x 130 hoch)
         // -----------------------------------------------------------------
         const canvas = document.getElementById('areaCanvas');
         const ctx = canvas.getContext('2d');
         const PAD = { left: 48, right: 22, top: 22, bottom: 42 };
-        const X_MAX = 200, Y_MAX = 140;
+        const X_MAX = 200, Y_MAX = 130;
         let areaState = { collecting: false, points: [], hullEdges: [], M_A: null, M_M: null, M_U: null };
 
         function toCanvasX(x) { return PAD.left + (x / X_MAX) * (canvas.width - PAD.left - PAD.right); }
