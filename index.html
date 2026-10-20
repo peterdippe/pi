@@ -235,8 +235,8 @@
         #page-home #osm-map { height: 100%; min-height: 220px; }
         /* Karten-/Tool-Seiten fuellen die Hoehe und scrollen NICHT selbst -
            dort uebernimmt das innere Layout (Karte waechst, Seitenspalte scrollt). */
-        #page-area-maps.active, #page-dominanz.active { overflow: hidden; }
-        #page-area-pur.active { overflow-y: auto; }
+        #page-area-maps.active { overflow: hidden; } 
+        #page-dominanz.active, #page-area-pur.active { overflow-y: auto; }
         .page-section.active > .section-header { flex: 0 0 auto; }
         .page-section.active .fill-height { flex: 1 1 auto; min-height: 0; }
 
@@ -472,7 +472,7 @@
         /* Karten fuellen die verfuegbare Hoehe (mit sinnvollem Minimum),
            statt einer festen Pixelhoehe -> nutzt grosse Bildschirme aus. */
         #mapsMathContainer { flex: 1 1 auto; min-height: 280px; height: auto; width: 100%; border-radius: 14px; border: 2px solid var(--border-sand); z-index: 10; cursor: crosshair; }
-        #dominanzMapContainer { flex: 1 1 auto; min-height: 320px; height: auto; width: 100%; border-radius: 14px; border: 2px solid var(--border-sand); z-index: 10; }
+        #dominanzMapContainer { flex: 1 1 auto; min-height: 280px; height: auto; width: 100%; border-radius: 14px; border: 2px solid var(--border-sand); z-index: 10; }
 
         /* Berg-Atlas: Marker & Bezugsgipfel */
         .domPeakDot { border-radius: 50%; border: 1.5px solid rgba(0,0,0,0.45); box-shadow: 0 0 0 1px rgba(255,255,255,0.65); }
