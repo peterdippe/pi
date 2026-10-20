@@ -816,15 +816,23 @@
 
             <div class="home-bottom-grid">
                 <div class="sand-card">
-                    <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px;">
+                    <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px;">
                         <div>
                             <span class="eyebrow-dark">Unser Standort</span>
-                            <h3 style="font-size:21px; font-weight:800;">📍 Emil-Gast-Straße 4, 01796 Pirna</h3>
+                            <h3 style="font-size:21px; font-weight:800;" id="home-loc-title">📍 Emil-Gast-Straße 4, 01796 Pirna</h3>
                         </div>
-                        <a href="https://www.openstreetmap.org/search?query=Emil-Gast-Stra%C3%9Fe%204%2C%2001796%20Pirna"
-                           target="_blank" rel="noopener" class="btn btn-dark" style="padding:8px 14px; font-size:12px;">
+                        <a id="home-route-link" href="#" target="_blank" rel="noopener" class="btn btn-dark" style="padding:8px 14px; font-size:12px;">
                             Größere Karte & Route ↗
                         </a>
+                    </div>
+                    <!-- Standort- und Kartenauswahl -->
+                    <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+                        <label style="display:flex; align-items:center; gap:6px; font-size:12.5px;">
+                            🏠 <select id="home-loc-select" class="form-input" style="max-width:220px;" onchange="setHomeLocation(this.value)"></select>
+                        </label>
+                        <label style="display:flex; align-items:center; gap:6px; font-size:12.5px;">
+                            🗺️ <select id="home-layer-select" class="form-input" style="max-width:200px;" onchange="setHomeLayer(this.value)"></select>
+                        </label>
                     </div>
                     <div id="osm-map"></div>
                 </div>
@@ -1218,10 +1226,7 @@
                 <div class="toolbar-box" style="margin-bottom:16px;">
                     <div style="display:flex; flex-wrap:wrap; align-items:center; gap:6px;">
                         <strong style="font-size:12.5px; margin-right:4px;">Karte:</strong>
-                        <button onclick="setMapsMathLayer('osm')" id="layer-btn-osm" class="layer-btn active">OpenStreetMap</button>
-                        <button onclick="setMapsMathLayer('google-streets')" id="layer-btn-google-streets" class="layer-btn">Google Maps</button>
-                        <button onclick="setMapsMathLayer('google-sat')" id="layer-btn-google-sat" class="layer-btn">Google Satellit</button>
-                        <button onclick="setMapsMathLayer('topo')" id="layer-btn-topo" class="layer-btn">Topografie</button>
+                        <select id="maps-layer-select" class="form-input" style="max-width:200px;" onchange="setMapsMathLayer(this.value)"></select>
                     </div>
 
                     <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
@@ -1564,32 +1569,88 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         }
 
         // -----------------------------------------------------------------
-        // 2. STARTSEITEN-KARTE (Emil-Gast-Str. 4, Pirna)
+        // 2. STARTSEITEN-KARTE (umschaltbare Standorte + Kartenebenen)
         // -----------------------------------------------------------------
         let homeMap = null;
-        let pirnaCoords = [50.9585, 13.9372];
+        let homeMarker = null;
+        let homeLayers = {};
+        let pirnaCoords = [50.9939978, 13.9076698];  // Emil-Gast-Str. 4 (Default, korrigiert)
+
+        // Standorte der Familie (geokodiert ueber Nominatim/OSM)
+        const HOME_LOCATIONS = [
+            { id: 'dippe-graupa', label: 'Familie Dippe (Graupa)', fam: 'Familie Dippe',
+              addr: 'Emil-Gast-Straße 4', plz: '01796 Pirna', lat: 50.9939978, lon: 13.9076698 },
+            { id: 'wolf-graupa', label: 'Familie Wolf (Graupa)', fam: 'Familie Wolf',
+              addr: 'Bonnewitzer Straße 17', plz: '01796 Pirna', lat: 51.0019948, lon: 13.9247022 },
+            { id: 'dippe-berlin', label: 'Familie Dippe (Berlin)', fam: 'Familie Dippe',
+              addr: 'Steinstraße 30', plz: '14109 Berlin', lat: 52.3890128, lon: 13.1280380 }
+        ];
+        let homeLocId = 'dippe-graupa';
+
+        // Gemeinsame Kartenebenen-Definition (fuer alle Karten der Seite)
+        function buildLayerSet() {
+            return {
+                'osm':            L.tileLayer('//{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }),
+                'google-streets': L.tileLayer('//mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 20, attribution: '© Google Maps' }),
+                'google-sat':     L.tileLayer('//mt1.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', { maxZoom: 20, attribution: '© Google Satellit' }),
+                'topo':           L.tileLayer('//{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, attribution: '© OpenTopoMap' }),
+                'carto-voyager':  L.tileLayer('//{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 20, subdomains: 'abcd', attribution: '© OpenStreetMap, © CARTO' }),
+                'esri-sat':       L.tileLayer('//server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Esri, Maxar, Earthstar Geographics' })
+            };
+        }
+        // Anzeige-Namen fuer die Dropdowns
+        const LAYER_LABELS = {
+            'osm': 'OpenStreetMap',
+            'google-streets': 'Google Maps',
+            'google-sat': 'Google Satellit',
+            'topo': 'Topografie',
+            'carto-voyager': 'CARTO Voyager (hell)',
+            'esri-sat': 'Esri Luftbild (3D-artig)'
+        };
+        // Reihenfolge im Dropdown (Standard zuerst)
+        const LAYER_ORDER = ['osm', 'google-streets', 'google-sat', 'topo', 'carto-voyager', 'esri-sat'];
+
+        function fillLayerSelect(selId, current) {
+            const sel = document.getElementById(selId);
+            if (!sel) return;
+            sel.innerHTML = LAYER_ORDER.map(k => `<option value="${k}"${k===current?' selected':''}>${LAYER_LABELS[k]}</option>`).join('');
+        }
 
         function initHomeMap() {
             if (typeof L === 'undefined') return;
-            homeMap = L.map('osm-map').setView(pirnaCoords, 16);
-            L.tileLayer('//{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19,
-                attribution: '© OpenStreetMap'
-            }).addTo(homeMap);
+            const loc = HOME_LOCATIONS.find(l => l.id === homeLocId);
+            homeMap = L.map('osm-map').setView([loc.lat, loc.lon], 17);
+            homeLayers = buildLayerSet();
+            homeLayers['osm'].addTo(homeMap);
+            homeMarker = L.marker([loc.lat, loc.lon]).addTo(homeMap);
 
-            const marker = L.marker(pirnaCoords).addTo(homeMap);
-            marker.bindPopup("<b>Familie Dippe</b><br>Emil-Gast-Str. 4<br>01796 Pirna").openPopup();
+            // Standort-Dropdown + Karten-Dropdown fuellen
+            const locSel = document.getElementById('home-loc-select');
+            if (locSel) locSel.innerHTML = HOME_LOCATIONS.map(l => `<option value="${l.id}">${l.label}</option>`).join('');
+            fillLayerSelect('home-layer-select', 'osm');
+            setHomeLocation(homeLocId);
+        }
 
-            fetch("//nominatim.openstreetmap.org/search?format=json&q=Emil-Gast-Stra%C3%9Fe%204,%2001796%20Pirna")
-                .then(r => r.json())
-                .then(data => {
-                    if (data && data.length > 0) {
-                        pirnaCoords = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
-                        homeMap.setView(pirnaCoords, 17);
-                        marker.setLatLng(pirnaCoords);
-                    }
-                })
-                .catch(() => {});
+        function setHomeLocation(id) {
+            const loc = HOME_LOCATIONS.find(l => l.id === id);
+            if (!loc || !homeMap) return;
+            homeLocId = id;
+            pirnaCoords = [loc.lat, loc.lon];
+            homeMap.setView([loc.lat, loc.lon], 17);
+            homeMarker.setLatLng([loc.lat, loc.lon]);
+            homeMarker.bindPopup(`<b>${loc.fam}</b><br>${loc.addr}<br>${loc.plz}`).openPopup();
+            const t = document.getElementById('home-loc-title');
+            if (t) t.textContent = '📍 ' + loc.addr + ', ' + loc.plz;
+            const link = document.getElementById('home-route-link');
+            if (link) link.href = 'https://www.openstreetmap.org/?mlat=' + loc.lat + '&mlon=' + loc.lon + '#map=17/' + loc.lat + '/' + loc.lon;
+            const sel = document.getElementById('home-loc-select');
+            if (sel && sel.value !== id) sel.value = id;
+        }
+
+        function setHomeLayer(key) {
+            if (!homeMap || !homeLayers[key]) return;
+            Object.values(homeLayers).forEach(l => homeMap.removeLayer(l));
+            homeLayers[key].addTo(homeMap);
         }
         window.addEventListener('DOMContentLoaded', () => {
             initHomeMap();
@@ -2531,15 +2592,10 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             if (mapsMathMap || typeof L === 'undefined') return;
 
             mapsMathMap = L.map('mapsMathContainer', { center: pirnaCoords, zoom: 16 });
-            mapsMathLayers = {
-                'osm': L.tileLayer('//{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 20, attribution: '© OpenStreetMap' }),
-                'google-streets': L.tileLayer('//mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 20, attribution: '© Google Maps' }),
-                'google-sat': L.tileLayer('//mt1.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', { maxZoom: 20, attribution: '© Google Satellite' }),
-                'topo': L.tileLayer('//{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, attribution: '© OpenTopoMap' })
-            };
-
+            mapsMathLayers = buildLayerSet();
             mapsMathLayers['osm'].addTo(mapsMathMap);
             mapsMathDrawGroup = L.layerGroup().addTo(mapsMathMap);
+            fillLayerSelect('maps-layer-select', 'osm');
 
             mapsMathMap.on('mousemove', (e) => {
                 document.getElementById('maps-lat-val').value = e.latlng.lat.toFixed(5);
@@ -2560,11 +2616,11 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
 
         function setMapsMathLayer(key) {
             initMapsMathIfNeeded();
-            if (!mapsMathMap) return;
+            if (!mapsMathMap || !mapsMathLayers[key]) return;
             Object.values(mapsMathLayers).forEach(l => mapsMathMap.removeLayer(l));
             mapsMathLayers[key].addTo(mapsMathMap);
-            document.querySelectorAll('[id^="layer-btn-"]').forEach(b => b.classList.remove('active'));
-            document.getElementById('layer-btn-' + key).classList.add('active');
+            const sel = document.getElementById('maps-layer-select');
+            if (sel && sel.value !== key) sel.value = key;
         }
 
         function mapsMathResetToPirna() {
