@@ -214,12 +214,22 @@
             max-width: none;        /* volle Bildschirmbreite auf allen Seiten */
             margin: 0;
             width: 100%;
+            /* Volle Hoehe ausnutzen: Inhalt fuellt mindestens den Viewport */
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
         }
         /* Ab sehr breiten Schirmen etwas mehr Luft an den Seiten */
         @media (min-width: 1700px) { .main-content { padding: 36px 64px; } }
 
         .page-section { display: none; animation: fadeIn 0.28s ease-out; }
-        .page-section.active { display: block; }
+        /* Aktive Seite fuellt die verfuegbare Hoehe der main-content-Spalte */
+        .page-section.active { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+        /* Seiten, die eine Karte/ein Tool enthalten, lassen ihr Haupt-Layout
+           den Restplatz in der Hoehe fuellen (Karten werden hoeher). */
+        .page-section.active > .section-header { flex: 0 0 auto; }
+        .page-section.active .fill-height { flex: 1 1 auto; min-height: 0; }
 
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(6px); }
@@ -250,7 +260,24 @@
         .hero-grid { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 30px; align-items: center; }
         .home-bottom-grid { display: grid; grid-template-columns: 1.35fr 0.85fr; gap: 24px; }
         .area-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 22px; align-items: stretch; }
-        .dominanz-layout { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(320px, 1fr); gap: 22px; align-items: start; }
+        .dominanz-layout { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(320px, 1fr); gap: 22px; align-items: stretch; }
+        /* Map-Spalten als Flex-Spalte, damit die Karte den Restplatz fuellt */
+        .area-layout > div, .dominanz-layout > div { display: flex; flex-direction: column; min-height: 0; }
+        /* Auf Karten-Seiten fuellt das Layout die verfuegbare Hoehe.
+           Die rechte Info-/Such-Spalte scrollt bei Bedarf intern. */
+        .page-section.active .area-layout,
+        .page-section.active .dominanz-layout { flex: 1 1 auto; min-height: 0; }
+        /* Die .sand-card auf den Karten-Seiten muss die Hoehe durchreichen,
+           sonst stoppt die Flex-Kette und die Karte bleibt kurz. */
+        #page-area-maps.active > .sand-card,
+        #page-dominanz.active > .sand-card,
+        #page-area-pur.active > .sand-card {
+            flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column;
+        }
+        .dominanz-layout > div:last-child,
+        .area-layout > div:last-child { overflow-y: auto; }
+        /* Gipfelliste darf jetzt mitwachsen statt bei 330px zu stoppen */
+        .page-section.active .dominanz-layout .peak-list { max-height: none; flex: 1 1 auto; min-height: 120px; }
 
         /* Berg-Atlas: Legende */
         .dom-legend {
@@ -415,8 +442,10 @@
 
         /* MAPS & CANVAS */
         #osm-map { height: 350px; width: 100%; border-radius: 16px; border: 2px solid var(--border-sand); z-index: 10; }
-        #mapsMathContainer { height: 540px; width: 100%; border-radius: 14px; border: 2px solid var(--border-sand); z-index: 10; cursor: crosshair; }
-        #dominanzMapContainer { height: 560px; width: 100%; border-radius: 14px; border: 2px solid var(--border-sand); z-index: 10; }
+        /* Karten fuellen die verfuegbare Hoehe (mit sinnvollem Minimum),
+           statt einer festen Pixelhoehe -> nutzt grosse Bildschirme aus. */
+        #mapsMathContainer { flex: 1 1 auto; min-height: 460px; height: auto; width: 100%; border-radius: 14px; border: 2px solid var(--border-sand); z-index: 10; cursor: crosshair; }
+        #dominanzMapContainer { flex: 1 1 auto; min-height: 480px; height: auto; width: 100%; border-radius: 14px; border: 2px solid var(--border-sand); z-index: 10; }
 
         /* Berg-Atlas: Marker & Bezugsgipfel */
         .domPeakDot { border-radius: 50%; border: 1.5px solid rgba(0,0,0,0.45); box-shadow: 0 0 0 1px rgba(255,255,255,0.65); }
@@ -1568,6 +1597,18 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             }
         }
 
+        // Karten an geaenderte Fensterhoehe/-breite anpassen (Hoehe wird jetzt
+        // dynamisch gefuellt) -> alle initialisierten Leaflet-Karten neu vermessen.
+        let _mapResizeTimer = null;
+        window.addEventListener('resize', () => {
+            clearTimeout(_mapResizeTimer);
+            _mapResizeTimer = setTimeout(() => {
+                if (typeof homeMap !== 'undefined' && homeMap) homeMap.invalidateSize();
+                if (typeof mapsMathMap !== 'undefined' && mapsMathMap) mapsMathMap.invalidateSize();
+                if (typeof dominanzMap !== 'undefined' && dominanzMap) dominanzMap.invalidateSize();
+            }, 180);
+        });
+
         // -----------------------------------------------------------------
         // 2. STARTSEITEN-KARTE (umschaltbare Standorte + Kartenebenen)
         // -----------------------------------------------------------------
@@ -2242,27 +2283,94 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             return 6371.0088 * 2 * Math.atan2(Math.sqrt(Math.min(1, h)), Math.sqrt(Math.max(0, 1 - h)));
         }
 
-        // Geodaetischer Kreis; mit target zeigt der Startpunkt des Kreises zum Bezugsgipfel
+        // Ab diesem Bezugsradius ist ein geodaetischer "Kreis" auf der flachen
+        // Karte keine sinnvolle Form mehr (naehert sich dem Erd-Gegenpunkt) ->
+        // dann statt Vollkreis nur die geodaetische Linie zum Bezugsgipfel.
+        const DOM_CIRCLE_MAX_KM = 3000;
+
+        // Ein Punkt in Richtung t (bearing, rad) im Winkelabstand d (rad) von (a,b in rad)
+        function domDestination(a, b, d, t) {
+            const lat = Math.asin(Math.sin(a) * Math.cos(d) + Math.cos(a) * Math.sin(d) * Math.cos(t));
+            const lon = b + Math.atan2(Math.sin(t) * Math.sin(d) * Math.cos(a), Math.cos(d) - Math.sin(a) * Math.sin(lat));
+            return [lat * 180 / Math.PI, lon * 180 / Math.PI];
+        }
+
+        // Zerlegt eine Punktfolge an Antimeridian-Spruengen (>180deg Laengen-
+        // differenz) in mehrere Segmente, damit keine quer ueber die Karte
+        // gezogenen Linien entstehen.
+        function domSplitAntimeridian(raw) {
+            const segs = [];
+            let cur = [];
+            for (let i = 0; i < raw.length; i++) {
+                if (i > 0 && Math.abs(raw[i][1] - raw[i - 1][1]) > 180) {
+                    if (cur.length) segs.push(cur);
+                    cur = [];
+                }
+                cur.push(raw[i]);
+            }
+            if (cur.length) segs.push(cur);
+            return segs;
+        }
+
+        // Geodaetische Linie (Great-Circle) von p zu target, als Polyline-Segmente.
+        function domGeoLine(p, target) {
+            const rad = Math.PI / 180;
+            const a1 = p.lat * rad, b1 = p.lon * rad, a2 = target.lat * rad, b2 = target.lon * rad;
+            const dh = Math.sin((a2 - a1) / 2) ** 2 + Math.cos(a1) * Math.cos(a2) * Math.sin((b2 - b1) / 2) ** 2;
+            const d = 2 * Math.atan2(Math.sqrt(Math.min(1, dh)), Math.sqrt(Math.max(0, 1 - dh)));
+            const N = 180, raw = [];
+            for (let i = 0; i <= N; i++) {
+                const f = i / N;
+                if (d === 0) { raw.push([p.lat, p.lon]); continue; }
+                const A = Math.sin((1 - f) * d) / Math.sin(d), B = Math.sin(f * d) / Math.sin(d);
+                const x = A * Math.cos(a1) * Math.cos(b1) + B * Math.cos(a2) * Math.cos(b2);
+                const y = A * Math.cos(a1) * Math.sin(b1) + B * Math.cos(a2) * Math.sin(b2);
+                const z = A * Math.sin(a1) + B * Math.sin(a2);
+                raw.push([Math.atan2(z, Math.hypot(x, y)) / rad, Math.atan2(y, x) / rad]);
+            }
+            const segs = domSplitAntimeridian(raw);
+            const parts = [];
+            segs.forEach(s => {
+                parts.push(L.polyline(s, { color: '#ffffff', weight: 6, opacity: .9, interactive: false }));
+                parts.push(L.polyline(s, { color: '#2563eb', weight: 3, opacity: 1, dashArray: '10, 8', interactive: false }));
+            });
+            return L.featureGroup(parts);
+        }
+
+        // Darstellung des Bezugsabstands. Kleiner Radius -> glatter geodaetischer
+        // Kreis; grosser Radius -> geodaetische Linie zum Bezugsgipfel.
+        // (target bestimmt bei kleinen Kreisen den Startwinkel Richtung Bezug.)
         function domGeodesic(p, r, target) {
-            const pts = [], R = 6371008.8, d = r / R, a = p.lat * Math.PI / 180, b = p.lon * Math.PI / 180;
+            if (r / 1000 > DOM_CIRCLE_MAX_KM && target) {
+                return domGeoLine(p, target);
+            }
+            const R = 6371008.8, d = r / R, a = p.lat * Math.PI / 180, b = p.lon * Math.PI / 180;
             const bearing = target ? Math.atan2(
                 Math.sin((target.lon - p.lon) * Math.PI / 180) * Math.cos(target.lat * Math.PI / 180),
                 Math.cos(a) * Math.sin(target.lat * Math.PI / 180) - Math.sin(a) * Math.cos(target.lat * Math.PI / 180) * Math.cos((target.lon - p.lon) * Math.PI / 180)
             ) : 0;
-            for (let i = 0; i <= 180; i++) {
-                const t = bearing + i * 2 * Math.PI / 180;
-                const lat = Math.asin(Math.sin(a) * Math.cos(d) + Math.cos(a) * Math.sin(d) * Math.cos(t));
-                const lon = b + Math.atan2(Math.sin(t) * Math.sin(d) * Math.cos(a), Math.cos(d) - Math.sin(a) * Math.sin(lat));
-                let deg = lon * 180 / Math.PI;
-                while (deg - p.lon > 180) deg -= 360;
-                while (deg - p.lon < -180) deg += 360;
-                pts.push([lat * 180 / Math.PI, deg]);
+            // Feineres Sampling (1 Grad) fuer eine runde Kurve.
+            const raw = [];
+            for (let i = 0; i <= 360; i++) {
+                const t = bearing + i * Math.PI / 180;
+                raw.push(domDestination(a, b, d, t));
             }
-            // Kreis um den aktuellen Berg: blau gestrichelt (weisser Halo fuer Kontrast)
-            return L.featureGroup([
-                L.polygon(pts, { color: '#ffffff', weight: 6, opacity: .9, fill: false, interactive: false }),
-                L.polygon(pts, { color: '#2563eb', weight: 3, opacity: 1, dashArray: '10, 8', fillColor: '#3b82f6', fillOpacity: .10, interactive: false })
-            ]);
+            const segs = domSplitAntimeridian(raw);
+            // Geschlossenes Polygon nur, wenn der Kreis nicht am Kartenrand
+            // zerschnitten wurde; sonst Segmente als Linien (kein Querstrich).
+            if (segs.length === 1) {
+                const pts = segs[0];
+                return L.featureGroup([
+                    L.polygon(pts, { color: '#ffffff', weight: 6, opacity: .9, fill: false, interactive: false }),
+                    L.polygon(pts, { color: '#2563eb', weight: 3, opacity: 1, dashArray: '10, 8', fillColor: '#3b82f6', fillOpacity: .10, interactive: false })
+                ]);
+            }
+            const parts = [];
+            segs.forEach(s => {
+                parts.push(L.polyline(s, { color: '#ffffff', weight: 6, opacity: .9, interactive: false }));
+                parts.push(L.polyline(s, { color: '#2563eb', weight: 3, opacity: 1, dashArray: '10, 8', interactive: false }));
+            });
+            return L.featureGroup(parts);
         }
 
         // Naechstgelegener hoeherer Gipfel im geladenen Datensatz (Naeherung)
@@ -2291,10 +2399,12 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                 return;
             }
             domReference = next;
+            const domDistKm = domDistanceKm(p, next);
+            const asLine = domDistKm > DOM_CIRCLE_MAX_KM;
             if (domCircle) dominanzMap.removeLayer(domCircle);
-            domCircle = domGeodesic(p, domDistanceKm(p, next) * 1000, next);
+            domCircle = domGeodesic(p, domDistKm * 1000, next);
             if (document.getElementById('dom-show-circle').checked) domCircle.addTo(dominanzMap);
-            document.getElementById('dom-circle-label').textContent = 'Kreis zum Bezugsgipfel';
+            document.getElementById('dom-circle-label').textContent = asLine ? 'Linie zum Bezugsgipfel' : 'Kreis zum Bezugsgipfel';
 
             if (domRefMarker) dominanzMap.removeLayer(domRefMarker);
             let lon = next.lon;
@@ -2309,8 +2419,11 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             box.innerHTML =
                 '<button type="button" class="dom-higher-btn">⬆️ Nächsthöherer Berg: ' + domEsc(next.name) +
                 ' <span class="dom-higher-h">' + domNum(next.height) + ' m</span> →</button>' +
-                '<p class="dom-note">' + domNum(domDistanceKm(p, next), 2) +
-                ' km bis zum Bezugsgipfel (Kreisradius). Klick dich weiter – irgendwann landest du beim Mount Everest.</p>';
+                '<p class="dom-note">' + domNum(domDistKm, 2) +
+                (asLine
+                    ? ' km bis zum Bezugsgipfel. Bei so großer Dominanz wäre der Kreis fast ein ganzer Erdumlauf – daher zeigt die Karte die direkte Linie zum Bezugsgipfel.'
+                    : ' km bis zum Bezugsgipfel (Kreisradius).') +
+                ' Klick dich weiter – irgendwann landest du beim Mount Everest.</p>';
             box.querySelector('button').onclick = () => domSelect(next);
 
             const bounds = domCircle ? domCircle.getBounds() : L.latLngBounds([[p.lat, p.lon]]);
