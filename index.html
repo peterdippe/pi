@@ -700,6 +700,19 @@
             border-bottom: 1px solid var(--border-sand);
         }
 
+        .pin-sync-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11.5px;
+            font-weight: 700;
+            padding: 6px 11px;
+            border-radius: 99px;
+            background: rgba(16, 185, 129, 0.14);
+            border: 1px solid var(--border-green);
+            color: #a7f3d0;
+        }
+
         .form-input {
             width: 100%;
             padding: 9px 11px;
@@ -802,11 +815,13 @@
 <body>
 
     <!-- ===================================================================
-         KONFIGURATION FÜR PASSWORT & CLOUD
+         KONFIGURATION FÜR PASSWORT, PINNWAND-CLOUD & FOTO-ALBEN
          =================================================================== -->
     <script>
         const CONFIG = {
             fotoPasswort: "dippe",
+            // HIER DEINE GOOGLE APPS SCRIPT WEB-APP-URL EINTRAGEN (beginnt mit https://script.google.com/macros/s/.../exec):
+            pinnwandCloudUrl: "https://script.google.com/macros/s/AKfycbzHgvunOjNSElrtj-SuRoMuqzlzqWiL6t6FMXGpq172xTKl13gbrq-9-E36BE12ijG9-g/exec",
             alben: [
                 {
                     titel: "Familienfotos & Schnappschüsse",
@@ -1035,7 +1050,7 @@
 
 
         <!-- ===============================================================
-             3. INTERAKTIVE FAMILIEN-PINNWAND (TERMINE, REZEPTE, BILDER & DATEIEN)
+             3. INTERAKTIVE FAMILIEN-PINNWAND (CLOUD-SYNC MIT GOOGLE DRIVE)
              =============================================================== -->
         <section id="page-pinnwand" class="page-section">
             <div class="section-header">
@@ -1043,7 +1058,9 @@
                     <span class="eyebrow">Termine, Wissen, Rezepte, Bilder & Ideen</span>
                     <h2 style="font-size:32px; font-weight:800;">📌 Unsere Familien-Pinnwand</h2>
                 </div>
-                <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
+                    <span id="pinnwand-sync-status" class="pin-sync-pill">💾 Lokal gespeichert</span>
+                    <button class="btn btn-sand" style="padding:7px 12px; font-size:12px;" onclick="loadPinnwandFromCloud(true)" title="Aktuellsten Stand aus Google Drive abrufen">🔄 Aktualisieren</button>
                     <button class="btn btn-emerald" onclick="openNewPinnwandPostForm()">➕ Neuer Beitrag / Bild</button>
                     <button class="btn btn-amber" onclick="togglePinnwandForm('cat')">📁 Neue Kategorie</button>
                 </div>
@@ -1420,7 +1437,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             document.getElementById('sidebar').classList.toggle('open');
         }
 
-        // Zuordnung Unterseiten -> Navigationsgruppe (aufklappbares Menue)
         const NAV_GROUPS = {
             familie:     ['fotos', 'pinnwand'],
             maptools:    ['area-maps', 'dominanz', 'area-pur'],
@@ -1435,7 +1451,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             return null;
         }
 
-        // Gruppe auf-/zuklappen, ohne automatisch die Seite zu wechseln
         function toggleNavGroup(group) {
             const panel = document.getElementById('subnav-group-' + group);
             const btn = document.getElementById('nav-' + group);
@@ -1475,6 +1490,9 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
 
             if (pageId === 'home' && homeMap) {
                 setTimeout(() => homeMap.invalidateSize(), 150);
+            }
+            if (pageId === 'pinnwand') {
+                loadPinnwandFromCloud(false);
             }
             if (pageId === 'area-maps') {
                 setTimeout(() => {
@@ -1518,7 +1536,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             { id: 'dippe-graupa', label: 'Familie Dippe (Graupa)', fam: 'Familie Dippe',
               addr: 'Emil-Gast-Straße 4', plz: '01796 Pirna', lat: 50.9939978, lon: 13.9076698 }
         ];
-        let homeLocId = 'dippe-graupa';
 
         function buildLayerSet() {
             return {
@@ -1641,7 +1658,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         }
 
         // -----------------------------------------------------------------
-        // 4. INTERAKTIVE FAMILIEN-PINNWAND (TERMINE, BILDER, BEARBEITEN & DATEIEN)
+        // 4. INTERAKTIVE FAMILIEN-PINNWAND (INKL. GOOGLE DRIVE CLOUD-SYNC)
         // -----------------------------------------------------------------
         const DEFAULT_PINNWAND = {
             categories: [
@@ -1702,68 +1719,130 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         let editingPinId = null;
         let currentPinImageData = '';
 
-        function initPinnwand() {
-            const saved = localStorage.getItem('dippe_pinnwand_v1');
-            if (saved) {
-                try {
-                    pinnwandData = JSON.parse(saved);
-                    if (pinnwandData && Array.isArray(pinnwandData.categories)) {
-                        if (!pinnwandData.categories.some(c => c.id === 'termine')) {
-                            pinnwandData.categories.splice(1, 0, { id: 'termine', icon: '📅', name: 'Termine & Treffen' });
-                        }
-                        if (!pinnwandData.posts.some(p => p.cat === 'termine')) {
-                            pinnwandData.posts.unshift({
-                                id: 101,
-                                cat: 'termine',
-                                title: '🏡 Großes Sippen-Treffen in Pirna',
-                                desc: 'Gemütliches Beisammensein in der Emil-Gast-Straße 4 in Pirna. Neue Termine und Ideen einfach hier per „Bearbeiten“ ergänzen!',
-                                img: '',
-                                fileLink: ''
-                            });
-                        }
-                    } else {
-                        pinnwandData = DEFAULT_PINNWAND;
-                    }
-                } catch {
-                    pinnwandData = DEFAULT_PINNWAND;
+        function setPinnwandSyncStatus(text, color) {
+            const el = document.getElementById('pinnwand-sync-status');
+            if (!el) return;
+            el.textContent = text;
+            if (color) el.style.color = color;
+        }
+
+        function ensureTermineCategory(data) {
+            if (!data || !Array.isArray(data.categories)) return DEFAULT_PINNWAND;
+            if (!data.categories.some(c => c.id === 'termine')) {
+                data.categories.splice(1, 0, { id: 'termine', icon: '📅', name: 'Termine & Treffen' });
+            }
+            if (!Array.isArray(data.posts)) data.posts = [];
+            return data;
+        }
+
+        async function initPinnwand() {
+             // 1. Lokalen Stand sofort anzeigen
+             const saved = localStorage.getItem('dippe_pinnwand_v1');
+             if (saved) {
+                 try { pinnwandData = JSON.parse(saved); } catch { pinnwandData = DEFAULT_PINNWAND; }
+             } else {
+                 pinnwandData = DEFAULT_PINNWAND;
+             }
+             renderPinnwand();
+    
+             // 2. Strg+V Bild-Upload im Formular aktivieren
+             const postForm = document.getElementById('pinnwand-post-form');
+             if (postForm && !postForm.dataset.pasteBound) {
+                 postForm.dataset.pasteBound = "1";
+                 postForm.addEventListener('paste', (e) => {
+                     const items = e.clipboardData?.items;
+                     if (!items) return;
+                     for (const item of items) {
+                         if (item.type.indexOf('image') !== -1) {
+                             const file = item.getAsFile();
+                             if (file) compressAndSetPinImage(file);
+                             e.preventDefault();
+                             break;
+                         }
+                     }
+                 });
+             }
+    
+             // 3. Aktuellen Stand aus dippe_pinnwand_db.json in Google Drive laden
+             if (CONFIG.pinnwandCloudUrl && CONFIG.pinnwandCloudUrl.startsWith('https://script.google.com/')) {
+                 try {
+                     const res = await fetch(CONFIG.pinnwandCloudUrl, { method: 'GET', redirect: 'follow' });
+                     const cloudData = await res.json();
+                     if (cloudData && Array.isArray(cloudData.posts) && Array.isArray(cloudData.categories)) {
+                         pinnwandData = cloudData;
+                         localStorage.setItem('dippe_pinnwand_v1', JSON.stringify(pinnwandData));
+                         renderPinnwand();
+                     } else if (cloudData && cloudData.empty) {
+                         // Noch keine Datei in Drive vorhanden -> jetzt automatisch anlegen
+                         savePinnwandState();
+                     }
+                 } catch (err) {
+                     console.warn('Cloud-Pinnwand konnte nicht geladen werden:', err);
+                 }
+             }
+         }
+
+        async function loadPinnwandFromCloud(manualClick) {
+            const url = (CONFIG.pinnwandCloudUrl || '').trim();
+            if (!url) {
+                if (manualClick) {
+                    alert('Bitte trage zuerst deine Google Apps Script Web-App-URL oben in der index.html unter CONFIG.pinnwandCloudUrl ein.');
                 }
-            } else {
-                pinnwandData = DEFAULT_PINNWAND;
+                return;
             }
-            renderPinnwand();
-
-            const postForm = document.getElementById('pinnwand-post-form');
-            if (postForm) {
-                postForm.addEventListener('paste', (e) => {
-                    const items = e.clipboardData?.items;
-                    if (!items) return;
-                    for (const item of items) {
-                        if (item.type.indexOf('image') !== -1) {
-                            const file = item.getAsFile();
-                            if (file) compressAndSetPinImage(file);
-                            e.preventDefault();
-                            break;
-                        }
-                    }
-                });
-            }
-        }
-
-        function savePinnwandState() {
+            setPinnwandSyncStatus('⏳ Lade aus Google Drive …', '#fbbf24');
             try {
-                localStorage.setItem('dippe_pinnwand_v1', JSON.stringify(pinnwandData));
+                const res = await fetch(url + '?t=' + Date.now(), { method: 'GET' });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const cloudData = await res.json();
+                if (cloudData && cloudData.empty) {
+                    // Noch keine Datei in Google Drive -> aktuellen Stand initial hochladen
+                    await savePinnwandState();
+                    return;
+                }
+                if (cloudData && Array.isArray(cloudData.categories) && Array.isArray(cloudData.posts)) {
+                    const currentActive = pinnwandData?.activeCat || 'alle';
+                    pinnwandData = ensureTermineCategory(cloudData);
+                    pinnwandData.activeCat = currentActive;
+                    localStorage.setItem('dippe_pinnwand_v1', JSON.stringify(pinnwandData));
+                    renderPinnwand();
+                    setPinnwandSyncStatus('☁️ Synchronisiert mit Google Drive', '#a7f3d0');
+                } else {
+                    setPinnwandSyncStatus('⚠️ Cloud-Antwort unerwartet', '#fca5a5');
+                }
             } catch (err) {
-                alert('Hinweis: Das Bild ist sehr groß für den lokalen Browser-Speicher. Bitte verwende ein kleineres Bild oder eine Bild-URL.');
+                setPinnwandSyncStatus('⚠️ Offline / Lokal gespeichert', '#fca5a5');
             }
-            renderPinnwand();
         }
+
+        async function savePinnwandState() {
+         // 1. Sofort lokal speichern & Oberfläche aktualisieren
+         try {
+             localStorage.setItem('dippe_pinnwand_v1', JSON.stringify(pinnwandData));
+         } catch (err) {}
+         renderPinnwand();
+
+         // 2. Im Hintergrund automatisch in dippe_pinnwand_db.json auf Google Drive speichern
+         if (CONFIG.pinnwandCloudUrl && CONFIG.pinnwandCloudUrl.startsWith('https://script.google.com/')) {
+             try {
+                 await fetch(CONFIG.pinnwandCloudUrl, {
+                     method: 'POST',
+                     redirect: 'follow',
+                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                     body: JSON.stringify(pinnwandData)
+                 });
+             } catch (err) {
+                 console.error('Fehler beim Cloud-Speichern:', err);
+             }
+         }
+     }
 
         function compressAndSetPinImage(file) {
             const reader = new FileReader();
             reader.onload = (ev) => {
                 const img = new Image();
                 img.onload = () => {
-                    const maxDim = 1200;
+                    const maxDim = 1000;
                     let w = img.width, h = img.height;
                     if (w > maxDim || h > maxDim) {
                         if (w > h) { h = Math.round(h * (maxDim / w)); w = maxDim; }
@@ -1772,7 +1851,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                     const c = document.createElement('canvas');
                     c.width = w; c.height = h;
                     c.getContext('2d').drawImage(img, 0, 0, w, h);
-                    currentPinImageData = c.toDataURL('image/jpeg', 0.82);
+                    currentPinImageData = c.toDataURL('image/jpeg', 0.80);
                     updatePinImagePreviewUI(currentPinImageData);
                 };
                 img.src = ev.target.result;
