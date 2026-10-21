@@ -579,7 +579,93 @@
         .tetris-touch-controls { display:flex; justify-content:center; gap:6px; margin-top:10px; }
         .tetris-touch-controls button { width:54px; height:42px; border:1px solid #34d399; border-radius:10px; background:#123b30; color:#fff; font-size:20px; cursor:pointer; touch-action:manipulation; }
         .tetris-touch-controls button:active { background:#059669; transform:scale(0.96); }
+        /* Highscore-Box, Minesweeper & Snake */
+        .hs-box {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-green);
+            border-radius: 12px;
+            padding: 12px 14px;
+            min-width: 210px;
+            max-width: 260px;
+            flex: 1;
+        }
+        .hs-box h4 {
+            font-size: 14px;
+            color: #fbbf24;
+            margin: 0 0 8px 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .hs-list {
+            list-style: none;
+            font-size: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .hs-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 8px;
+            border-radius: 6px;
+            background: rgba(0, 0, 0, 0.25);
+        }
+        .hs-item.top-1 { background: rgba(251, 191, 36, 0.2); border: 1px solid rgba(251, 191, 36, 0.4); font-weight: 700; }
+        .hs-rank { color: var(--text-muted); width: 22px; font-family: 'JetBrains Mono', monospace; }
+        .hs-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 6px; }
+        .hs-val { font-family: 'JetBrains Mono', monospace; color: #34d399; font-weight: 700; }
 
+        /* Minesweeper Grid */
+        .ms-board {
+            display: grid;
+            gap: 3px;
+            background: #07120f;
+            padding: 10px;
+            border: 3px solid #34d399;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+            user-select: none;
+            touch-action: manipulation;
+        }
+        .ms-cell {
+            width: clamp(26px, 3.4vw, 34px);
+            height: clamp(26px, 3.4vw, 34px);
+            border-radius: 6px;
+            background: #14352b;
+            border: 1px solid rgba(52, 211, 153, 0.35);
+            color: #fff;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            padding: 0;
+        }
+        .ms-cell:hover:not(.open) { background: #1c473a; }
+        .ms-cell.open { background: rgba(255, 255, 255, 0.08); border-color: rgba(255,255,255,0.08); cursor: default; }
+        .ms-cell.mine { background: #dc2626; border-color: #f87171; }
+        .ms-cell.flagged { background: #1e3a31; }
+        .ms-n1 { color: #38bdf8; } .ms-n2 { color: #4ade80; } .ms-n3 { color: #f87171; }
+        .ms-n4 { color: #c084fc; } .ms-n5 { color: #fb923c; } .ms-n6 { color: #2dd4bf; }
+
+        /* Snake Canvas */
+        #snake-canvas {
+            display: block;
+            width: clamp(280px, 52vh, 460px);
+            height: clamp(280px, 52vh, 460px);
+            max-width: 82vw;
+            max-height: 82vw;
+            aspect-ratio: 1 / 1;
+            background: #07120f;
+            border: 3px solid #34d399;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+            touch-action: none;
+        }
         .impressum-card { max-width:680px; color:var(--text-dark); }
         .impressum-card h3 { margin:16px 0 7px; font-size:19px; }
         .impressum-card h3:first-child { margin-top:0; }
@@ -913,6 +999,12 @@
                 <div class="sub-nav" id="subnav-group-spiele">
                     <button onclick="switchPage('tetris')" id="subnav-tetris" class="sub-nav-btn">
                         <span>🧱 Tetris</span>
+                    </button>
+                    <button onclick="switchPage('minesweeper')" id="subnav-minesweeper" class="sub-nav-btn">
+                        <span>💣 Minesweeper</span>
+                    </button>
+                    <button onclick="switchPage('snake')" id="subnav-snake" class="sub-nav-btn">
+                        <span>🐍 Snake</span>
                     </button>
                 </div>
 
@@ -1399,9 +1491,118 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                         <p id="tetris-status" class="tetris-status">Tippe auf „Neues Spiel“ oder drücke eine Taste.</p>
                         <div class="tetris-keys">← → bewegen · ↑ drehen · ↓ fallen · Leertaste Drop · P pausiert</div>
                     </div>
+                    <div class="hs-box" id="hs-box-tetris"></div>
                 </div>
             </div>
         </section>
+
+        <!-- ===============================================================
+             7b. SPIELE-ECKE: MINESWEEPER
+             =============================================================== -->
+        <section id="page-minesweeper" class="page-section">
+            <div class="section-header">
+                <div>
+                    <span class="eyebrow">Spiele-Ecke</span>
+                    <h2 style="font-size:32px; font-weight:800;">💣 Minesweeper</h2>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    <button class="btn btn-amber" onclick="msNewGame()">▶ Neues Spiel</button>
+                    <button class="btn btn-sand" onclick="switchPage('tetris')">🧱 Tetris</button>
+                    <button class="btn btn-sand" onclick="switchPage('snake')">🐍 Snake</button>
+                </div>
+            </div>
+            <div class="sand-card tetris-shell">
+                <div class="tetris-options">
+                    <label>Größe / Schwierigkeit:
+                        <select id="ms-diff" onchange="msNewGame()">
+                            <option value="easy" selected>Anfänger (9×9 · 10 Minen)</option>
+                            <option value="medium">Fortgeschritten (12×12 · 22 Minen)</option>
+                            <option value="hard">Profi (16×12 · 35 Minen)</option>
+                        </select>
+                    </label>
+                    <button id="ms-flag-toggle" class="btn btn-sand" style="padding:5px 12px; font-size:12px;" onclick="msToggleFlagMode()">
+                        ⛏️ Modus: Aufdecken (Rechtsklick = 🚩)
+                    </button>
+                </div>
+                <div class="tetris-game-wrap">
+                    <div class="tetris-board-wrap">
+                        <div id="ms-board" class="ms-board"></div>
+                    </div>
+                    <div class="tetris-side">
+                        <div class="tetris-stat"><span>Minen übrig</span><strong id="ms-mines-left">10</strong></div>
+                        <div class="tetris-stat"><span>Zeit</span><strong id="ms-time">0.0 s</strong></div>
+                        <div class="tetris-stat"><span>Score</span><strong id="ms-score">0</strong></div>
+                        <p id="ms-status" class="tetris-status">Klicke auf ein Feld, um zu starten!</p>
+                        <div class="tetris-keys">Linksklick: Feld öffnen · Rechtsklick (oder Modus-Schalter): Flagge 🚩 setzen. Score = Schwierigkeits-Bonus minus benötigte Zeit.</div>
+                    </div>
+                    <div class="hs-box" id="hs-box-minesweeper"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===============================================================
+             7c. SPIELE-ECKE: SNAKE
+             =============================================================== -->
+        <section id="page-snake" class="page-section">
+            <div class="section-header">
+                <div>
+                    <span class="eyebrow">Spiele-Ecke</span>
+                    <h2 style="font-size:32px; font-weight:800;">🐍 Snake</h2>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    <button class="btn btn-amber" onclick="snakeNewGame()">▶ Neues Spiel</button>
+                    <button class="btn btn-sand" onclick="switchPage('tetris')">🧱 Tetris</button>
+                    <button class="btn btn-sand" onclick="switchPage('minesweeper')">💣 Minesweeper</button>
+                </div>
+            </div>
+            <div class="sand-card tetris-shell">
+                <div class="tetris-options">
+                    <label>Tempo:
+                        <select id="snake-speed" onchange="snakeChangeSpeed()">
+                            <option value="145">Gemütlich</option>
+                            <option value="105" selected>Normal</option>
+                            <option value="72">Rasend</option>
+                        </select>
+                    </label>
+                    <label><input type="checkbox" id="snake-walls" checked> 🧱 Wände tödlich (sonst Durchgang)</label>
+                </div>
+                <div class="tetris-game-wrap">
+                    <div class="tetris-board-wrap">
+                        <canvas id="snake-canvas" width="400" height="400"></canvas>
+                        <div class="tetris-touch-controls">
+                            <button onclick="snakeSetDir(-1,0)">◀</button>
+                            <button onclick="snakeSetDir(0,-1)">▲</button>
+                            <button onclick="snakeSetDir(0,1)">▼</button>
+                            <button onclick="snakeSetDir(1,0)">▶</button>
+                        </div>
+                    </div>
+                    <div class="tetris-side">
+                        <div class="tetris-stat"><span>Punkte</span><strong id="snake-score">0</strong></div>
+                        <div class="tetris-stat"><span>Äpfel 🍎</span><strong id="snake-apples">0</strong></div>
+                        <div class="tetris-stat"><span>Länge</span><strong id="snake-len">3</strong></div>
+                        <p id="snake-status" class="tetris-status">Klicke auf „Neues Spiel“ oder drücke eine Pfeiltaste.</p>
+                        <div class="tetris-keys">Steuerung mit Pfeiltasten, WASD oder den Buttons unter dem Spielfeld. Leertaste pausiert.</div>
+                    </div>
+                    <div class="hs-box" id="hs-box-snake"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Highscore Top-10 Namenseingabe Modal -->
+        <div class="modal-overlay" id="hs-modal">
+            <div class="modal-box" style="max-width:420px; text-align:center;">
+                <div style="font-size:38px; margin-bottom:6px;">🏆</div>
+                <h3 id="hs-modal-title">Neuer Top-10 Highscore!</h3>
+                <p id="hs-modal-text" style="font-size:14px; margin-bottom:14px;"></p>
+                <form onsubmit="submitHighscoreName(event)" style="display:flex; flex-direction:column; gap:10px;">
+                    <input type="text" id="hs-player-name" class="form-input" placeholder="Dein Name (z. B. Pi, David, Alwin...)" maxlength="22" required style="text-align:center; font-weight:700; font-size:15px;">
+                    <div style="display:flex; gap:8px; justify-content:center; margin-top:4px;">
+                        <button type="submit" class="btn btn-emerald" style="flex:1;">🏅 Eintragen</button>
+                        <button type="button" class="btn btn-dark" onclick="closeHighscoreModal()">Überspringen</button>
+                    </div>
+                </form>
+            </div>
+        </div>        
 
         <!-- ===============================================================
              8. IMPRESSUM
@@ -1440,7 +1641,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         const NAV_GROUPS = {
             familie:     ['fotos', 'pinnwand'],
             maptools:    ['area-maps', 'dominanz', 'area-pur'],
-            spiele:      ['tetris'],
+            spiele:      ['tetris', 'minesweeper', 'snake'],
             rechtliches: ['impressum']
         };
 
@@ -1511,6 +1712,12 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             }
             if (pageId === 'tetris') {
                 setTimeout(() => initTetrisIfNeeded(), 120);
+            }
+            if (pageId === 'minesweeper') {
+                setTimeout(() => initMinesweeperIfNeeded(), 80);
+            }
+            if (pageId === 'snake') {
+                setTimeout(() => initSnakeIfNeeded(), 80);
             }
         }
 
@@ -1744,6 +1951,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                  pinnwandData = DEFAULT_PINNWAND;
              }
              renderPinnwand();
+             renderAllHighscores();
     
              // 2. Strg+V Bild-Upload im Formular aktivieren
              const postForm = document.getElementById('pinnwand-post-form');
@@ -1806,6 +2014,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                     pinnwandData.activeCat = currentActive;
                     localStorage.setItem('dippe_pinnwand_v1', JSON.stringify(pinnwandData));
                     renderPinnwand();
+                    renderAllHighscores();
                     setPinnwandSyncStatus('☁️ Synchronisiert mit Google Drive', '#a7f3d0');
                 } else {
                     setPinnwandSyncStatus('⚠️ Cloud-Antwort unerwartet', '#fca5a5');
@@ -3173,7 +3382,11 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             if (cleared) { tetris.lines += cleared; tetris.score += [0,100,300,500,800][cleared] * tetris.level; if (document.getElementById('tetris-sound').checked) tetrisBeep(440, 0.08); }
             tetris.level = document.getElementById('tetris-speed').checked ? Math.min(15, 1 + Math.floor(tetris.lines / 10)) : Number(document.getElementById('tetris-level').value);
             tetris.piece = tetris.next || tetrisMakePiece(); tetris.next = tetrisMakePiece();
-            if (tetrisCollides(tetris.piece)) { tetris.over = true; tetris.running = false; clearInterval(tetris.timer); document.getElementById('tetris-status').textContent = 'Game Over – Neues Spiel starten'; }
+            if (tetrisCollides(tetris.piece)) {
+                tetris.over = true; tetris.running = false; clearInterval(tetris.timer);
+                document.getElementById('tetris-status').textContent = 'Game Over – Neues Spiel starten';
+                checkAndOfferHighscore('tetris', tetris.score, `${tetris.score.toLocaleString('de-DE')} Pkt.`);
+            }
             tetrisUpdateStats(); tetrisDraw();
         }
         function tetrisStep() { if (!tetris.running) return; if (!tetrisCollides(tetris.piece,0,1)) tetris.piece.y++; else tetrisLock(); tetrisDraw(); }
@@ -3200,6 +3413,431 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         function initTetrisIfNeeded(){ tetrisInitBoard(); tetrisDraw(); }
         document.addEventListener('keydown', e => { if(!document.getElementById('page-tetris')?.classList.contains('active')) return; if(['ArrowLeft','ArrowRight','ArrowDown','ArrowUp',' ','p','P'].includes(e.key)) e.preventDefault(); if(e.key==='ArrowLeft')tetrisMove(-1);if(e.key==='ArrowRight')tetrisMove(1);if(e.key==='ArrowDown')tetrisStep();if(e.key==='ArrowUp')tetrisRotate();if(e.key===' ')tetrisHardDrop();if(e.key==='p'||e.key==='P'){tetris.running=!tetris.running;if(tetris.running)tetrisRestartTimer();else clearInterval(tetris.timer);}});
         drawAreaCanvas();
+        // -----------------------------------------------------------------
+        // 10. TOP-10 HIGHSCORE SYSTEM (LOKAL + GOOGLE DRIVE SYNC)
+        // -----------------------------------------------------------------
+        const DEFAULT_HIGHSCORES = {
+            tetris: [
+                { name: 'Pi', score: 2400, label: '2.400 Pkt.' },
+                { name: 'David', score: 1500, label: '1.500 Pkt.' },
+                { name: 'Alwin', score: 900, label: '900 Pkt.' }
+            ],
+            minesweeper: [
+                { name: 'Pi', score: 850, label: '850 Pkt. (25s)' }
+            ],
+            snake: [
+                { name: 'Pi', score: 180, label: '180 Pkt.' },
+                { name: 'Lili', score: 90, label: '90 Pkt.' }
+            ]
+        };
+
+        let pendingHighscore = null;
+
+        function getHighscoreStore() {
+            if (pinnwandData && typeof pinnwandData === 'object') {
+                if (!pinnwandData.highscores) {
+                    const localHs = localStorage.getItem('dippe_highscores_v1');
+                    pinnwandData.highscores = localHs ? JSON.parse(localHs) : JSON.parse(JSON.stringify(DEFAULT_HIGHSCORES));
+                }
+                return pinnwandData.highscores;
+            }
+            const raw = localStorage.getItem('dippe_highscores_v1');
+            return raw ? JSON.parse(raw) : JSON.parse(JSON.stringify(DEFAULT_HIGHSCORES));
+        }
+
+        function saveHighscoreStore(store) {
+            try { localStorage.setItem('dippe_highscores_v1', JSON.stringify(store)); } catch (e) {}
+            if (pinnwandData && typeof pinnwandData === 'object') {
+                pinnwandData.highscores = store;
+                savePinnwandState(); // Synchronisiert automatisch mit Google Drive!
+            }
+            renderAllHighscores();
+        }
+
+        function renderAllHighscores() {
+            const store = getHighscoreStore();
+            const titles = { tetris: '🏆 Top 10 · Tetris', minesweeper: '🏆 Top 10 · Minesweeper', snake: '🏆 Top 10 · Snake' };
+            ['tetris', 'minesweeper', 'snake'].forEach(game => {
+                const box = document.getElementById('hs-box-' + game);
+                if (!box) return;
+                const list = (store[game] || []).slice(0, 10);
+                box.innerHTML = `
+                    <h4><span>${titles[game]}</span><span style="font-size:11px; opacity:0.75;">Bestenliste</span></h4>
+                    <ul class="hs-list">
+                        ${list.length === 0 ? '<li class="hs-item"><span class="hs-name">Noch keine Einträge</span></li>' :
+                          list.map((entry, idx) => `
+                            <li class="hs-item ${idx === 0 ? 'top-1' : ''}">
+                                <span class="hs-rank">${idx + 1}.</span>
+                                <span class="hs-name">${domEsc(entry.name)}</span>
+                                <span class="hs-val">${domEsc(entry.label || entry.score)}</span>
+                            </li>
+                        `).join('')}
+                    </ul>
+                `;
+            });
+        }
+
+        function checkAndOfferHighscore(game, score, label) {
+            if (!score || score <= 0) return;
+            const store = getHighscoreStore();
+            const list = store[game] || [];
+            const qualifies = list.length < 10 || score > list[list.length - 1].score;
+            if (!qualifies) return;
+
+            pendingHighscore = { game, score, label };
+            const gameNames = { tetris: 'Tetris', minesweeper: 'Minesweeper', snake: 'Snake' };
+            document.getElementById('hs-modal-title').textContent = `🏆 Top 10 in ${gameNames[game]}!`;
+            document.getElementById('hs-modal-text').textContent = `Stark! Du hast ${label} erreicht und bist in den Top 10. Trag deinen Namen in die Bestenliste ein:`;
+            const inp = document.getElementById('hs-player-name');
+            inp.value = localStorage.getItem('dippe_last_player') || '';
+            document.getElementById('hs-modal').classList.add('open');
+            setTimeout(() => inp.focus(), 80);
+        }
+
+        function submitHighscoreName(e) {
+            e.preventDefault();
+            if (!pendingHighscore) return;
+            const name = document.getElementById('hs-player-name').value.trim() || 'Anonym';
+            try { localStorage.setItem('dippe_last_player', name); } catch (err) {}
+
+            const store = getHighscoreStore();
+            const list = store[pendingHighscore.game] || [];
+            list.push({ name, score: pendingHighscore.score, label: pendingHighscore.label, date: Date.now() });
+            list.sort((a, b) => b.score - a.score);
+            store[pendingHighscore.game] = list.slice(0, 10);
+
+            pendingHighscore = null;
+            closeHighscoreModal();
+            saveHighscoreStore(store);
+        }
+
+        function closeHighscoreModal() {
+            document.getElementById('hs-modal').classList.remove('open');
+            pendingHighscore = null;
+        }
+
+        // -----------------------------------------------------------------
+        // 11. MINESWEEPER
+        // -----------------------------------------------------------------
+        const MS_CONFIGS = {
+            easy:   { cols: 9,  rows: 9,  mines: 10, baseScore: 1000 },
+            medium: { cols: 12, rows: 12, mines: 22, baseScore: 2200 },
+            hard:   { cols: 16, rows: 12, mines: 35, baseScore: 3800 }
+        };
+        let ms = { cols: 9, rows: 9, mines: 10, baseScore: 1000, grid: [], started: false, over: false, flagMode: false, flags: 0, opened: 0, startTime: 0, timer: null };
+
+        function initMinesweeperIfNeeded() {
+            renderAllHighscores();
+            if (!ms.grid.length) msNewGame();
+        }
+
+        function msToggleFlagMode() {
+            ms.flagMode = !ms.flagMode;
+            const btn = document.getElementById('ms-flag-toggle');
+            btn.textContent = ms.flagMode ? '🚩 Modus: Flagge setzen (Aktiv)' : '⛏️ Modus: Aufdecken (Rechtsklick = 🚩)';
+            btn.className = ms.flagMode ? 'btn btn-amber' : 'btn btn-sand';
+        }
+
+        function msNewGame() {
+            clearInterval(ms.timer);
+            const diff = document.getElementById('ms-diff')?.value || 'easy';
+            const cfg = MS_CONFIGS[diff] || MS_CONFIGS.easy;
+            ms = { ...cfg, grid: [], started: false, over: false, flagMode: ms.flagMode, flags: 0, opened: 0, startTime: 0, timer: null };
+
+            for (let r = 0; r < ms.rows; r++) {
+                const row = [];
+                for (let c = 0; c < ms.cols; c++) {
+                    row.push({ r, c, mine: false, open: false, flag: false, count: 0 });
+                }
+                ms.grid.push(row);
+            }
+            document.getElementById('ms-mines-left').textContent = ms.mines;
+            document.getElementById('ms-time').textContent = '0.0 s';
+            document.getElementById('ms-score').textContent = '0';
+            document.getElementById('ms-status').textContent = 'Bereit – erstes Feld ist garantiert sicher!';
+            msRenderBoard();
+        }
+
+        function msPlaceMines(safeR, safeC) {
+            let placed = 0;
+            while (placed < ms.mines) {
+                const r = Math.floor(Math.random() * ms.rows);
+                const c = Math.floor(Math.random() * ms.cols);
+                if (ms.grid[r][c].mine || (Math.abs(r - safeR) <= 1 && Math.abs(c - safeC) <= 1)) continue;
+                ms.grid[r][c].mine = true;
+                placed++;
+            }
+            for (let r = 0; r < ms.rows; r++) {
+                for (let c = 0; c < ms.cols; c++) {
+                    if (ms.grid[r][c].mine) continue;
+                    let cnt = 0;
+                    msNeighbors(r, c).forEach(n => { if (n.mine) cnt++; });
+                    ms.grid[r][c].count = cnt;
+                }
+            }
+        }
+
+        function msNeighbors(r, c) {
+            const list = [];
+            for (let dr = -1; dr <= 1; dr++) {
+                for (let dc = -1; dc <= 1; dc++) {
+                    if (dr === 0 && dc === 0) continue;
+                    const nr = r + dr, nc = c + dc;
+                    if (nr >= 0 && nr < ms.rows && nc >= 0 && nc < ms.cols) list.push(ms.grid[nr][nc]);
+                }
+            }
+            return list;
+        }
+
+        function msHandleClick(r, c) {
+            if (ms.over) return;
+            const cell = ms.grid[r][c];
+            if (ms.flagMode) { msToggleFlag(r, c); return; }
+            if (cell.flag || cell.open) return;
+
+            if (!ms.started) {
+                ms.started = true;
+                msPlaceMines(r, c);
+                ms.startTime = performance.now();
+                ms.timer = setInterval(() => {
+                    const sec = (performance.now() - ms.startTime) / 1000;
+                    document.getElementById('ms-time').textContent = sec.toFixed(1) + ' s';
+                }, 100);
+            }
+
+            if (cell.mine) {
+                cell.open = true;
+                msGameOver(false);
+                return;
+            }
+            msReveal(r, c);
+            msRenderBoard();
+            msCheckWin();
+        }
+
+        function msToggleFlag(r, c) {
+            if (ms.over) return;
+            const cell = ms.grid[r][c];
+            if (cell.open) return;
+            cell.flag = !cell.flag;
+            ms.flags += cell.flag ? 1 : -1;
+            document.getElementById('ms-mines-left').textContent = ms.mines - ms.flags;
+            msRenderBoard();
+        }
+
+        function msReveal(r, c) {
+            const stack = [ms.grid[r][c]];
+            while (stack.length) {
+                const cur = stack.pop();
+                if (cur.open || cur.flag) continue;
+                cur.open = true;
+                ms.opened++;
+                if (cur.count === 0 && !cur.mine) {
+                    msNeighbors(cur.r, cur.c).forEach(n => { if (!n.open && !n.flag) stack.push(n); });
+                }
+            }
+        }
+
+        function msCheckWin() {
+            const totalSafe = ms.rows * ms.cols - ms.mines;
+            if (ms.opened >= totalSafe) msGameOver(true);
+        }
+
+        function msGameOver(won) {
+            ms.over = true;
+            clearInterval(ms.timer);
+            const sec = ms.started ? Math.max(1, Math.round((performance.now() - ms.startTime) / 1000)) : 0;
+            if (!won) {
+                ms.grid.forEach(row => row.forEach(c => { if (c.mine) c.open = true; }));
+                msRenderBoard();
+                document.getElementById('ms-status').textContent = '💥 Bumm! Mine getroffen. Versuch es gleich nochmal!';
+            } else {
+                const score = Math.max(100, ms.baseScore - sec * 6);
+                document.getElementById('ms-score').textContent = score.toLocaleString('de-DE');
+                document.getElementById('ms-status').textContent = `🎉 Gelöst in ${sec}s! Score: ${score} Pkt.`;
+                msRenderBoard();
+                checkAndOfferHighscore('minesweeper', score, `${score} Pkt. (${sec}s)`);
+            }
+        }
+
+        function msRenderBoard() {
+            const board = document.getElementById('ms-board');
+            if (!board) return;
+            board.style.gridTemplateColumns = `repeat(${ms.cols}, auto)`;
+            board.innerHTML = '';
+            for (let r = 0; r < ms.rows; r++) {
+                for (let c = 0; c < ms.cols; c++) {
+                    const cell = ms.grid[r][c];
+                    const btn = document.createElement('button');
+                    btn.className = 'ms-cell' + (cell.open ? ' open' : '') + (cell.open && cell.mine ? ' mine' : '') + (cell.flag ? ' flagged' : '');
+                    if (cell.open) {
+                        if (cell.mine) btn.textContent = '💣';
+                        else if (cell.count > 0) {
+                            btn.textContent = cell.count;
+                            btn.classList.add('ms-n' + Math.min(6, cell.count));
+                        }
+                    } else if (cell.flag) {
+                        btn.textContent = '🚩';
+                    }
+                    btn.onclick = () => msHandleClick(r, c);
+                    btn.oncontextmenu = (e) => { e.preventDefault(); msToggleFlag(r, c); };
+                    board.appendChild(btn);
+                }
+            }
+        }
+
+        // -----------------------------------------------------------------
+        // 12. SNAKE
+        // -----------------------------------------------------------------
+        const SNAKE_GRID = 20;
+        let snake = { body: [], dir: {x:1, y:0}, nextDir: {x:1, y:0}, food: {x:10, y:10}, score: 0, apples: 0, running: false, paused: false, timer: null };
+
+        function initSnakeIfNeeded() {
+            renderAllHighscores();
+            if (!snake.body.length) {
+                snakeResetState();
+                snakeDraw();
+            }
+        }
+
+        function snakeResetState() {
+            snake.body = [{x: 8, y: 10}, {x: 7, y: 10}, {x: 6, y: 10}];
+            snake.dir = {x: 1, y: 0};
+            snake.nextDir = {x: 1, y: 0};
+            snake.score = 0;
+            snake.apples = 0;
+            snakePlaceFood();
+            snakeUpdateUI();
+        }
+
+        function snakePlaceFood() {
+            while (true) {
+                const fx = Math.floor(Math.random() * SNAKE_GRID);
+                const fy = Math.floor(Math.random() * SNAKE_GRID);
+                if (!snake.body.some(seg => seg.x === fx && seg.y === fy)) {
+                    snake.food = {x: fx, y: fy};
+                    break;
+                }
+            }
+        }
+
+        function snakeNewGame() {
+            clearInterval(snake.timer);
+            snakeResetState();
+            snake.running = true;
+            snake.paused = false;
+            document.getElementById('snake-status').textContent = '🐍 Läuft – sammle die Äpfel!';
+            snakeStartTimer();
+            snakeDraw();
+        }
+
+        function snakeStartTimer() {
+            clearInterval(snake.timer);
+            const speed = Number(document.getElementById('snake-speed')?.value || 105);
+            snake.timer = setInterval(snakeStep, speed);
+        }
+
+        function snakeChangeSpeed() {
+            if (snake.running && !snake.paused) snakeStartTimer();
+        }
+
+        function snakeSetDir(dx, dy) {
+            if (!snake.running) snakeNewGame();
+            if (dx === -snake.dir.x && dy === -snake.dir.y) return;
+            snake.nextDir = {x: dx, y: dy};
+        }
+
+        function snakeStep() {
+            if (!snake.running || snake.paused) return;
+            snake.dir = snake.nextDir;
+            let nx = snake.body[0].x + snake.dir.x;
+            let ny = snake.body[0].y + snake.dir.y;
+
+            const wallsDeadly = document.getElementById('snake-walls')?.checked;
+            if (nx < 0 || nx >= SNAKE_GRID || ny < 0 || ny >= SNAKE_GRID) {
+                if (wallsDeadly) { snakeGameOver(); return; }
+                nx = (nx + SNAKE_GRID) % SNAKE_GRID;
+                ny = (ny + SNAKE_GRID) % SNAKE_GRID;
+            }
+
+            if (snake.body.some(seg => seg.x === nx && seg.y === ny)) {
+                snakeGameOver();
+                return;
+            }
+
+            snake.body.unshift({x: nx, y: ny});
+            if (nx === snake.food.x && ny === snake.food.y) {
+                snake.apples++;
+                const speedBonus = document.getElementById('snake-speed')?.value === '72' ? 15 : 10;
+                snake.score += speedBonus;
+                snakePlaceFood();
+            } else {
+                snake.body.pop();
+            }
+            snakeUpdateUI();
+            snakeDraw();
+        }
+
+        function snakeGameOver() {
+            snake.running = false;
+            clearInterval(snake.timer);
+            document.getElementById('snake-status').textContent = '💥 Game Over – Neues Spiel starten!';
+            snakeDraw();
+            checkAndOfferHighscore('snake', snake.score, `${snake.score.toLocaleString('de-DE')} Pkt.`);
+        }
+
+        function snakeUpdateUI() {
+            document.getElementById('snake-score').textContent = snake.score.toLocaleString('de-DE');
+            document.getElementById('snake-apples').textContent = snake.apples;
+            document.getElementById('snake-len').textContent = snake.body.length;
+        }
+
+        function snakeDraw() {
+            const c = document.getElementById('snake-canvas');
+            if (!c) return;
+            const ctx = c.getContext('2d');
+            const size = c.width / SNAKE_GRID;
+            ctx.fillStyle = '#07120f';
+            ctx.fillRect(0, 0, c.width, c.height);
+
+            ctx.strokeStyle = 'rgba(52, 211, 153, 0.08)';
+            ctx.lineWidth = 1;
+            for (let i = 1; i < SNAKE_GRID; i++) {
+                ctx.beginPath(); ctx.moveTo(i * size, 0); ctx.lineTo(i * size, c.height); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0, i * size); ctx.lineTo(c.width, i * size); ctx.stroke();
+            }
+
+            // Apfel
+            ctx.fillStyle = '#ef4444';
+            ctx.beginPath();
+            ctx.arc((snake.food.x + 0.5) * size, (snake.food.y + 0.5) * size, size * 0.4, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Schlange
+            snake.body.forEach((seg, idx) => {
+                ctx.fillStyle = idx === 0 ? '#fbbf24' : '#10b981';
+                ctx.fillRect(seg.x * size + 1.5, seg.y * size + 1.5, size - 3, size - 3);
+            });
+        }
+
+        document.addEventListener('keydown', e => {
+            if (!document.getElementById('page-snake')?.classList.contains('active')) return;
+            if (document.getElementById('hs-modal')?.classList.contains('open')) return;
+            const k = e.key;
+            if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].includes(k)) e.preventDefault();
+            if (k === 'ArrowLeft'  || k === 'a' || k === 'A') snakeSetDir(-1, 0);
+            if (k === 'ArrowRight' || k === 'd' || k === 'D') snakeSetDir(1, 0);
+            if (k === 'ArrowUp'    || k === 'w' || k === 'W') snakeSetDir(0, -1);
+            if (k === 'ArrowDown'  || k === 's' || k === 'S') snakeSetDir(0, 1);
+            if (k === ' ' && snake.running) {
+                snake.paused = !snake.paused;
+                document.getElementById('snake-status').textContent = snake.paused ? '⏸️ Pausiert (Leertaste zum Fortsetzen)' : '🐍 Läuft!';
+            }
+        });
+
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(renderAllHighscores, 400);
+        });
     </script>
 </body>
 </html>
