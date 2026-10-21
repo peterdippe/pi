@@ -495,27 +495,6 @@
         }
         .btn-start-matlab:hover { background: #157de5; }
 
-        /* CHIPS & FAMILY BOXES */
-        .chip-row { display: flex; flex-wrap: wrap; gap: 7px; margin: 12px 0 18px; }
-        .chip {
-            font-size: 11.8px;
-            font-weight: 600;
-            padding: 5px 11px;
-            border-radius: 10px;
-            background: rgba(16, 185, 129, 0.14);
-            border: 1px solid rgba(52, 211, 153, 0.3);
-            color: #d1fae5;
-        }
-
-        .scrabble-frame {
-            border-radius: 20px;
-            overflow: hidden;
-            border: 4px solid var(--bg-sand);
-            box-shadow: 0 18px 36px rgba(0,0,0,0.45);
-            background: #091512;
-        }
-        .scrabble-frame img { width: 100%; height: auto; display: block; }
-
         /* Wappen im Home-Hero: skaliert dynamisch mit der Bildschirmhoehe */
         .wappen-frame {
             display: flex; align-items: center; justify-content: center;
@@ -541,37 +520,6 @@
         }
         .person-role { font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--emerald-dark); display: block; }
         .person-name { font-size: 14px; font-weight: 700; color: var(--text-dark); margin-top: 2px; }
-
-        /* STAMMBAUM VISUALISIERUNG */
-        .tree-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 18px;
-            padding: 16px 0;
-        }
-        .tree-level {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 16px;
-            width: 100%;
-        }
-        .tree-node {
-            background: #fff;
-            border: 2px solid var(--emerald-dark);
-            border-radius: 14px;
-            padding: 10px 16px;
-            text-align: center;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-            min-width: 180px;
-        }
-        .tree-connector {
-            width: 3px;
-            height: 18px;
-            background: var(--emerald-dark);
-            margin: -10px auto;
-        }
 
         /* Berg-Atlas: Marker & Bezugsgipfel */
         .domPeakDot { border-radius: 50%; border: 1.5px solid rgba(0,0,0,0.45); box-shadow: 0 0 0 1px rgba(255,255,255,0.65); }
@@ -854,16 +802,15 @@
 <body>
 
     <!-- ===================================================================
-         KONFIGURATION FÜR PASSWORT, CLOUD & MYHERITAGE
+         KONFIGURATION FÜR PASSWORT & CLOUD
          =================================================================== -->
     <script>
         const CONFIG = {
             fotoPasswort: "dippe",
-            myHeritageUrl: "https://www.myheritage.de/", // Hier optional den Direktlink zum MyHeritage-Baum von Klaus eintragen
             alben: [
                 {
                     titel: "Familienfotos & Schnappschüsse",
-                    beschreibung: "Unsere schönsten Momente, Feste und Ausflüge der gesamten Dippe- & Wolf-Sippe.",
+                    beschreibung: "Unsere schönsten Momente, Feste und Ausflüge der gesamten Familie.",
                     datum: "Laufend aktualisiert",
                     anbieter: "Google Drive",
                     bg: "linear-gradient(135deg, #059669, #0f766e)",
@@ -919,9 +866,6 @@
                     <span id="caret-familie" class="nav-caret">▸</span>
                 </button>
                 <div class="sub-nav open" id="subnav-group-familie">
-                    <button onclick="switchPage('sippe')" id="subnav-sippe" class="sub-nav-btn">
-                        <span>👨‍👩‍👧‍👦 Die Sippe & Stammbaum</span>
-                    </button>
                     <button onclick="switchPage('fotos')" id="subnav-fotos" class="sub-nav-btn">
                         <span>📸 Fotos & Cloud</span>
                         <span id="lock-indicator">🔒</span>
@@ -993,7 +937,7 @@
                             Unser Familienzuhause im Tor zur <span class="highlight-grad">Sächsischen Schweiz</span>.
                         </h2>
                         <p style="color:var(--text-muted); font-size:15.5px; line-height:1.65; margin-bottom:0;">
-                            Herzlich willkommen auf der Homepage unserer Familie! Von unserem Zuhause in Pirna aus teilen wir hier Erinnerungen, unseren Stammbaum, Fotoalben, unsere interaktive Pinnwand sowie Karten- und Geometrie-Tools.
+                            Herzlich willkommen auf der Homepage unserer Familie! Von unserem Zuhause in Pirna aus teilen wir hier Erinnerungen, Fotoalben, unsere interaktive Pinnwand sowie Karten- und Geometrie-Tools.
                         </p>
                     </div>
 
@@ -1012,18 +956,14 @@
                             <span class="eyebrow-dark">Unser Standort</span>
                             <h3 style="font-size:21px; font-weight:800;" id="home-loc-title">📍 Emil-Gast-Straße 4, 01796 Pirna</h3>
                         </div>
-                        <a id="home-route-link" href="#" target="_blank" rel="noopener" class="btn btn-dark" style="padding:8px 14px; font-size:12px;">
-                            Größere Karte & Route ↗
-                        </a>
-                    </div>
-                    <!-- Standort- und Kartenauswahl -->
-                    <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:12px;">
-                        <label style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; white-space:nowrap;">
-                            🏠 <select id="home-loc-select" class="form-input" style="width:auto; min-width:175px; max-width:230px; padding:6px 10px;" onchange="setHomeLocation(this.value)"></select>
-                        </label>
-                        <label style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; white-space:nowrap;">
-                            🗺️ <select id="home-layer-select" class="form-input" style="width:auto; min-width:155px; max-width:210px; padding:6px 10px;" onchange="setHomeLayer(this.value)"></select>
-                        </label>
+                        <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
+                            <label style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; white-space:nowrap;">
+                                🗺️ <select id="home-layer-select" class="form-input" style="width:auto; min-width:155px; max-width:210px; padding:6px 10px;" onchange="setHomeLayer(this.value)"></select>
+                            </label>
+                            <a id="home-route-link" href="#" target="_blank" rel="noopener" class="btn btn-dark" style="padding:8px 14px; font-size:12px;">
+                                Größere Karte & Route ↗
+                            </a>
+                        </div>
                     </div>
                     <div id="osm-map"></div>
                 </div>
@@ -1061,204 +1001,7 @@
 
 
         <!-- ===============================================================
-             2. DIE SIPPE & MYHERITAGE STAMMBAUM
-             =============================================================== -->
-        <section id="page-sippe" class="page-section">
-            <div class="section-header">
-                <div>
-                    <span class="eyebrow">Unsere Familie & Ahnenforschung</span>
-                    <h2 style="font-size:32px; font-weight:800;">Die große Dippe- & Wolf-Sippe</h2>
-                </div>
-                <a href="#stammbaum-section" class="btn btn-amber">🌳 Zum Stammbaum & MyHeritage ↓</a>
-            </div>
-
-            <div class="grid-2" style="margin-bottom:28px;">
-                <!-- 1. Peter & Bianca Dippe + Kinder -->
-                <div class="sand-card">
-                    <span class="eyebrow-dark">Pirna · Emil-Gast-Str. 4</span>
-                    <h3 style="font-size:23px; font-weight:800; margin-bottom:10px;">Peter & Bianca Dippe</h3>
-                    <div class="person-grid-2">
-                        <div class="person-box">
-                            <span class="person-role">Vater (Ich)</span>
-                            <div class="person-name">Peter Dippe</div>
-                        </div>
-                        <div class="person-box">
-                            <span class="person-role">Ehefrau & Mutter</span>
-                            <div class="person-name">Bianca Dippe</div>
-                        </div>
-                    </div>
-                    <div style="font-size:11.5px; font-weight:800; text-transform:uppercase; margin-top:12px; color:#475569;">Unsere 3 Kinder</div>
-                    <div class="person-grid-3">
-                        <div class="person-box">
-                            <span class="person-role">1. Sohn</span>
-                            <div class="person-name">David Dippe</div>
-                        </div>
-                        <div class="person-box">
-                            <span class="person-role">2. Sohn</span>
-                            <div class="person-name">Alwin Dippe</div>
-                        </div>
-                        <div class="person-box">
-                            <span class="person-role" style="color:var(--amber);">Jüngste Tochter</span>
-                            <div class="person-name">Liliana Dippe</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 2. Eltern Steffi & Klaus Dippe -->
-                <div class="sand-card" style="display:flex; flex-direction:column; justify-content:space-between;">
-                    <div>
-                        <span class="eyebrow-dark" style="color:var(--amber);">Eltern & Großeltern</span>
-                        <h3 style="font-size:23px; font-weight:800; margin-bottom:10px;">Steffi & Klaus Dippe</h3>
-                        <p style="font-size:14px; line-height:1.6; margin-bottom:12px;">
-                            Meine Eltern und das Fundament der gesamten Familie – Eltern von Peter, Anna und Andreas sowie stolze Großeltern von acht Enkelkindern. Klaus pflegt zudem unseren großen Familienstammbaum.
-                        </p>
-                        <div class="person-grid-2">
-                            <div class="person-box">
-                                <span class="person-role" style="color:var(--amber);">Mutter & Oma</span>
-                                <div class="person-name">Steffi Dippe</div>
-                            </div>
-                            <div class="person-box">
-                                <span class="person-role" style="color:var(--amber);">Vater & Opa</span>
-                                <div class="person-name">Klaus Dippe</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div style="padding:11px 14px; border-radius:12px; background:rgba(217,119,6,0.12); font-size:13px; font-weight:600;">
-                        💛 Halten die gesamte Sippe über alle Generationen hinweg zusammen.
-                    </div>
-                </div>
-
-                <!-- 3. Schwester Anna Wolf & Familie -->
-                <div class="sand-card">
-                    <span class="eyebrow-dark">Schwester & Familie</span>
-                    <h3 style="font-size:23px; font-weight:800; margin-bottom:10px;">Anna & Tobias Wolf</h3>
-                    <div class="person-grid-2">
-                        <div class="person-box">
-                            <span class="person-role">Meine Schwester</span>
-                            <div class="person-name">Anna Wolf</div>
-                        </div>
-                        <div class="person-box">
-                            <span class="person-role">Ihr Mann</span>
-                            <div class="person-name">Tobias Wolf</div>
-                        </div>
-                    </div>
-                    <div style="font-size:11.5px; font-weight:800; text-transform:uppercase; margin-top:12px; color:#475569;">Ihre 3 Kinder</div>
-                    <div class="person-grid-3">
-                        <div class="person-box">
-                            <span class="person-role">Sohn</span>
-                            <div class="person-name">Edgar Wolf</div>
-                        </div>
-                        <div class="person-box">
-                            <span class="person-role" style="color:var(--amber);">Tochter</span>
-                            <div class="person-name">Paula Wolf</div>
-                        </div>
-                        <div class="person-box">
-                            <span class="person-role">Sohn</span>
-                            <div class="person-name">Enno Wolf</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 4. Bruder Andreas Dippe & Familie -->
-                <div class="sand-card">
-                    <span class="eyebrow-dark">Bruder & Familie</span>
-                    <h3 style="font-size:23px; font-weight:800; margin-bottom:10px;">Andreas & Natascha Dippe</h3>
-                    <div class="person-grid-2">
-                        <div class="person-box">
-                            <span class="person-role">Mein Bruder</span>
-                            <div class="person-name">Andreas Dippe</div>
-                        </div>
-                        <div class="person-box">
-                            <span class="person-role">Seine Frau</span>
-                            <div class="person-name">Natascha Dippe</div>
-                        </div>
-                    </div>
-                    <div style="font-size:11.5px; font-weight:800; text-transform:uppercase; margin-top:12px; color:#475569;">Ihre Zwillinge (beides Jungs)</div>
-                    <div class="person-grid-2">
-                        <div class="person-box">
-                            <span class="person-role">Zwillingssohn</span>
-                            <div class="person-name">Nicolas Dippe</div>
-                        </div>
-                        <div class="person-box">
-                            <span class="person-role">Zwillingssohn</span>
-                            <div class="person-name">Nikita Dippe</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- INTERAKTIVER STAMMBAUM & MYHERITAGE INTEGRATION -->
-            <div id="stammbaum-section" class="sand-card" style="margin-top:10px;">
-                <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; border-bottom:1px solid var(--border-sand); padding-bottom:16px; margin-bottom:20px;">
-                    <div>
-                        <span class="eyebrow-dark">Ahnentafel & MyHeritage-Anbindung</span>
-                        <h3 style="font-size:25px; font-weight:800;">🌳 Interaktiver Familienstammbaum</h3>
-                    </div>
-                    <div style="display:flex; flex-wrap:wrap; gap:10px;">
-                        <label class="btn btn-emerald" style="cursor:pointer;">
-                            📂 MyHeritage GEDCOM (.ged) laden
-                            <input type="file" accept=".ged" class="hidden" onchange="handleGedcomUpload(event)">
-                        </label>
-                        <a href="https://www.myheritage.de/" target="_blank" rel="noopener" class="btn btn-dark">
-                            🌐 Zu MyHeritage öffnen ↗
-                        </a>
-                    </div>
-                </div>
-
-                <!-- Visueller 3-Generationen-Baum -->
-                <div class="tree-container">
-                    <!-- Generation 1 -->
-                    <div class="tree-level">
-                        <div class="tree-node" style="border-color:var(--amber); background:#fffbeb;">
-                            <span class="person-role" style="color:var(--amber);">1. Generation (Großeltern)</span>
-                            <div style="font-size:17px; font-weight:800;">Klaus & Steffi Dippe</div>
-                        </div>
-                    </div>
-                    <div class="tree-connector"></div>
-                    <!-- Generation 2 & 3 -->
-                    <div class="tree-level" style="align-items:stretch;">
-                        <div class="tree-node" style="flex:1; max-width:340px;">
-                            <span class="person-role">2. Generation</span>
-                            <div style="font-size:16px; font-weight:800; margin-bottom:8px;">Peter & Bianca Dippe</div>
-                            <div style="font-size:12.5px; background:var(--bg-sand-light); padding:8px; border-radius:8px; border:1px solid var(--border-sand);">
-                                <strong>3. Gen.:</strong> David · Alwin · Liliana
-                            </div>
-                        </div>
-                        <div class="tree-node" style="flex:1; max-width:340px;">
-                            <span class="person-role">2. Generation</span>
-                            <div style="font-size:16px; font-weight:800; margin-bottom:8px;">Anna & Tobias Wolf</div>
-                            <div style="font-size:12.5px; background:var(--bg-sand-light); padding:8px; border-radius:8px; border:1px solid var(--border-sand);">
-                                <strong>3. Gen.:</strong> Edgar · Paula · Enno
-                            </div>
-                        </div>
-                        <div class="tree-node" style="flex:1; max-width:340px;">
-                            <span class="person-role">2. Generation</span>
-                            <div style="font-size:16px; font-weight:800; margin-bottom:8px;">Andreas & Natascha Dippe</div>
-                            <div style="font-size:12.5px; background:var(--bg-sand-light); padding:8px; border-radius:8px; border:1px solid var(--border-sand);">
-                                <strong>3. Gen.:</strong> Nicolas & Nikita (Zwillinge)
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Dynamischer Bereich für importierte MyHeritage GEDCOM-Daten -->
-                <div id="gedcom-viewer" class="hidden" style="margin-top:22px; padding-top:18px; border-top:2px dashed var(--border-sand);">
-                    <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px;">
-                        <h4 style="font-size:19px; font-weight:800;" id="gedcom-title">Geladener MyHeritage-Stammbaum</h4>
-                        <input type="text" id="gedcom-search" class="form-input" style="max-width:280px;" placeholder="🔍 Vorfahren suchen (Name, Ort, Jahr)..." oninput="filterGedcomList()">
-                    </div>
-                    <div id="gedcom-list" class="grid-3" style="max-height:420px; overflow-y:auto; padding:4px;"></div>
-                </div>
-
-                <div style="margin-top:16px; padding:12px 16px; border-radius:12px; background:var(--bg-sand-light); border:1px solid var(--border-sand); font-size:13px; line-height:1.5;">
-                    💡 <strong>So bindet ihr Klaus' kompletten MyHeritage-Stammbaum ein:</strong> In MyHeritage einfach auf <em>„Stammbaum → Stammbaum verwalten → Nach GEDCOM exportieren“</em> klicken. Die heruntergeladene <code>.ged</code>-Datei könnt ihr oben über den grünen Button direkt einlesen (oder als <code>stammbaum.ged</code> in den GitHub-Ordner legen, dann lädt sie für alle Besucher automatisch!).
-                </div>
-            </div>
-        </section>
-
-
-        <!-- ===============================================================
-             3. FOTOS & CLOUD (PASSWORTGESCHÜTZT)
+             2. FOTOS & CLOUD (PASSWORTGESCHÜTZT)
              =============================================================== -->
         <section id="page-fotos" class="page-section">
             <div class="section-header">
@@ -1292,7 +1035,7 @@
 
 
         <!-- ===============================================================
-             4. INTERAKTIVE FAMILIEN-PINNWAND (TERMINE, REZEPTE, BILDER & DATEIEN)
+             3. INTERAKTIVE FAMILIEN-PINNWAND (TERMINE, REZEPTE, BILDER & DATEIEN)
              =============================================================== -->
         <section id="page-pinnwand" class="page-section">
             <div class="section-header">
@@ -1303,7 +1046,6 @@
                 <div style="display:flex; flex-wrap:wrap; gap:8px;">
                     <button class="btn btn-emerald" onclick="openNewPinnwandPostForm()">➕ Neuer Beitrag / Bild</button>
                     <button class="btn btn-amber" onclick="togglePinnwandForm('cat')">📁 Neue Kategorie</button>
-                    <button class="btn btn-sand" onclick="exportPinnwandJSON()" title="Pinnwand als Datei sichern">💾 Backup</button>
                 </div>
             </div>
 
@@ -1354,7 +1096,7 @@
                     </div>
                 </div>
                 <div style="display:flex; flex-wrap:wrap; gap:10px;">
-                    <button id="pin-submit-btn" class="btn btn-emerald" onclick="savePinnwandPost()">💾 Beitrag anheften</button>
+                    <button id="pin-submit-btn" class="btn btn-emerald" onclick="savePinnwandPost()">💾 Speichern</button>
                     <button class="btn btn-dark" onclick="togglePinnwandForm(null)">Abbrechen</button>
                 </div>
             </div>
@@ -1379,7 +1121,7 @@
 
 
         <!-- ===============================================================
-             6. MAP-TOOLS (1): "MAPS MATH" (KARTENGEOMETRIE)
+             4. MAP-TOOLS (1): "MAPS MATH" (KARTENGEOMETRIE)
              =============================================================== -->
         <section id="page-area-maps" class="page-section">
             <div class="section-header">
@@ -1439,7 +1181,7 @@ Das umschließende Polygon, der kleinste Umkreis nach Welzl sowie die Mittelpunk
 
 
         <!-- ===============================================================
-             7. MAP-TOOLS (2): "BERG-DOMINANZ-ATLAS" (TOPOLOGIE & GIPFEL)
+             5. MAP-TOOLS (2): "BERG-DOMINANZ-ATLAS" (TOPOLOGIE & GIPFEL)
              =============================================================== -->
         <section id="page-dominanz" class="page-section">
             <div class="section-header">
@@ -1475,15 +1217,15 @@ Das umschließende Polygon, der kleinste Umkreis nach Welzl sowie die Mittelpunk
 
                 <!-- Farblegende (Höhenklassen) über der Karte -->
                 <div class="dom-legend" id="dom-legend">
-                    <strong style="font-size:12px; margin-right:2px;">Höhe ü. NN:</strong>
+                    <strong style="font-size:12px; margin-right:2px;">Höhe ü. NN:</strong>
                     <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#1a6b2e;"></span> &lt; 1000 m</span>
-                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#5bd16a;"></span> 1000–2000 m</span>
-                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#f2d307;"></span> 2000–3000 m</span>
-                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#d9a406;"></span> 3000–4000 m</span>
-                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#f27405;"></span> 4000–5000 m</span>
-                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#f2766e;"></span> 5000–6000 m</span>
-                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#e01b1b;"></span> 6000–7000 m</span>
-                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#8b2fc9;"></span> &gt; 7000 m</span>
+                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#5bd16a;"></span> 1000–2000 m</span>
+                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#f2d307;"></span> 2000–3000 m</span>
+                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#d9a406;"></span> 3000–4000 m</span>
+                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#f27405;"></span> 4000–5000 m</span>
+                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#f2766e;"></span> 5000–6000 m</span>
+                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#e01b1b;"></span> 6000–7000 m</span>
+                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#8b2fc9;"></span> &gt; 7000 m</span>
                     <span class="dom-legend-sep">|</span>
                     <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#111;"></span> gewählter Berg</span>
                     <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#fff; border-color:#111;"></span> Bezugsberg</span>
@@ -1557,7 +1299,7 @@ Das umschließende Polygon, der kleinste Umkreis nach Welzl sowie die Mittelpunk
 
 
         <!-- ===============================================================
-             8. MAP-TOOLS (3): "PURE MATH" (130x100 KOORDINATENSYSTEM)
+             6. MAP-TOOLS (3): "PURE MATH" (130x100 KOORDINATENSYSTEM)
              =============================================================== -->
         <section id="page-area-pur" class="page-section">
             <div class="section-header">
@@ -1603,12 +1345,12 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         </section>
 
         <!-- ===============================================================
-             9. SPIELE-ECKE: MOBILES TETRIS
+             7. SPIELE-ECKE: MOBILES TETRIS
              =============================================================== -->
         <section id="page-tetris" class="page-section">
             <div class="section-header">
                 <div>
-                    <span class="eyebrow">Dies & Das · Spiele-Ecke</span>
+                    <span class="eyebrow">Spiele-Ecke</span>
                     <h2 style="font-size:32px; font-weight:800;">🧱 Tetris</h2>
                 </div>
                 <div style="display:flex; flex-wrap:wrap; gap:8px;">
@@ -1645,7 +1387,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         </section>
 
         <!-- ===============================================================
-             9. IMPRESSUM
+             8. IMPRESSUM
              =============================================================== -->
         <section id="page-impressum" class="page-section">
             <div class="section-header"><div><span class="eyebrow">Rechtliches</span><h2 style="font-size:32px; font-weight:800;">📄 Impressum</h2></div></div>
@@ -1680,7 +1422,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
 
         // Zuordnung Unterseiten -> Navigationsgruppe (aufklappbares Menue)
         const NAV_GROUPS = {
-            familie:     ['sippe', 'fotos', 'pinnwand'],
+            familie:     ['fotos', 'pinnwand'],
             maptools:    ['area-maps', 'dominanz', 'area-pur'],
             spiele:      ['tetris'],
             rechtliches: ['impressum']
@@ -1719,7 +1461,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
 
             const group = groupOfPage(pageId);
             if (group) {
-                // Gruppen-Button markieren + zugehoeriges Menue aufklappen
                 const groupBtn = document.getElementById('nav-' + group);
                 if (groupBtn) groupBtn.classList.add('active');
                 openNavGroup(group);
@@ -1755,8 +1496,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             }
         }
 
-        // Karten an geaenderte Fensterhoehe/-breite anpassen (Hoehe wird jetzt
-        // dynamisch gefuellt) -> alle initialisierten Leaflet-Karten neu vermessen.
         let _mapResizeTimer = null;
         window.addEventListener('resize', () => {
             clearTimeout(_mapResizeTimer);
@@ -1768,25 +1507,19 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         });
 
         // -----------------------------------------------------------------
-        // 2. STARTSEITEN-KARTE (umschaltbare Standorte + Kartenebenen)
+        // 2. STARTSEITEN-KARTE (Standort Pirna + Kartenebenen)
         // -----------------------------------------------------------------
         let homeMap = null;
         let homeMarker = null;
         let homeLayers = {};
-        let pirnaCoords = [50.9939978, 13.9076698];  // Emil-Gast-Str. 4 (Default, korrigiert)
+        let pirnaCoords = [50.9939978, 13.9076698];  // Emil-Gast-Str. 4
 
-        // Standorte der Familie (geokodiert ueber Nominatim/OSM)
         const HOME_LOCATIONS = [
             { id: 'dippe-graupa', label: 'Familie Dippe (Graupa)', fam: 'Familie Dippe',
-              addr: 'Emil-Gast-Straße 4', plz: '01796 Pirna', lat: 50.9939978, lon: 13.9076698 },
-            { id: 'wolf-graupa', label: 'Familie Wolf (Graupa)', fam: 'Familie Wolf',
-              addr: 'Bonnewitzer Straße 17', plz: '01796 Pirna', lat: 51.0019948, lon: 13.9247022 },
-            { id: 'dippe-berlin', label: 'Familie Dippe (Berlin)', fam: 'Familie Dippe',
-              addr: 'Steinstraße 30', plz: '14109 Berlin', lat: 52.3890128, lon: 13.1280380 }
+              addr: 'Emil-Gast-Straße 4', plz: '01796 Pirna', lat: 50.9939978, lon: 13.9076698 }
         ];
         let homeLocId = 'dippe-graupa';
 
-        // Gemeinsame Kartenebenen-Definition (fuer alle Karten der Seite)
         function buildLayerSet() {
             return {
                 'osm':            L.tileLayer('//{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }),
@@ -1796,7 +1529,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                 'esri-sat':       L.tileLayer('//server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Esri, Maxar, Earthstar Geographics' })
             };
         }
-        // Anzeige-Namen fuer die Dropdowns
+
         const LAYER_LABELS = {
             'osm': 'OpenStreetMap',
             'google-streets': 'Google Maps',
@@ -1804,9 +1537,8 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             'topo': 'Topografie',
             'esri-sat': 'Esri Luftbild (3D-artig)'
         };
-        // Reihenfolge im Dropdown (Standard zuerst)
         const LAYER_ORDER = ['osm', 'google-streets', 'google-sat', 'topo', 'esri-sat'];
-        // Externe Kartenlinks je Ebene fuer "Groessere Karte & Route"
+
         function externalMapUrl(key, lat, lon, z) {
             z = z || 17;
             switch (key) {
@@ -1824,41 +1556,26 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             sel.innerHTML = LAYER_ORDER.map(k => `<option value="${k}"${k===current?' selected':''}>${LAYER_LABELS[k]}</option>`).join('');
         }
 
-        function initHomeMap() {
-            if (typeof L === 'undefined') return;
-            const loc = HOME_LOCATIONS.find(l => l.id === homeLocId);
-            homeMap = L.map('osm-map').setView([loc.lat, loc.lon], 17);
-            homeLayers = buildLayerSet();
-            homeLayers['osm'].addTo(homeMap);
-            homeMarker = L.marker([loc.lat, loc.lon]).addTo(homeMap);
-
-            // Standort-Dropdown + Karten-Dropdown fuellen
-            const locSel = document.getElementById('home-loc-select');
-            if (locSel) locSel.innerHTML = HOME_LOCATIONS.map(l => `<option value="${l.id}">${l.label}</option>`).join('');
-            fillLayerSelect('home-layer-select', 'osm');
-            setHomeLocation(homeLocId);
-        }
-
-        let homeLayerKey = 'osm';  // aktuell gewaehlte Kartenebene der Startseite
+        let homeLayerKey = 'osm';
 
         function updateHomeRouteLink() {
-            const loc = HOME_LOCATIONS.find(l => l.id === homeLocId);
+            const loc = HOME_LOCATIONS[0];
             const link = document.getElementById('home-route-link');
             if (loc && link) link.href = externalMapUrl(homeLayerKey, loc.lat, loc.lon, 17);
         }
 
-        function setHomeLocation(id) {
-            const loc = HOME_LOCATIONS.find(l => l.id === id);
-            if (!loc || !homeMap) return;
-            homeLocId = id;
-            pirnaCoords = [loc.lat, loc.lon];
-            homeMap.setView([loc.lat, loc.lon], 17);
-            homeMarker.setLatLng([loc.lat, loc.lon]);
+        function initHomeMap() {
+            if (typeof L === 'undefined') return;
+            const loc = HOME_LOCATIONS[0];
+            homeMap = L.map('osm-map').setView([loc.lat, loc.lon], 17);
+            homeLayers = buildLayerSet();
+            homeLayers['osm'].addTo(homeMap);
+            homeMarker = L.marker([loc.lat, loc.lon]).addTo(homeMap);
             homeMarker.bindPopup(`<b>${loc.fam}</b><br>${loc.addr}<br>${loc.plz}`).openPopup();
+
+            fillLayerSelect('home-layer-select', 'osm');
             const t = document.getElementById('home-loc-title');
             if (t) t.textContent = '📍 ' + loc.addr + ', ' + loc.plz;
-            const sel = document.getElementById('home-loc-select');
-            if (sel && sel.value !== id) sel.value = id;
             updateHomeRouteLink();
         }
 
@@ -1869,14 +1586,10 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             homeLayerKey = key;
             updateHomeRouteLink();
         }
+
         window.addEventListener('DOMContentLoaded', () => {
             initHomeMap();
             initPinnwand();
-            // Prüfen, ob eine stammbaum.ged im selben Ordner liegt
-            fetch("stammbaum.ged")
-                .then(r => { if (r.ok) return r.text(); throw new Error(); })
-                .then(txt => parseGedcomText(txt, "stammbaum.ged"))
-                .catch(() => {});
         });
 
         // -----------------------------------------------------------------
@@ -1928,77 +1641,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         }
 
         // -----------------------------------------------------------------
-        // 4. MYHERITAGE GEDCOM (.ged) PARSER & VIEWER
-        // -----------------------------------------------------------------
-        let gedcomPersons = [];
-
-        function handleGedcomUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (e) => parseGedcomText(e.target.result, file.name);
-            reader.readAsText(file);
-        }
-
-        function parseGedcomText(text, fileName) {
-            const lines = text.split(/\r?\n/);
-            const individuals = [];
-            let current = null;
-            let currentTag = null;
-
-            for (const rawLine of lines) {
-                const line = rawLine.trim();
-                if (!line) continue;
-                const parts = line.split(/\s+/);
-                const level = parseInt(parts[0], 10);
-                if (level === 0) {
-                    if (current) individuals.push(current);
-                    if (parts[2] === 'INDI') {
-                        current = { id: parts[1], name: 'Unbekannt', birth: '', death: '', place: '' };
-                    } else {
-                        current = null;
-                    }
-                    currentTag = null;
-                } else if (current) {
-                    const tag = parts[1];
-                    const rest = parts.slice(2).join(' ');
-                    if (level === 1) {
-                        currentTag = tag;
-                        if (tag === 'NAME') current.name = rest.replace(/\//g, '');
-                    } else if (level === 2) {
-                        if (tag === 'DATE' && currentTag === 'BIRT') current.birth = rest;
-                        if (tag === 'DATE' && currentTag === 'DEAT') current.death = rest;
-                        if (tag === 'PLAC' && (currentTag === 'BIRT' || !current.place)) current.place = rest;
-                    }
-                }
-            }
-            if (current) individuals.push(current);
-
-            gedcomPersons = individuals;
-            document.getElementById('gedcom-viewer').classList.remove('hidden');
-            document.getElementById('gedcom-title').textContent = `MyHeritage-Stammbaum (${individuals.length} Personen aus ${fileName})`;
-            filterGedcomList();
-        }
-
-        function filterGedcomList() {
-            const q = (document.getElementById('gedcom-search').value || '').toLowerCase();
-            const listEl = document.getElementById('gedcom-list');
-            const filtered = gedcomPersons.filter(p =>
-                p.name.toLowerCase().includes(q) ||
-                p.birth.toLowerCase().includes(q) ||
-                p.place.toLowerCase().includes(q)
-            );
-            listEl.innerHTML = filtered.slice(0, 120).map(p => `
-                <div class="person-box" style="background:#fff;">
-                    <span class="person-role">${p.birth ? '✶ ' + p.birth : 'Stammbaum'} ${p.death ? ' · † ' + p.death : ''}</span>
-                    <div class="person-name">${p.name}</div>
-                    ${p.place ? `<div style="font-size:12px; color:#64748b; margin-top:3px;">📍 ${p.place}</div>` : ''}
-                </div>
-            `).join('');
-        }
-
-        // -----------------------------------------------------------------
-        // 5. INTERAKTIVE FAMILIEN-PINNWAND (TERMINE, BILDER, BEARBEITEN & DATEIEN)
+        // 4. INTERAKTIVE FAMILIEN-PINNWAND (TERMINE, BILDER, BEARBEITEN & DATEIEN)
         // -----------------------------------------------------------------
         const DEFAULT_PINNWAND = {
             categories: [
@@ -2016,7 +1659,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                     id: 101,
                     cat: 'termine',
                     title: '🏡 Großes Sippen-Treffen in Pirna',
-                    desc: 'Wenn die Familien Dippe und Wolf zusammenkommen: Gemütliches Beisammensein in der Emil-Gast-Straße 4 in Pirna. Neue Termine und Ideen einfach hier per „Bearbeiten“ ergänzen!',
+                    desc: 'Gemütliches Beisammensein in der Emil-Gast-Straße 4 in Pirna. Neue Termine und Ideen einfach hier per „Bearbeiten“ ergänzen!',
                     img: '',
                     fileLink: ''
                 },
@@ -2024,7 +1667,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                     id: 1,
                     cat: 'rezepte',
                     title: 'Sächsische Eierschecke & Familienrezepte',
-                    desc: 'Hier sammeln wir die besten Kuchen-, Grill- und Festtagsrezepte von Steffi, Bianca, Anna und Natascha – gern direkt mit eingebettetem Foto oder PDF-Rezeptblatt!',
+                    desc: 'Hier sammeln wir die besten Kuchen-, Grill- und Festtagsrezepte unserer Familie – gern direkt mit eingebettetem Foto oder PDF-Rezeptblatt!',
                     img: '',
                     fileLink: ''
                 },
@@ -2064,7 +1707,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             if (saved) {
                 try {
                     pinnwandData = JSON.parse(saved);
-                    // Sicherstellen, dass die neue Kategorie "Termine & Treffen" auch bei bestehenden Nutzern vorhanden ist
                     if (pinnwandData && Array.isArray(pinnwandData.categories)) {
                         if (!pinnwandData.categories.some(c => c.id === 'termine')) {
                             pinnwandData.categories.splice(1, 0, { id: 'termine', icon: '📅', name: 'Termine & Treffen' });
@@ -2074,7 +1716,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                                 id: 101,
                                 cat: 'termine',
                                 title: '🏡 Großes Sippen-Treffen in Pirna',
-                                desc: 'Wenn die Familien Dippe und Wolf zusammenkommen: Gemütliches Beisammensein in der Emil-Gast-Straße 4 in Pirna. Neue Termine und Ideen einfach hier per „Bearbeiten“ ergänzen!',
+                                desc: 'Gemütliches Beisammensein in der Emil-Gast-Straße 4 in Pirna. Neue Termine und Ideen einfach hier per „Bearbeiten“ ergänzen!',
                                 img: '',
                                 fileLink: ''
                             });
@@ -2090,7 +1732,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             }
             renderPinnwand();
 
-            // Bilder direkt per Strg+V im Pinnwand-Formular aus der Zwischenablage einbetten
             const postForm = document.getElementById('pinnwand-post-form');
             if (postForm) {
                 postForm.addEventListener('paste', (e) => {
@@ -2117,8 +1758,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             renderPinnwand();
         }
 
-        // Komprimiert hochgeladene Bilder automatisch auf ein schlankes Format (max. 1200px),
-        // damit viele eingebettete Bilder problemlos im Browser gespeichert werden koennen.
         function compressAndSetPinImage(file) {
             const reader = new FileReader();
             reader.onload = (ev) => {
@@ -2183,7 +1822,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         function openNewPinnwandPostForm() {
             editingPinId = null;
             document.getElementById('pin-form-heading').textContent = '➕ Neuen Pinnwand-Eintrag hinzufügen';
-            document.getElementById('pin-submit-btn').textContent = '💾 Beitrag anheften';
+            document.getElementById('pin-submit-btn').textContent = '💾 Speichern';
             document.getElementById('pin-title').value = '';
             document.getElementById('pin-desc').value = '';
             document.getElementById('pin-file-link').value = '';
@@ -2292,15 +1931,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             document.getElementById('pin-lightbox-img').src = '';
         }
 
-        function exportPinnwandJSON() {
-            const blob = new Blob([JSON.stringify(pinnwandData, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'pinnwand-dippe-sippe.json';
-            a.click();
-        }
-
         function renderPinnwand() {
             const bar = document.getElementById('pinnwand-categories-bar');
             bar.innerHTML = pinnwandData.categories.map(c => `
@@ -2356,24 +1986,22 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         }
 
         // -----------------------------------------------------------------
-        // 6. BERG-DOMINANZ-ATLAS (Wikidata/Wikipedia, Start = Zugspitze)
+        // 5. BERG-DOMINANZ-ATLAS (Wikidata/Wikipedia, Start = Zugspitze)
         // -----------------------------------------------------------------
-        // Datenquelle: peaks.json (weltweite Gipfel mit Dominanz aus Wikidata),
-        // liegt als Datei neben der index.html. Robust auf http wie https.
         const domEsc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
         const domNum = (n, d = 0) => n == null ? '–' : new Intl.NumberFormat('de-DE', { maximumFractionDigits: d }).format(n);
         const domNorm = s => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
         let dominanzMap = null;
         let dominanzLayers = {};
-        let domLayerKey = 'topo';  // aktuell gewaehlte Kartenebene im Atlas
-        let domPeaks = [];                 // geladene Gipfel (peaks.json + online dazugeholte)
-        let domActive = null;              // aktuell gewaehlter Gipfel
-        let domReference = null;           // aktueller Bezugsgipfel (naechsthoeherer)
-        let domCircle = null;              // Dominanz-/Bezugskreis (Leaflet)
-        let domSelMarker = null;           // Marker des gewaehlten Gipfels
-        let domRefMarker = null;           // Marker des Bezugsgipfels (auf dem Kreis)
-        let domMarkers = null;             // Layergroup der uebrigen Gipfel
+        let domLayerKey = 'topo';
+        let domPeaks = [];
+        let domActive = null;
+        let domReference = null;
+        let domCircle = null;
+        let domSelMarker = null;
+        let domRefMarker = null;
+        let domMarkers = null;
         let domGen = 0, domSearchGen = 0, domSearchTimer = null;
         let domInitDone = false;
 
@@ -2381,7 +2009,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             if (dominanzMap || typeof L === 'undefined') return;
             dominanzMap = L.map('dominanzMapContainer', { zoomControl: true, minZoom: 2, maxZoom: 17 })
                            .setView([30, 15], 3);
-            // Gemeinsame Kartenebenen (wie Startseite) + Topografie als Default
             dominanzLayers = buildLayerSet();
             dominanzLayers['topo'].addTo(dominanzMap);
             domLayerKey = 'topo';
@@ -2389,13 +2016,10 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             domMarkers = L.layerGroup().addTo(dominanzMap);
             L.control.scale({ imperial: false }).addTo(dominanzMap);
             dominanzMap.on('moveend zoomend', domPaint);
-            // Klick auf freie Kartenflaeche: im Pick-Modus eigenen Punkt messen.
-            // (Marker-Klicks rufen domSelect und stoppen die Weitergabe, s.u.)
             dominanzMap.on('click', (e) => {
                 if (domPickMode) measureDomPoint(e.latlng.lat, e.latlng.lng);
             });
 
-            // Suche
             const si = document.getElementById('dom-search-input');
             si.oninput = () => { clearTimeout(domSearchTimer); domSearchTimer = setTimeout(domSearch, 300); };
             si.onkeydown = e => {
@@ -2410,7 +2034,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             loadDominanzData();
         }
 
-        // --- Eigener Punkt: Dominanz per Kartenklick messen ---
         let domPickMode = false;
         let domPickMarker = null;
         function toggleDomPickMode() {
@@ -2430,8 +2053,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             }
         }
 
-        // Fuer einen beliebigen Kartenpunkt: Hoehe live abfragen (Open-Meteo),
-        // naechsten hoeheren Gipfel im Datensatz finden, Dominanz = Distanz dahin.
         function measureDomPoint(lat, lon) {
             const token = ++domGen;
             setDomStatus('Höhe & Dominanz werden berechnet …');
@@ -2445,7 +2066,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                 .then(data => {
                     if (token !== domGen) return;
                     const elev = (data && data.elevation && data.elevation.length) ? Math.round(data.elevation[0]) : null;
-                    // naechsten hoeheren Gipfel suchen (Hoehe noetig; sonst keine Bezugssuche)
                     let best = null, bestd = Infinity;
                     if (elev != null) {
                         const pt = { lat, lon };
@@ -2469,8 +2089,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         }
         function round2(x) { return Math.round(x * 100) / 100; }
 
-        // Zeigt das Ergebnis der Punktmessung: Kreis bis zum naechsten hoeheren
-        // Gipfel (blau gestrichelt) + Infokarte.
         function renderPickResult(p, ref) {
             domActive = p; domReference = ref || null;
             if (domSelMarker) { dominanzMap.removeLayer(domSelMarker); domSelMarker = null; }
@@ -2500,9 +2118,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                 '<p class="dom-note">Koordinaten: ' + p.lat.toFixed(4) + '°, ' + p.lon.toFixed(4) + '°. Höhe live via Open-Meteo, Dominanz näherungsweise (Distanz zum nächsten höheren Gipfel).</p>';
         }
 
-        // Hoehen-Plausibilisierung: Werte oberhalb des Mount Everest (8849 m) sind
-        // physikalisch unmoeglich und stammen aus Fuss-Angaben, die nicht umgerechnet
-        // wurden. In diesem Fall von Fuss in Meter umrechnen (1 ft = 0,3048 m).
         function normalizeHeightMeters(h) {
             if (typeof h !== 'number' || !isFinite(h)) return h;
             if (h > 8849) return Math.round(h * 0.3048);
@@ -2512,20 +2127,15 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         function loadDominanzData() {
             if (domInitDone) return;
             setDomStatus('Bergdaten werden geladen …');
-            // peaks.json liegt neben der index.html (relativ -> funktioniert auf http & https)
             fetch('peaks.json', { signal: AbortSignal.timeout(20000) })
                 .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
                 .then(data => {
-                    // Fuss-Fehlwerte korrigieren (z. B. Mount Humphreys 13992 ft -> 4265 m)
                     data.forEach(p => { p.height = normalizeHeightMeters(p.height); });
                     domPeaks = data;
                     domInitDone = true;
                     setDomStatus('');
                     const cnt = document.getElementById('dom-count');
                     if (cnt) cnt.textContent = domNum(domPeaks.length) + ' Gipfel weltweit';
-                    // Kartengroesse sicherstellen, dann Zugspitze waehlen und Marker zeichnen.
-                    // Mehrfaches Nachzeichnen faengt den Fall ab, dass die Karte beim
-                    // ersten Lauf noch keine gueltige Groesse/Bounds hatte.
                     if (dominanzMap) dominanzMap.invalidateSize();
                     domSearch();
                     const z = domPeaks.find(p => p.name === 'Zugspitze') || domPeaks.find(p => p.id === 'Q3375');
@@ -2555,19 +2165,18 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
 
         function dominanzWorldView() { if (dominanzMap) dominanzMap.setView([25, 10], 2); }
 
-        // Farbe nach Hoehenklasse (8 Stufen, exakt laut Legende)
         function domColorForHeight(h) {
-            if (h == null) return '#94a3b8';     // unbekannt -> grau
-            if (h > 7000) return '#8b2fc9';        // violett
-            if (h >= 6000) return '#e01b1b';       // rot
-            if (h >= 5000) return '#f2766e';       // hellrot
-            if (h >= 4000) return '#f27405';       // orange
-            if (h >= 3000) return '#d9a406';       // dunkelgelb
-            if (h >= 2000) return '#f2d307';       // gelb
-            if (h >= 1000) return '#5bd16a';       // hellgruen
-            return '#1a6b2e';                      // dunkelgruen (alle < 1000 m)
+            if (h == null) return '#94a3b8';
+            if (h > 7000) return '#8b2fc9';
+            if (h >= 6000) return '#e01b1b';
+            if (h >= 5000) return '#f2766e';
+            if (h >= 4000) return '#f27405';
+            if (h >= 3000) return '#d9a406';
+            if (h >= 2000) return '#f2d307';
+            if (h >= 1000) return '#5bd16a';
+            return '#1a6b2e';
         }
-        // Punktgroesse leicht nach Hoehe skaliert
+
         function domRadiusForHeight(h) {
             if (h == null) return 5;
             if (h > 7000) return 9;
@@ -2577,7 +2186,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             return 5;
         }
 
-        // Maximale Punktzahl je Zoomstufe (gegen Ueberladung bei ~88.000 Bergen)
         function domMaxForZoom(z) {
             if (z <= 3)  return 60;
             if (z <= 4)  return 110;
@@ -2589,9 +2197,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             return 850;
         }
 
-        // Hintergrund-Gipfel im Ausschnitt zeichnen.
-        // Dichte je Zoom begrenzt; beim Rauszoomen haben HOHE Berge Vorrang
-        // (Sortierung nach Hoehe absteigend + Cap).
         function domPaint() {
             if (!domMarkers || !dominanzMap) return;
             domMarkers.clearLayers();
@@ -2620,21 +2225,14 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             return 6371.0088 * 2 * Math.atan2(Math.sqrt(Math.min(1, h)), Math.sqrt(Math.max(0, 1 - h)));
         }
 
-        // Ab diesem Bezugsradius ist ein geodaetischer "Kreis" auf der flachen
-        // Karte keine sinnvolle Form mehr (naehert sich dem Erd-Gegenpunkt) ->
-        // dann statt Vollkreis nur die geodaetische Linie zum Bezugsgipfel.
         const DOM_CIRCLE_MAX_KM = 3000;
 
-        // Ein Punkt in Richtung t (bearing, rad) im Winkelabstand d (rad) von (a,b in rad)
         function domDestination(a, b, d, t) {
             const lat = Math.asin(Math.sin(a) * Math.cos(d) + Math.cos(a) * Math.sin(d) * Math.cos(t));
             const lon = b + Math.atan2(Math.sin(t) * Math.sin(d) * Math.cos(a), Math.cos(d) - Math.sin(a) * Math.sin(lat));
             return [lat * 180 / Math.PI, lon * 180 / Math.PI];
         }
 
-        // Zerlegt eine Punktfolge an Antimeridian-Spruengen (>180deg Laengen-
-        // differenz) in mehrere Segmente, damit keine quer ueber die Karte
-        // gezogenen Linien entstehen.
         function domSplitAntimeridian(raw) {
             const segs = [];
             let cur = [];
@@ -2649,7 +2247,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             return segs;
         }
 
-        // Geodaetische Linie (Great-Circle) von p zu target, als Polyline-Segmente.
         function domGeoLine(p, target) {
             const rad = Math.PI / 180;
             const a1 = p.lat * rad, b1 = p.lon * rad, a2 = target.lat * rad, b2 = target.lon * rad;
@@ -2674,9 +2271,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             return L.featureGroup(parts);
         }
 
-        // Darstellung des Bezugsabstands. Kleiner Radius -> glatter geodaetischer
-        // Kreis; grosser Radius -> geodaetische Linie zum Bezugsgipfel.
-        // (target bestimmt bei kleinen Kreisen den Startwinkel Richtung Bezug.)
         function domGeodesic(p, r, target) {
             if (r / 1000 > DOM_CIRCLE_MAX_KM && target) {
                 return domGeoLine(p, target);
@@ -2686,15 +2280,12 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                 Math.sin((target.lon - p.lon) * Math.PI / 180) * Math.cos(target.lat * Math.PI / 180),
                 Math.cos(a) * Math.sin(target.lat * Math.PI / 180) - Math.sin(a) * Math.cos(target.lat * Math.PI / 180) * Math.cos((target.lon - p.lon) * Math.PI / 180)
             ) : 0;
-            // Feineres Sampling (1 Grad) fuer eine runde Kurve.
             const raw = [];
             for (let i = 0; i <= 360; i++) {
                 const t = bearing + i * Math.PI / 180;
                 raw.push(domDestination(a, b, d, t));
             }
             const segs = domSplitAntimeridian(raw);
-            // Geschlossenes Polygon nur, wenn der Kreis nicht am Kartenrand
-            // zerschnitten wurde; sonst Segmente als Linien (kein Querstrich).
             if (segs.length === 1) {
                 const pts = segs[0];
                 return L.featureGroup([
@@ -2710,7 +2301,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             return L.featureGroup(parts);
         }
 
-        // Naechstgelegener hoeherer Gipfel im geladenen Datensatz (Naeherung)
         function domNearestHigher(p) {
             if (p.id === 'Q513' || !Number.isFinite(p.height)) return null;
             let best = null, min = Infinity;
@@ -2722,8 +2312,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             return best;
         }
 
-        // Bezugsgipfel anzeigen: Kreis bis zum Bezugsgipfel + Marker auf dem Kreis
-        // + anklickbares Feld "Naechsthoeherer Berg" (fuehrt Schritt fuer Schritt zum Everest)
         function domOfferHigher(p, next, token) {
             if (token !== domGen) return;
             const box = document.getElementById('dom-higher');
@@ -2769,10 +2357,8 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             domPaint();
         }
 
-        // Gipfel auswaehlen: Marker + Dominanzkreis + Infokarte + Bezugsgipfel
         function domSelect(p, known) {
             if (!dominanzMap) return;
-            // Beim Auswaehlen eines echten Gipfels den Mess-Modus beenden
             if (domPickMode) {
                 domPickMode = false;
                 const pb = document.getElementById('dom-pick-btn');
@@ -2793,7 +2379,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             if (domSelMarker) dominanzMap.removeLayer(domSelMarker);
             domCircle = (p.isolation > 0) ? domGeodesic(p, p.isolation * 1000) : null;
             if (domCircle && document.getElementById('dom-show-circle').checked) domCircle.addTo(dominanzMap);
-            // gewaehlter Berg = schwarzer Punkt
             domSelMarker = L.marker([p.lat, p.lon], {
                 icon: L.divIcon({ className: 'domSelWrap', html: '<span class="domSelDot"></span>', iconSize: [18, 18] }),
                 title: p.name, zIndexOffset: 1100
@@ -2820,9 +2405,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                   '<a class="btn btn-sand" href="//www.wikidata.org/wiki/' + domEsc(p.id) + '" target="_blank" rel="noopener" style="font-size:12px; padding:7px 12px;">Wikidata ↗</a>' +
                 '</div>';
 
-            // sofort Naeherung anbieten (naechstgelegener hoeherer Gipfel im Datensatz)
             domOfferHigher(p, domNearestHigher(p), token);
-            // dann aus Wikidata/Wikipedia verfeinern (Gebirge, Foto, Kurztext, Bezugsgipfel)
             domEnrich(p, token, known);
         }
 
@@ -2843,7 +2426,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                      height: h ? normalizeHeightMeters(+h.amount) : null, isolation: iso ? +iso.amount * (unit === 'Q11573' ? .001 : unit === 'Q253276' ? 1.609344 : 1) : null, range: null };
         }
 
-        // Online-Details nachladen; Everest (Q513) braucht keinen Bezug mehr
         async function domEnrich(p, token, known) {
             try {
                 const e = known || await domEntity(p.id);
@@ -2867,7 +2449,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                 }
                 if (p.id === 'Q513') return;
 
-                // Bezugsgipfel laut Wikipedia-Infobox (isolation_parent / DOMINANZ-BEZUG)
                 const article = e.sitelinks.dewiki || e.sitelinks.enwiki;
                 if (article) {
                     const w = await domGetJSON('//' + lang + '.wikipedia.org/w/api.php?action=parse&page=' + encodeURIComponent(article.title) + '&prop=wikitext&format=json&origin=*');
@@ -2890,7 +2471,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             }
         }
 
-        // Suche: Treffer im Datensatz + Wikidata-Online-Suche
         function domRenderResults(items, remote = false) {
             const box = document.getElementById('dom-results');
             box.innerHTML = items.map((p, i) =>
@@ -2942,16 +2522,12 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             }
         }
 
-        // Info-Modal: Was ist Dominanz?
         function openDominanzInfo() { document.getElementById('dom-info-modal').classList.add('open'); }
         function closeDominanzInfo() { document.getElementById('dom-info-modal').classList.remove('open'); }
 
         // -----------------------------------------------------------------
-        // 7. GEOMETRIE-KERN FÜR MAPS MATH & PURE MATH (Welzl, Polygon, Konvexhülle)
+        // 6. GEOMETRIE-KERN FÜR MAPS MATH & PURE MATH (Welzl, Polygon, Konvexhülle)
         // -----------------------------------------------------------------
-
-        // Fläche eines Polygons in Klick-Reihenfolge (Gaußsche Trapezformel / Shoelace).
-        // Kanten: 1->2->3->...->n->1. Funktioniert auch fuer konkave Polygone.
         function polygonAreaOrdered(pts) {
             const n = pts.length;
             let sum = 0;
@@ -2962,15 +2538,13 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             return Math.abs(sum) / 2.0;
         }
 
-        // Schneiden sich zwei Strecken p1p2 und p3p4 echt (nicht nur an gemeinsamen Endpunkten)?
         function segmentsProperlyIntersect(p1, p2, p3, p4) {
             const o = (a, b, c) => Math.sign((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x));
             const onSeg = (a, b, c) =>
                 Math.min(a.x, b.x) - 1e-9 <= c.x && c.x <= Math.max(a.x, b.x) + 1e-9 &&
                 Math.min(a.y, b.y) - 1e-9 <= c.y && c.y <= Math.max(a.y, b.y) + 1e-9;
             const d1 = o(p3, p4, p1), d2 = o(p3, p4, p2), d3 = o(p1, p2, p3), d4 = o(p1, p2, p4);
-            if (d1 !== d2 && d3 !== d4) return true;            // sauberer Überkreuzungsfall
-            // Kollineare Overlaps zaehlen ebenfalls als ungueltig (Kanten liegen aufeinander)
+            if (d1 !== d2 && d3 !== d4) return true;
             if (d1 === 0 && onSeg(p3, p4, p1)) return true;
             if (d2 === 0 && onSeg(p3, p4, p2)) return true;
             if (d3 === 0 && onSeg(p1, p2, p3)) return true;
@@ -2978,15 +2552,11 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             return false;
         }
 
-        // Prueft, ob das Polygon (Kanten in Klickreihenfolge) sich selbst durchkreuzt.
-        // Benachbarte Kanten teilen einen Endpunkt und werden nicht geprueft.
-        // Rueckgabe: null (ok) oder { a:[i,i+1], b:[j,j+1] } der sich kreuzenden Kanten (1-basiert).
         function findSelfIntersection(pts) {
             const n = pts.length;
             const edge = i => [pts[i], pts[(i + 1) % n]];
             for (let i = 0; i < n; i++) {
                 for (let j = i + 1; j < n; j++) {
-                    // benachbarte Kanten (teilen einen Punkt) ueberspringen
                     if (j === i) continue;
                     if (i === (j + 1) % n || j === (i + 1) % n) continue;
                     const [a1, a2] = edge(i), [b1, b2] = edge(j);
@@ -2998,7 +2568,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             return null;
         }
 
-        // Kleinster umschliessender Kreis (Welzl) ueber ALLE Punkte.
         function circumcircleWelzl(pts) {
             const indexed = pts.map((p, idx) => ({ idx, x: p.x, y: p.y }));
             for (let i = indexed.length - 1; i > 0; i--) {
@@ -3008,7 +2577,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             return welzlRecursive(indexed, []);
         }
 
-        // --- Original-Geometrie fuer PURE MATH (umschliessendes Polygon / Konvexhuelle) ---
         function computeCentroid(hullPts) {
             const n = hullPts.length;
             if (n < 3) return { x: 0, y: 0 };
@@ -3154,7 +2722,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
 
 
         // -----------------------------------------------------------------
-        // 8. MAPS MATH (Interaktive Karte)
+        // 7. MAPS MATH (Interaktive Karte)
         // -----------------------------------------------------------------
         let mapsMathMap = null, mapsMathLayers = {}, mapsMathDrawGroup = null;
         let mapsState = { collecting: true, latlngs: [] };
@@ -3267,10 +2835,8 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
 
             const metricPts = mapsState.latlngs.map(p => toMeters(p.lat, p.lng));
 
-            // --- Selbstueberschneidung pruefen (Polygon in Klickreihenfolge) ---
             const crossing = findSelfIntersection(metricPts);
             if (crossing) {
-                // Punkte + Kanten trotzdem anzeigen, damit man den Fehler sieht
                 drawMapsOrderedEdges(mapsState.latlngs, '#dc2626');
                 mapsState.latlngs.forEach((pt, idx) => {
                     L.circleMarker([pt.lat, pt.lng], { radius: 6, color: '#dc2626', weight: 2.5, fillColor: '#ffffff', fillOpacity: 1 })
@@ -3293,7 +2859,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             const areaM2 = polygonAreaOrdered(metricPts);
             const M_U_ll = toLatLng(res.x, res.y);
 
-            // Polygon in Klick-Reihenfolge fuellen + Kanten zeichnen
             L.polygon(mapsState.latlngs.map(p => [p.lat, p.lng]),
                 { color: '#2563eb', weight: 2.5, fillColor: '#3b82f6', fillOpacity: 0.16 }).addTo(mapsMathDrawGroup);
 
@@ -3330,7 +2895,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             document.getElementById('maps-output-text').value = lines.join("\n");
         }
 
-        // Zeichnet die Polygonkanten in Klick-Reihenfolge (inkl. Schlusskante n->1)
         function drawMapsOrderedEdges(latlngs, color) {
             const n = latlngs.length;
             for (let i = 0; i < n; i++) {
@@ -3340,7 +2904,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         }
 
         // -----------------------------------------------------------------
-        // 9. PURE MATH (Koordinatensystem 200 breit x 130 hoch)
+        // 8. PURE MATH (Koordinatensystem 200 breit x 130 hoch)
         // -----------------------------------------------------------------
         const canvas = document.getElementById('areaCanvas');
         const ctx = canvas.getContext('2d');
@@ -3492,7 +3056,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         }
 
         // -----------------------------------------------------------------
-        // 10. TETRIS (mobil bedienbar, Tastatur + Touch)
+        // 9. TETRIS (mobil bedienbar, Tastatur + Touch)
         // -----------------------------------------------------------------
         let tetris = { board: [], piece: null, next: null, score: 0, lines: 0, level: 1, timer: null, over: false, running: false };
         const TETRIS_COLORS = ['#22d3ee','#3b82f6','#f97316','#facc15','#a855f7','#22c55e','#ef4444'];
@@ -3560,4 +3124,3 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
     </script>
 </body>
 </html>
-<!-- ENDE DER DATEI -->
