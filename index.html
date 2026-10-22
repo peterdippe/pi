@@ -6264,8 +6264,13 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
          * Findet jede Liga-Tabelle, extrahiert den Liganamen, alle Tabellenzeilen
          * sowie den exakten Link zur jeweiligen TSV-Graupa-Mannschaft (`L3=Mannschaft&L3P=...`).
          */
+        // -----------------------------------------------------------------
+        // SAUBERER HTML-PARSER FÜR TTLIVE (FILTERT SKRIPTE & jQuery HERAUS)
+        // -----------------------------------------------------------------
         function parseTTLiveOverviewHtml(htmlString) {
-            const doc = new DOMParser().parseFromString(htmlString, 'text/html');
+            // Skript-Tags komplett entfernen, damit kein jQuery-Code im Text landet
+            const cleanHtml = htmlString.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+            const doc = new DOMParser().parseFromString(cleanHtml, 'text/html');
             const tables = Array.from(doc.querySelectorAll('table'));
             const teams = [];
             let teamCounter = 1;
@@ -6274,90 +6279,74 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                 const rows = Array.from(tbl.querySelectorAll('tr'));
                 if (rows.length < 3) return;
 
-                // Prüfen, ob diese Tabelle eine Liga-Tabelle ist (enthält Spalten wie Platz/Mannschaft/Punkte und eine Zeile mit "TSV Graupa")
-                const graupaRow = rows.find(r => /TSV\s+Graupa/i.test(r.textContent));
-                if (!graupaRow) return;
+                const textContent = tbl.textContent;
+                if (!/TSV\s+Graupa/i.test(textContent)) return;
 
-                // Prüfen, ob in der Graupa-Zeile ein Link zu einer Mannschaft steckt (L3=Mannschaft oder L3P=)
-                const links = Array.from(graupaRow.querySelectorAll('a'));
-                const teamAnchor = links.find(a => /TSV\s+Graupa/i.test(a.textContent)) || links.find(a => /L3=Mannschaft|L3P=/i.test(a.getAttribute('href') || '')) || links[0];
+                // Finde die Graupa-Zeile und den Link zur Mannschaft
+                let teamAnchor = null;
+                let graupaTeamName = 'TSV Graupa';
+                for (const r of rows) {
+                    const links = Array.from(r.querySelectorAll('a'));
+                    const found = links.find(a => /TSV\s+Graupa/i.test(a.textContent) || /L3=Mannschaft|L3P=/i.test(a.getAttribute('href') || ''));
+                    if (found) {
+                        teamAnchor = found;
+                        graupaTeamName = found.textContent.replace(/\s+/g, ' ').trim();
+                        break;
+                    }
+                }
                 if (!teamAnchor) return;
 
                 const rawHref = teamAnchor.getAttribute('href') || '';
-                // Ignoriere reine Navigations-Tabellen, die nur allgemeine Vereinslinks enthalten
-                if (!/L3P=|Mannschaft|Staffel/i.test(rawHref) && rows.length > 25) return;
-
                 const teamUrl = resolveTTLiveHref(rawHref);
-                const graupaTeamNameInTable = teamAnchor.textContent.replace(/\s+/g, ' ').trim();
 
-                // Liga-Überschrift oberhalb der Tabelle suchen (z.B. in vorhergehenden Überschriften, fetten Elementen oder Tabellenkopf)
+                // Liga-Namen über der Tabelle suchen
                 let leagueTitle = '';
                 let prev = tbl.previousElementSibling;
                 while (prev && !leagueTitle) {
                     const txt = prev.textContent.replace(/\s+/g, ' ').trim();
-                    if (txt.length > 3 && txt.length < 120) leagueTitle = txt;
+                    if (txt.length > 3 && txt.length < 100 && !/jquery|\$/i.test(txt)) leagueTitle = txt;
                     prev = prev.previousElementSibling;
                 }
-                if (!leagueTitle && rows[0]) {
-                    const firstRowTxt = rows[0].textContent.replace(/\s+/g, ' ').trim();
-                    if (!/Platz|Mannschaft|Spiele|Punkte/i.test(firstRowTxt) && firstRowTxt.length < 100) {
-                        leagueTitle = firstRowTxt;
-                    }
-                }
 
-                // Tabellen-Header & Datenzeilen sauber extrahieren
                 const standingsHeaders = [];
                 const standingsRows = [];
 
                 rows.forEach(r => {
+                    // Ignorieren, falls Zeile Skripte enthält
+                    if (/script|\$/i.test(r.textContent)) return;
                     const cells = Array.from(r.querySelectorAll('th, td')).map(c => c.textContent.replace(/\s+/g, ' ').trim());
                     const nonEmpty = cells.filter(Boolean);
                     if (nonEmpty.length < 3) return;
 
-                    // Header-Zeile erkennen
                     if (!standingsHeaders.length && cells.some(c => /Mannschaft|Team/i.test(c)) && cells.some(c => /Pkt|Punkte|Sp\./i.test(c))) {
-                        cells.forEach(c => standingsHeaders.push(c));
+                        cells.forEach(c => { if (c) standingsHeaders.push(c); });
                         return;
                     }
 
-                    // Reine Überschriftszeilen überspringen
                     if (r.querySelectorAll('th').length > 2) return;
 
                     const isGraupa = /TSV\s+Graupa/i.test(r.textContent);
                     standingsRows.push({
-                        cells: cells.filter((c, idx) => c !== '' || idx < 8),
+                        cells: cells.filter(c => c !== ''),
                         isGraupa
                     });
                 });
 
                 if (!standingsRows.length) return;
 
-                // Schönen Kurznamen für den Reiter ableiten (z.B. "1. Erwachsene", "2. Erwachsene", "Jugend U19" ...)
                 const l3pMatch = teamUrl.match(/L3P=(\d+)/i);
                 const id = l3pMatch ? ('team_' + l3pMatch[1]) : ('team_' + (teamCounter++));
-
-                // Falls schon exakt dieselbe Mannschafts-ID erfasst wurde, nicht doppelt anlegen
                 if (teams.some(t => t.id === id)) return;
 
-                let tabLabel = graupaTeamNameInTable;
-                if (/^TSV\s+Graupa$/i.test(tabLabel)) {
+                let tabLabel = graupaTeamName.replace(/^TSV\s+Graupa\s*[,·-]?\s*/i, '').trim();
+                if (!tabLabel || tabLabel.toLowerCase() === 'tsv graupa') {
                     tabLabel = `${teams.length + 1}. Mannschaft`;
-                } else {
-                    tabLabel = tabLabel.replace(/^TSV\s+Graupa\s*/i, '');
-                    if (!tabLabel) tabLabel = `${teams.length + 1}. Mannschaft`;
-                }
-                // Wenn aus dem Liga-Titel erkennbar ist, ob Jugend/Schüler/Erwachsene, im Tab-Namen veredeln
-                if (leagueTitle) {
-                    const shortLeague = leagueTitle.split(/[-–:]/)[0].trim();
-                    if (shortLeague && tabLabel.length <= 4) {
-                        tabLabel = `${tabLabel} (${shortLeague})`;
-                    }
                 }
 
                 teams.push({
                     id,
                     tabName: tabLabel,
-                    fullTeamName: graupaTeamNameInTable,
+                    fullTeamName: graupaTeamName,
                     league: leagueTitle || 'Saison 2026/27',
                     teamUrl,
                     standingsHeaders: standingsHeaders.length ? standingsHeaders : ['Pl.', 'Mannschaft', 'Sp.', 'S', 'U', 'N', 'Spiele', 'Pkt.'],
@@ -6434,26 +6423,24 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         // Einzel Bilanzen (+ LivePZ), Doppel Bilanzen & Spielplan
         // -----------------------------------------------------------------
         function parseTTLiveTeamDetailHtml(htmlString, lpzHtmlString) {
-            const doc = new DOMParser().parseFromString(htmlString, 'text/html');
+            const cleanHtml = htmlString.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+            const doc = new DOMParser().parseFromString(cleanHtml, 'text/html');
             const fullText = doc.body ? doc.body.textContent : '';
 
-            // 1. Kopftitel der Mannschaft (z.B. "TSV Graupa, 1. Erwachsene")
             let headerTitle = '';
-            const titleCandidates = Array.from(doc.querySelectorAll('h1, h2, h3, td, th, div'));
+            const titleCandidates = Array.from(doc.querySelectorAll('h1, h2, h3, td, th'));
             for (const el of titleCandidates) {
                 const t = el.textContent.replace(/\s+/g, ' ').trim();
-                if (/^TSV\s+Graupa\s*,/i.test(t) && t.length < 70) {
-                    headerTitle = t.replace(/\s+(Vorrunde|Rückrunde|Gesamt)$/i, '').trim();
+                if (/^TSV\s+Graupa/i.test(t) && t.length < 70 && !/jquery|\$/i.test(t)) {
+                    headerTitle = t;
                     break;
                 }
             }
 
-            // 2. Ballmarke (z.B. "Die Mannschaft verwendet Bälle der Marke Victas VP40+***")
             let ballInfo = '';
             const ballMatch = fullText.match(/Die\s+Mannschaft\s+verwendet\s+Bälle\s+der\s+Marke\s+([^\n\r.]+)/i);
             if (ballMatch) ballInfo = ballMatch[0].replace(/\s+/g, ' ').trim();
 
-            // 3. Alle Tabellen der Detailseite analysieren und nach Typ klassifizieren
             const tables = Array.from(doc.querySelectorAll('table'));
             const captainInfo = {};
             const venueInfo = {};
@@ -6462,11 +6449,11 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             let scheduleTable = null;
 
             tables.forEach(tbl => {
+                if (/script|\$/i.test(tbl.textContent)) return;
                 const txt = tbl.textContent.replace(/\s+/g, ' ').trim();
                 const rows = Array.from(tbl.querySelectorAll('tr'));
                 if (!rows.length) return;
 
-                // A) Mannschaftsführer Key-Value-Tabelle
                 if (/Name/i.test(txt) && (/Vertretung|Mobil|Email/i.test(txt)) && rows.length <= 10) {
                     rows.forEach(r => {
                         const cells = Array.from(r.querySelectorAll('td, th')).map(c => c.textContent.replace(/\s+/g, ' ').trim()).filter(Boolean);
@@ -6480,7 +6467,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                     });
                 }
 
-                // B) Sportstätte Key-Value-Tabelle
                 if (/Bezeichnung/i.test(txt) && (/Strasse|Straße|PLZ|Spieltag/i.test(txt)) && rows.length <= 12) {
                     rows.forEach(r => {
                         const cells = Array.from(r.querySelectorAll('td, th')).map(c => c.textContent.replace(/\s+/g, ' ').trim()).filter(Boolean);
@@ -6490,68 +6476,41 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                             if (k.includes('bezeichnung')) venueInfo.name = v;
                             else if (k.includes('strasse') || k.includes('straße')) venueInfo.street = v;
                             else if (k.includes('plz') || k.includes('ort')) venueInfo.city = v;
-                            else if (k.includes('telefon')) venueInfo.phone = v;
                             else if (k.includes('spieltag')) venueInfo.matchDay = v;
                         }
                     });
                 }
 
-                // Header-Zeile der Tabelle prüfen
                 const firstRowCells = Array.from(rows[0].querySelectorAll('th, td')).map(c => c.textContent.replace(/\s+/g, ' ').trim());
                 const headerJoined = firstRowCells.join(' | ');
 
-                // C) Einzel-Bilanzen (Header enthält "Position" & "Spieler" & ("Gesamt" oder "PK1" oder "ST"))
-                if (/Position/i.test(headerJoined) && /Spieler/i.test(headerJoined) && (/PK1|ST|Gesamt|Bilanz/i.test(headerJoined))) {
-                    singlesTable = extractGenericTable(rows);
-                }
-                // D) Doppel-Bilanzen (Header enthält "Spieler 1" & "Spieler 2" oder "Doppel")
-                else if ((/Spieler\s*1/i.test(headerJoined) && /Spieler\s*2/i.test(headerJoined)) || (/Doppel/i.test(headerJoined) && /Bilanz/i.test(headerJoined))) {
-                    doublesTable = extractGenericTable(rows);
-                }
-                // E) Spielplan (Header enthält "Datum" & "Heimmannschaft" & "Gastmannschaft")
-                else if (/Datum/i.test(headerJoined) && (/Heim/i.test(headerJoined) || /Gast/i.test(headerJoined))) {
-                    scheduleTable = extractGenericTable(rows);
+                if (/Position/i.test(headerJoined) && /Spieler/i.test(headerJoined)) {
+                    singlesTable = extractCleanTable(rows);
+                } else if ((/Spieler\s*1/i.test(headerJoined) && /Spieler\s*2/i.test(headerJoined)) || (/Doppel/i.test(headerJoined) && /Bilanz/i.test(headerJoined))) {
+                    doublesTable = extractCleanTable(rows);
+                } else if (/Datum/i.test(headerJoined) && (/Heim/i.test(headerJoined) || /Gast/i.test(headerJoined))) {
+                    scheduleTable = extractCleanTable(rows);
                 }
             });
 
-            // 4. Optional: Falls LivePZ aus dem separaten LivePZ-Reiter mitgeladen wurde, Spieler-LPZ ergänzen
-            const lpzMap = {};
-            if (lpzHtmlString) {
-                const lpzDoc = new DOMParser().parseFromString(lpzHtmlString, 'text/html');
-                Array.from(lpzDoc.querySelectorAll('tr')).forEach(r => {
-                    const cells = Array.from(r.querySelectorAll('td')).map(c => c.textContent.replace(/\s+/g, ' ').trim());
-                    // Suche nach Namen + 3- bis 4-stelliger LPZ-Zahl
-                    if (cells.length >= 3) {
-                        const numCell = cells.find(c => /^\d{3,4}$/.test(c));
-                        const nameCell = cells.find(c => /^[A-ZÄÖÜa-zäöüß]+\s+[A-ZÄÖÜa-zäöüß-]+/.test(c) || /^[A-ZÄÖÜa-zäöüß-]+,\s*[A-ZÄÖÜa-zäöüß]+/.test(c));
-                        if (numCell && nameCell) {
-                            const normName = nameCell.includes(',') ? nameCell.split(',').reverse().map(s => s.trim()).join(' ') : nameCell;
-                            lpzMap[normName.toLowerCase()] = numCell;
-                        }
-                    }
-                });
-            }
+            return { headerTitle, ballInfo, captainInfo, venueInfo, singlesTable, doublesTable, scheduleTable };
+        }
 
-            // Falls die Einzel-Bilanzen-Tabelle noch keine eigene LivePZ-Spalte hat, aber wir lpzMap-Werte haben -> Spalte anhängen
-            if (singlesTable && Object.keys(lpzMap).length > 0 && !singlesTable.headers.some(h => /LivePZ|LPZ/i.test(h))) {
-                singlesTable.headers.push('LivePZ');
-                singlesTable.rows.forEach(r => {
-                    if (r.isTotal) { r.cells.push(''); return; }
-                    const playerName = (r.cells[1] || '').toLowerCase();
-                    const foundLpz = lpzMap[playerName] || '';
-                    r.cells.push(foundLpz);
-                });
+        function extractCleanTable(rows) {
+            const headers = Array.from(rows[0].querySelectorAll('th, td'))
+                .map(c => c.textContent.replace(/\s+/g, ' ').trim())
+                .filter(h => h && !/script|\$/i.test(h));
+            const bodyRows = [];
+            for (let i = 1; i < rows.length; i++) {
+                if (/script|\$/i.test(rows[i].textContent)) continue;
+                const cells = Array.from(rows[i].querySelectorAll('td, th'))
+                    .map(c => c.textContent.replace(/\s+/g, ' ').trim());
+                const filteredCells = cells.filter(c => c !== '');
+                if (filteredCells.length === 0) continue;
+                const isTotal = /^Gesamt/i.test(filteredCells[0]) || /^Gesamt/i.test(filteredCells[1] || '');
+                bodyRows.push({ cells: filteredCells, isTotal });
             }
-
-            return {
-                headerTitle,
-                ballInfo,
-                captainInfo,
-                venueInfo,
-                singlesTable,
-                doublesTable,
-                scheduleTable
-            };
+            return { headers, rows: bodyRows };
         }
 
         function extractGenericTable(rows) {
