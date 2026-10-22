@@ -2508,6 +2508,13 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             } else {
                 const nav = document.getElementById('nav-' + pageId);
                 if (nav) nav.classList.add('active');
+                // Wenn Home geklickt wird, alle anderen Gruppen zuklappen
+                Object.keys(NAV_GROUPS).forEach(g => {
+                    const p = document.getElementById('subnav-group-' + g);
+                    const b = document.getElementById('nav-' + g);
+                    if (p) p.classList.remove('open');
+                    if (b) b.classList.remove('group-open');
+                });
             }
 
             document.getElementById('sidebar').classList.remove('open');
