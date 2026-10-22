@@ -2381,12 +2381,15 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                 <div class="tetris-options">
                     <label>Tempo:
                         <select id="snake-speed" onchange="snakeChangeSpeed()">
-                            <option value="145">Gemütlich</option>
-                            <option value="105" selected>Normal</option>
-                            <option value="72">Rasend</option>
+                            <option value="260">1 · Sehr gemütlich</option>
+                            <option value="200">2 · Gemütlich</option>
+                            <option value="150" selected>3 · Normal</option>
+                            <option value="100">4  · Schnell</option>
+                            <option value="70">5 · Rasend (Max)</option>
                         </select>
                     </label>
-                    <label><input type="checkbox" id="snake-walls" checked> 🧱 Wände tödlich (sonst Durchgang)</label>
+                    <label><input type="checkbox" id="snake-accel" checked> ⚡ Langsame Steigerung mit jedem Apfel</label>
+                    <label><input type="checkbox" id="snake-walls" checked> 🧱 Wände tödlich</label>
                 </div>
                 <div class="tetris-game-wrap">
                     <div class="tetris-board-wrap">
@@ -5280,8 +5283,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         // 12. SNAKE
         // -----------------------------------------------------------------
         const SNAKE_GRID = 20;
-        let snake = { body: [], dir: {x:1, y:0}, nextDir: {x:1, y:0}, food: {x:10, y:10}, score: 0, apples: 0, running: false, paused: false, timer: null };
-
+        let snake = { body: [], dir: {x:1, y:0}, nextDir: {x:1, y:0}, food: {x:10, y:10}, score: 0, apples: 0, running: false, paused: false, timer: null, currentMs: 105 };
         function initSnakeIfNeeded() {
             renderAllHighscores();
             if (!snake.body.length) {
@@ -5323,8 +5325,15 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
 
         function snakeStartTimer() {
             clearInterval(snake.timer);
-            const speed = Number(document.getElementById('snake-speed')?.value || 105);
-            snake.timer = setInterval(snakeStep, speed);
+            const baseSpeed = Number(document.getElementById('snake-speed')?.value || 115);
+            // Wenn die automatische Steigerung aktiv ist, wird es pro gefressenem Apfel ein Stück schneller (bis min 45ms)
+            if (document.getElementById('snake-accel')?.checked) {
+                const penalty = Math.min(65, snake.apples * 3.5);
+                snake.currentMs = Math.max(45, baseSpeed - penalty);
+            } else {
+                snake.currentMs = baseSpeed;
+            }
+            snake.timer = setInterval(snakeStep, snake.currentMs);
         }
 
         function snakeChangeSpeed() {
@@ -5358,9 +5367,16 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             snake.body.unshift({x: nx, y: ny});
             if (nx === snake.food.x && ny === snake.food.y) {
                 snake.apples++;
-                const speedBonus = document.getElementById('snake-speed')?.value === '72' ? 15 : 10;
-                snake.score += speedBonus;
+                // Punkte hängen jetzt auch vom gewählten Tempo ab (höheres Tempo = mehr Bonuspunkte)
+                const baseSpeed = Number(document.getElementById('snake-speed')?.value || 115);
+                const speedMultiplier = Math.round((210 - baseSpeed) / 25);
+                snake.score += 10 + Math.max(0, speedMultiplier);
+                
                 snakePlaceFood();
+                // Timer bei jedem Apfel neu starten, damit die Beschleunigung sofort greift
+                if (document.getElementById('snake-accel')?.checked) {
+                    snakeStartTimer();
+                }
             } else {
                 snake.body.pop();
             }
