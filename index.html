@@ -1043,7 +1043,7 @@
         const CONFIG = {
             fotoPasswort: "dippe",
             // HIER DEINE GOOGLE APPS SCRIPT WEB-APP-URL EINTRAGEN (beginnt mit https://script.google.com/macros/s/.../exec):
-            pinnwandCloudUrl: "https://script.google.com/macros/s/AKfycbyX8Nri_BsYKymxb-E81gW5tZKp_TuSl3_CDKhl72GjD_etSJlCBS_7KJF07ftW1-7Duw/exec",
+            pinnwandCloudUrl: "https://script.google.com/macros/s/AKfycbzHgvunOjNSElrtj-SuRoMuqzlzqWiL6t6FMXGpq172xTKl13gbrq-9-E36BE12ijG9-g/exec",
             alben: [
                 {
                     titel: "Familienfotos & Schnappschüsse",
@@ -4563,7 +4563,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         });
         
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
     <script>
         // =====================================================================
         // TURNIERPLANER – APPLICATION (State + UI + Logik)
@@ -5716,46 +5716,200 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         // ------------------- Beende-Warnung (Datenverlust vermeiden) -------------------
         window.addEventListener('beforeunload', e => { if (T && tpDirty) { e.preventDefault(); e.returnValue = ''; } });
 
-        // ------------------- Excel-Export (SheetJS) -------------------
-        function tpExportExcel() {
-            if (!T) { alert('Kein Turnier aktiv.'); return; }
-            if (typeof XLSX === 'undefined') { alert('Excel-Bibliothek lädt noch – bitte gleich erneut versuchen.'); return; }
-            const wb = XLSX.utils.book_new();
-            // Meldeliste
-            const meta = [['Turnier', T.name], ['Datum', T.date], ['Leitung', T.leader], ['Gewinnsätze', T.winSets], ['Gewinnpunkte/Satz', T.winPts], [], ['#', 'Name', 'Vorname', 'LPZ', 'Geschlecht', 'Verein']];
-            T.players.forEach((p, i) => meta.push([i + 1, p.name, p.vorname, p.lpz, p.geschlecht, p.verein]));
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(meta), 'Meldeliste');
-            // Je Wettbewerb
-            Object.entries(T.comps || {}).forEach(([k, comp]) => {
-                const label = { single: 'Einzel', women: 'Damen', doubles: 'Doppel' }[k] || k;
-                const rows = [[label.toUpperCase()], []];
-                (comp.groups || []).forEach((ids, gi) => {
-                    rows.push([`Gruppe ${gi + 1}`]);
-                    rows.push(['#', 'Spieler', 'Verein', 'Spiele', 'S', 'N', 'Punkte', 'SätzeW', 'SätzeL', 'BälleW', 'BälleL']);
-                    const st = TP.computeStandings(ids, comp.groupMatches[gi], T.winSets);
-                    st.forEach(s => rows.push([s.place, tpLabel(k, s.id), tpClub(k, s.id), s.games, s.wins, s.losses, s.pts, s.setsW, s.setsL, s.ballsW, s.ballsL]));
-                    rows.push([]);
-                    rows.push(['Spiele:']);
-                    comp.groupMatches[gi].forEach(m => { const r = m.done ? tpSetStr(m) : 'offen'; rows.push(['', tpLabel(k, m.aId), tpLabel(k, m.bId), r]); });
-                    rows.push([]);
-                });
-                if (comp.ko) {
-                    rows.push(['KO-Runde']);
-                    const names = ['Finale', 'Halbfinale', 'Viertelfinale', 'Achtelfinale', 'Runde 1']; const n = comp.ko.rounds.length;
-                    comp.ko.rounds.forEach((round, r) => {
-                        rows.push([names[n - 1 - r] || ('Runde ' + (r + 1))]);
-                        round.forEach(m => rows.push(['', tpLabel(k, m.aId), tpLabel(k, m.bId), m.done ? tpSetStr(m) : (m._byeWinner ? 'Freilos' : 'offen')]));
-                    });
-                    if (comp.ko.third && (comp.ko.third.aId || comp.ko.third.bId)) { rows.push(['Spiel um Platz 3']); rows.push(['', tpLabel(k, comp.ko.third.aId), tpLabel(k, comp.ko.third.bId), comp.ko.third.done ? tpSetStr(comp.ko.third) : 'offen']); }
-                }
-                const pod = tpComputePodium(k, comp);
-                if (pod) { rows.push([]); rows.push(['Platzierungen']); rows.push(['1.', tpLabel(k, pod.first), tpClub(k, pod.first)]); rows.push(['2.', tpLabel(k, pod.second), tpClub(k, pod.second)]); (pod.thirds || []).forEach(t => rows.push(['3.', tpLabel(k, t), tpClub(k, t)])); }
-                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), label.slice(0, 28));
-            });
-            const fname = (T.name || 'Turnier').replace(/[^\w\-]+/g, '_') + '.xlsx';
-            XLSX.writeFile(wb, fname);
-        }
+        // ===================================================================
+        // EXCEL-EXPORT (ExcelJS) – gestylt, Auto-Breiten, Live-Formeln
+        // ===================================================================
+        // Dezente, gut erkennbare Farbpalette
+        const XL = {
+            title:   'FF0E3D33',   // dunkelgrün (Kopfzeile)
+            head:    'FF0F766E',   // teal (Tabellenköpfe)
+            headTxt: 'FFFFFFFF',
+            input:   'FFFFF7E6',   // zartes Gelb = EINGABE erlaubt
+            inputBd: 'FFE0B84A',
+            calc:    'FFEFF4F2',   // zartes Grau-Grün = AUTOMATISCH berechnet
+            adv:     'FFE3F3EC',   // Hervorhebung Qualifikant
+            gold:    'FFF6C948', silver: 'FFC9CDD2', bronze: 'FFD8A46A',
+            line:    'FFD5CFC3'
+        };
         function tpSetStr(m) { if (!m.sets) return ''; const v = TP.validateResult(m.sets, T.winSets, T.winPts); return `${v.setsA}:${v.setsB} (${m.sets.map(s => s[0] + ':' + s[1]).join(', ')})`; }
+
+        async function tpExportExcel() {
+            if (!T) { alert('Kein Turnier aktiv.'); return; }
+            if (typeof ExcelJS === 'undefined') { alert('Excel-Bibliothek lädt noch – bitte in 1-2 Sekunden erneut versuchen.'); return; }
+            tpSetSaveHint('📊 erzeuge Excel …');
+            const wb = new ExcelJS.Workbook();
+            wb.creator = 'Turnierplaner'; wb.created = new Date();
+            const winSets = T.winSets, winPts = T.winPts, maxSets = winSets * 2 - 1;
+
+            const border = { top:{style:'thin',color:{argb:XL.line}}, left:{style:'thin',color:{argb:XL.line}}, bottom:{style:'thin',color:{argb:XL.line}}, right:{style:'thin',color:{argb:XL.line}} };
+            const inBorder = { top:{style:'thin',color:{argb:XL.inputBd}}, left:{style:'thin',color:{argb:XL.inputBd}}, bottom:{style:'thin',color:{argb:XL.inputBd}}, right:{style:'thin',color:{argb:XL.inputBd}} };
+            function fill(c, argb){ c.fill = {type:'pattern',pattern:'solid',fgColor:{argb}}; }
+            function headRow(ws, cells, rowNum){ const r = ws.getRow(rowNum); cells.forEach((t,i)=>{ const c=r.getCell(i+1); c.value=t; c.font={bold:true,color:{argb:XL.headTxt}}; fill(c,XL.head); c.alignment={horizontal:'center',vertical:'middle'}; c.border=border; }); r.height=20; }
+            function titleBlock(ws, text, span){ const c=ws.getCell('A1'); c.value=text; c.font={bold:true,size:15,color:{argb:'FFFFFFFF'}}; fill(c,XL.title); c.alignment={vertical:'middle',indent:1}; ws.getRow(1).height=28; ws.mergeCells(1,1,1,span||8); }
+            function autoWidth(ws){ ws.columns.forEach(col=>{ let max=8; col.eachCell({includeEmpty:false},cell=>{ const v=cell.value; let len = (v==null)?0 : (typeof v==='object'&&v!==null&&'formula' in v)? String(v.result==null?6:v.result).length : String(v).length; if(len>max) max=len; }); col.width=Math.min(Math.max(max+2,7),42); }); }
+            function legend(ws, atRow){
+                let c=ws.getRow(atRow).getCell(1); c.value='Legende:'; c.font={bold:true,size:10};
+                c=ws.getRow(atRow).getCell(2); c.value='Eingabe (hier eintragen)'; fill(c,XL.input); c.border=inBorder; c.font={size:10};
+                c=ws.getRow(atRow).getCell(4); c.value='automatisch berechnet'; fill(c,XL.calc); c.border=border; c.font={size:10};
+            }
+
+            // ---------- 1) MELDELISTE ----------
+            const wsM = wb.addWorksheet('Meldeliste', { views:[{state:'frozen',ySplit:4}] });
+            titleBlock(wsM, `🏓 ${T.name||'Turnier'}  –  ${T.date||''}${T.leader?'   |   Leitung: '+T.leader:''}`, 6);
+            wsM.getCell('A2').value = `Gewinnsätze: ${winSets}   ·   Gewinnpunkte/Satz: ${winPts}`; wsM.getCell('A2').font={italic:true,color:{argb:'FF555555'}}; wsM.mergeCells(2,1,2,6);
+            headRow(wsM, ['#','Name','Vorname','LPZ','Geschlecht','Verein'], 4);
+            T.players.forEach((p,i)=>{ const r=wsM.getRow(5+i); const vals=[i+1,p.name,p.vorname,(+p.lpz||0),p.geschlecht,p.verein]; vals.forEach((v,ci)=>{ const c=r.getCell(ci+1); c.value=v; c.border=border; if(i%2) fill(c,'FFF7F9F8'); }); });
+            autoWidth(wsM);
+
+            const summary = [];
+
+            // ---------- 2) JE WETTBEWERB EIN BLATT ----------
+            for (const k of Object.keys(T.comps||{})) {
+                const comp = T.comps[k];
+                tpKoPropagate2(comp);
+                const label = { single:'Einzel', women:'Damen', doubles:'Doppel' }[k] || k;
+                const ws = wb.addWorksheet(label, { views:[{state:'frozen',ySplit:1}] });
+                titleBlock(ws, `${label} – ${T.name||'Turnier'}`, 13);
+                let row = 3;
+                const colL = n => ws.getColumn(n).letter;
+
+                (comp.groups||[]).forEach((ids, gi) => {
+                    const matches = comp.groupMatches[gi];
+                    const tc=ws.getRow(row).getCell(1); tc.value = comp.mode.type==='round-robin' ? 'Jeder gegen jeden' : `Gruppe ${gi+1}`; tc.font={bold:true,size:12,color:{argb:XL.title}}; row++;
+
+                    const setStartCol = 4;
+                    const colSA = setStartCol + maxSets*2, colSB=colSA+1, colBA=colSA+2, colBB=colSA+3, colWin=colSA+4;
+                    const hr = ws.getRow(row);
+                    hr.getCell(1).value='Spiel'; hr.getCell(2).value='Spieler A'; hr.getCell(3).value='Spieler B';
+                    for (let si=0; si<maxSets; si++){ hr.getCell(setStartCol+si*2).value=`S${si+1}A`; hr.getCell(setStartCol+si*2+1).value=`S${si+1}B`; }
+                    hr.getCell(colSA).value='Sätze A'; hr.getCell(colSB).value='Sätze B'; hr.getCell(colBA).value='Bälle A'; hr.getCell(colBB).value='Bälle B'; hr.getCell(colWin).value='Sieger';
+                    for (let ci=1; ci<=colWin; ci++){ const c=hr.getCell(ci); c.font={bold:true,color:{argb:XL.headTxt}}; fill(c,XL.head); c.alignment={horizontal:'center'}; c.border=border; }
+                    row++;
+                    const firstMatchRow = row;
+                    matches.forEach((m,mi) => {
+                        const r = ws.getRow(row);
+                        r.getCell(1).value = mi+1;
+                        r.getCell(2).value = tpLabel(k,m.aId); r.getCell(3).value = tpLabel(k,m.bId);
+                        for (let si=0; si<maxSets; si++){
+                            const ca=r.getCell(setStartCol+si*2), cb=r.getCell(setStartCol+si*2+1);
+                            if (m.sets && m.sets[si]){ ca.value=m.sets[si][0]; cb.value=m.sets[si][1]; }
+                            [ca,cb].forEach(c=>{ fill(c,XL.input); c.border=inBorder; c.alignment={horizontal:'center'}; });
+                        }
+                        const aCells=[], bCells=[];
+                        for (let si=0; si<maxSets; si++){ aCells.push(colL(setStartCol+si*2)+row); bCells.push(colL(setStartCol+si*2+1)+row); }
+                        const aRange = colL(setStartCol)+row+':'+colL(setStartCol+(maxSets-1)*2)+row;
+                        const bRange = colL(setStartCol+1)+row+':'+colL(setStartCol+1+(maxSets-1)*2)+row;
+                        const prodA = aCells.map((a,si)=>`(${a}<>"")*(${bCells[si]}<>"")*(${a}>${bCells[si]})`).join('+');
+                        const prodB = aCells.map((a,si)=>`(${a}<>"")*(${bCells[si]}<>"")*(${a}<${bCells[si]})`).join('+');
+                        const cSA=r.getCell(colSA), cSB=r.getCell(colSB), cBA=r.getCell(colBA), cBB=r.getCell(colBB), cW=r.getCell(colWin);
+                        cSA.value={formula:prodA}; cSB.value={formula:prodB};
+                        cBA.value={formula:`SUM(${aRange})`}; cBB.value={formula:`SUM(${bRange})`};
+                        cW.value={formula:`IF(${colL(colSA)}${row}=${colL(colSB)}${row},"",IF(${colL(colSA)}${row}>${colL(colSB)}${row},B${row},C${row}))`};
+                        [cSA,cSB,cBA,cBB,cW].forEach(c=>{ fill(c,XL.calc); c.border=border; c.alignment={horizontal:'center'}; });
+                        r.getCell(1).border=border; r.getCell(2).border=border; r.getCell(3).border=border;
+                        row++;
+                    });
+                    const lastMatchRow = row-1;
+                    row++;
+
+                    // Tabelle mit Live-Formeln auf den Spiele-Block
+                    headRow(ws, ['Platz','Spieler','Verein','Spiele','Siege','Niederlagen','Punkte','Sätze +','Sätze -','Bälle +','Bälle -'], row); row++;
+                    const aNameRange = `B${firstMatchRow}:B${lastMatchRow}`;
+                    const bNameRange = `C${firstMatchRow}:C${lastMatchRow}`;
+                    const saRange = `${colL(colSA)}${firstMatchRow}:${colL(colSA)}${lastMatchRow}`;
+                    const sbRange = `${colL(colSB)}${firstMatchRow}:${colL(colSB)}${lastMatchRow}`;
+                    const baRange = `${colL(colBA)}${firstMatchRow}:${colL(colBA)}${lastMatchRow}`;
+                    const bbRange = `${colL(colBB)}${firstMatchRow}:${colL(colBB)}${lastMatchRow}`;
+                    const winRange = `${colL(colWin)}${firstMatchRow}:${colL(colWin)}${lastMatchRow}`;
+                    ids.forEach((pid, pi) => {
+                        const r = ws.getRow(row); const nc = `B${row}`;
+                        r.getCell(1).value = pi+1;
+                        r.getCell(2).value = tpLabel(k,pid);
+                        r.getCell(3).value = tpClub(k,pid);
+                        r.getCell(4).value={formula:`SUMPRODUCT((${aNameRange}=${nc})*(${winRange}<>""))+SUMPRODUCT((${bNameRange}=${nc})*(${winRange}<>""))`};
+                        r.getCell(5).value={formula:`SUMPRODUCT((${winRange}=${nc})*1)`};
+                        r.getCell(6).value={formula:`D${row}-E${row}`};
+                        r.getCell(7).value={formula:`E${row}*2`};
+                        r.getCell(8).value={formula:`SUMPRODUCT((${aNameRange}=${nc})*${saRange})+SUMPRODUCT((${bNameRange}=${nc})*${sbRange})`};
+                        r.getCell(9).value={formula:`SUMPRODUCT((${aNameRange}=${nc})*${sbRange})+SUMPRODUCT((${bNameRange}=${nc})*${saRange})`};
+                        r.getCell(10).value={formula:`SUMPRODUCT((${aNameRange}=${nc})*${baRange})+SUMPRODUCT((${bNameRange}=${nc})*${bbRange})`};
+                        r.getCell(11).value={formula:`SUMPRODUCT((${aNameRange}=${nc})*${bbRange})+SUMPRODUCT((${bNameRange}=${nc})*${baRange})`};
+                        const adv = comp.mode.type!=='round-robin' && (pi+1)<=(comp.mode.advance||0);
+                        for (let ci=1; ci<=11; ci++){ const c=r.getCell(ci); c.border=border; if(ci>=4) fill(c,XL.calc); else if(adv) fill(c,XL.adv); c.alignment={horizontal: (ci===2||ci===3)?'left':'center'}; }
+                        if (adv) r.getCell(2).font={bold:true};
+                        row++;
+                    });
+                    const noteR=ws.getRow(row).getCell(1); noteR.value='Hinweis: Reihenfolge = Setzung. Platzierung ergibt sich aus Punkten/Sätzen/Bällen (siehe Turnierplaner).'; noteR.font={italic:true,size:9,color:{argb:'FF888888'}};
+                    row += 2;
+                });
+
+                // KO / Platzierungen (Werte)
+                if (comp.ko) {
+                    const rc=ws.getRow(row).getCell(1); rc.value='KO-Runde'; rc.font={bold:true,size:12,color:{argb:XL.title}}; row++;
+                    headRow(ws, ['Runde','Spieler A','Spieler B','Ergebnis','Sätze','Sieger'], row); row++;
+                    const nTot = comp.ko.rounds.length;
+                    comp.ko.rounds.forEach((round, r0) => {
+                        round.forEach(m => {
+                            const r=ws.getRow(row);
+                            r.getCell(1).value = tpRoundTitle(nTot-1-r0, nTot);
+                            r.getCell(2).value = tpLabel(k,m.aId); r.getCell(3).value = tpLabel(k,m.bId);
+                            if (m.done&&m.sets){ const v=TP.validateResult(m.sets,winSets,winPts); r.getCell(4).value=`${v.setsA}:${v.setsB}`; r.getCell(5).value=m.sets.map(s=>s[0]+':'+s[1]).join(', '); r.getCell(6).value=tpLabel(k,tpKoWinnerOf(m)); }
+                            else if (m._byeWinner){ r.getCell(4).value='Freilos'; r.getCell(6).value=tpLabel(k,m._byeWinner); }
+                            else r.getCell(4).value='offen';
+                            for(let ci=1;ci<=6;ci++){ const c=r.getCell(ci); c.border=border; c.alignment={horizontal:(ci===2||ci===3||ci===5)?'left':'center'}; }
+                            row++;
+                        });
+                    });
+                    if (!comp.ko.de && comp.ko.third && (comp.ko.third.aId||comp.ko.third.bId)){ const m=comp.ko.third; const r=ws.getRow(row); r.getCell(1).value='Spiel um Platz 3'; r.getCell(2).value=tpLabel(k,m.aId); r.getCell(3).value=tpLabel(k,m.bId); if(m.done&&m.sets){const v=TP.validateResult(m.sets,winSets,winPts); r.getCell(4).value=`${v.setsA}:${v.setsB}`; r.getCell(6).value=tpLabel(k,tpKoWinnerOf(m));} else r.getCell(4).value='offen'; for(let ci=1;ci<=6;ci++) r.getCell(ci).border=border; row++; }
+                    if (comp.ko.de && comp.ko.scope==='full' && (comp.ko.placement||[]).length){
+                        row++; const pc=ws.getRow(row).getCell(1); pc.value='Verliererbaum – Platzierungsrunden'; pc.font={bold:true,color:{argb:'FF92400E'}}; row++;
+                        comp.ko.placement.forEach(pl => {
+                            pl.rounds.forEach(rd=>rd.forEach(m=>{ const r=ws.getRow(row); r.getCell(1).value = m.decidesHigh!=null?`um Platz ${m.decidesHigh}/${m.decidesLow}`:pl.label; r.getCell(2).value=tpLabel(k,m.aId); r.getCell(3).value=tpLabel(k,m.bId); if(m.done&&m.sets){const v=TP.validateResult(m.sets,winSets,winPts); r.getCell(4).value=`${v.setsA}:${v.setsB}`; r.getCell(6).value=tpLabel(k,tpKoWinnerOf(m));} else r.getCell(4).value='offen'; for(let ci=1;ci<=6;ci++) r.getCell(ci).border=border; row++; }));
+                        });
+                    }
+                    row++;
+                }
+
+                const pod = tpComputePodium(k, comp);
+                if (pod){ summary.push({ label, pod, placements: tpKoFullPlacements(k, comp.ko||{}) || null, kind:k }); }
+                legend(ws, row+1);
+                autoWidth(ws);
+            }
+
+            // ---------- 3) ZUSAMMENFASSUNG ----------
+            const wsS = wb.addWorksheet('Zusammenfassung', { views:[{state:'frozen',ySplit:1}] });
+            titleBlock(wsS, `🏆 Endergebnisse – ${T.name||'Turnier'}`, 10);
+            let sr = 3;
+            summary.forEach(entry => {
+                const { label, pod, placements, kind } = entry;
+                const name = id => id? tpLabel(kind,id):'–'; const club = id => id? tpClub(kind,id):'';
+                const tc=wsS.getRow(sr).getCell(1); tc.value=label; tc.font={bold:true,size:13,color:{argb:XL.title}}; sr++;
+                const podRow = wsS.getRow(sr); podRow.height=22;
+                const cells = [
+                    {col:2, rank:'🥈 2.', id:pod.second, bg:XL.silver},
+                    {col:3, rank:'🥇 1.', id:pod.first, bg:XL.gold},
+                    {col:4, rank:'🥉 3.', id:(pod.thirds||[])[0], bg:XL.bronze}
+                ];
+                cells.forEach(cel=>{ const c=podRow.getCell(cel.col); c.value=`${cel.rank}  ${name(cel.id)}`; fill(c,cel.bg); c.font={bold:true}; c.alignment={horizontal:'center'}; c.border=border; const c2=wsS.getRow(sr+1).getCell(cel.col); c2.value=club(cel.id); c2.alignment={horizontal:'center'}; c2.font={size:10,italic:true}; c2.border=border; });
+                if ((pod.thirds||[]).length>1){ const c=podRow.getCell(5); c.value=`🥉 3.  ${name(pod.thirds[1])}`; fill(c,XL.bronze); c.font={bold:true}; c.alignment={horizontal:'center'}; c.border=border; const c2=wsS.getRow(sr+1).getCell(5); c2.value=club(pod.thirds[1]); c2.alignment={horizontal:'center'}; c2.font={size:10,italic:true}; c2.border=border; }
+                sr+=3;
+                if (placements && placements.length){
+                    headRow(wsS, ['Platz','Spieler','Verein'], sr); sr++;
+                    placements.forEach(p=>{ const r=wsS.getRow(sr); r.getCell(1).value=p.place+'.'; r.getCell(2).value=name(p.id); r.getCell(3).value=club(p.id); for(let ci=1;ci<=3;ci++){const c=r.getCell(ci); c.border=border; if(sr%2) fill(c,'FFF7F9F8');} r.getCell(2).alignment={horizontal:'left'}; sr++; });
+                }
+                sr += 2;
+            });
+            if (!summary.length){ wsS.getCell('A3').value='Noch keine abgeschlossenen Wettbewerbe.'; }
+            legend(wsS, sr+1);
+            autoWidth(wsS);
+
+            const buf = await wb.xlsx.writeBuffer();
+            const blob = new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const a = document.createElement('a'); a.href=URL.createObjectURL(blob);
+            a.download = (T.name||'Turnier').replace(/[^\w\-]+/g,'_') + '.xlsx';
+            document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+            tpSetSaveHint('📊 Excel erzeugt ' + new Date().toLocaleTimeString('de-DE'));
+        }
 
         // ------------------- Sortier-Header-Binding + Autosave -------------------
         function tpInitTurnierplaner() {
