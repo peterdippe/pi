@@ -1028,6 +1028,8 @@
         .tp-set-inputs input { width:48px; text-align:center; padding:5px; border:1px solid var(--border-sand); border-radius:7px; font-weight:700; }
         .tp-err { background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; border-radius:9px; padding:8px 10px; font-size:12.5px; margin:8px 0; }
         .tp-ok-note { background:#ecfdf5; border:1px solid #a7f3d0; color:#065f46; border-radius:9px; padding:8px 10px; font-size:12.5px; margin:8px 0; }
+        .tp-cross th, .tp-cross td { text-align:center; padding:4px 6px; font-size:12px; }
+        .tp-cross thead th { background:var(--bg-sand); cursor:default; }
         @media (max-width:640px){ .tp-ko { gap:14px; } .tp-ko-round { min-width:150px; } }
 
     </style>
@@ -1557,7 +1559,7 @@
                         <div class="tp-field"><label>Name des Turniers</label><input id="tp-m-name" type="text" placeholder="z.B. Vereinsmeisterschaft 2026"></div>
                         <div class="tp-field"><label>Datum</label><input id="tp-m-date" type="date"></div>
                         <div class="tp-field"><label>Turnierleitung</label><input id="tp-m-leader" type="text" placeholder="Name"></div>
-                        <div class="tp-field"><label>Anzahl Spieler (Plan)</label><input id="tp-m-count" type="number" min="2" value="8"></div>
+                        <div class="tp-field"><label>Anzahl Spieler (automatisch)</label><input id="tp-m-count" type="number" min="2" value="8" readonly style="background:#eef2f0;color:#64748b;" title="Wird automatisch aus der Spielerliste berechnet"></div>
                         <div class="tp-field"><label>Gewinnsätze</label><input id="tp-m-winsets" type="number" min="1" value="3"></div>
                         <div class="tp-field"><label>Gewinnpunkte / Satz</label><input id="tp-m-winpts" type="number" min="1" value="11"></div>
                     </div>
@@ -4703,6 +4705,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             document.getElementById('tp-m-name').value = T.name;
             document.getElementById('tp-m-date').value = T.date;
             document.getElementById('tp-m-leader').value = T.leader;
+            T.plannedCount = T.players.length;
             document.getElementById('tp-m-count').value = T.plannedCount;
             document.getElementById('tp-m-winsets').value = T.winSets;
             document.getElementById('tp-m-winpts').value = T.winPts;
@@ -4716,7 +4719,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         function tpBindMeta() {
             const map = { 'tp-m-name': 'name', 'tp-m-date': 'date', 'tp-m-leader': 'leader' };
             Object.entries(map).forEach(([id, k]) => { const e = document.getElementById(id); if (e) e.oninput = () => { T[k] = e.value; tpMark(); }; });
-            document.getElementById('tp-m-count').oninput = e => { T.plannedCount = +e.target.value || 0; tpMark(); };
+
             document.getElementById('tp-m-winsets').oninput = e => { T.winSets = Math.max(1, +e.target.value || 3); tpMark(); };
             document.getElementById('tp-m-winpts').oninput = e => { T.winPts = Math.max(1, +e.target.value || 11); tpMark(); };
         }
@@ -4758,8 +4761,9 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             });
         }
         function tpSetP(id, k, v) { const p = T.players.find(x => x.id === id); if (!p) return; p[k] = (k === 'lpz') ? (+v || 0) : v; tpMark(); }
-        function tpAddPlayerRow() { tpAddPlayer(); tpMark(); tpRenderPlayerTable(); }
-        function tpDelPlayer(id) { T.players = T.players.filter(p => p.id !== id); tpMark(); tpRenderPlayerTable(); }
+        function tpSyncCount() { T.plannedCount = T.players.length; const el = document.getElementById('tp-m-count'); if (el) el.value = T.plannedCount; }
+        function tpAddPlayerRow() { tpAddPlayer(); tpSyncCount(); tpMark(); tpRenderPlayerTable(); }
+        function tpDelPlayer(id) { T.players = T.players.filter(p => p.id !== id); tpSyncCount(); tpMark(); tpRenderPlayerTable(); }
         function tpEsc(s) { return ('' + (s == null ? '' : s)).replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
 
         // ------------------- Modus-Konfiguration (single/women/doubles) -------------------
@@ -5079,17 +5083,26 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             // ---- Gruppenphase ----
             if (comp.groups && comp.groups.length) {
                 html += `<div class="tp-section-card"><h4>📊 ${comp.mode.type === 'round-robin' ? 'Jeder gegen jeden' : 'Gruppenphase'}</h4>`;
+                const multiGroups = comp.groups.length > 1 && comp.mode.type !== 'round-robin';
                 comp.groups.forEach((ids, gi) => {
                     const matches = comp.groupMatches[gi];
                     const standings = TP.computeStandings(ids, matches, T.winSets);
                     html += `<div style="margin-bottom:18px;"><h5 style="font-weight:800; margin:6px 0;">Gruppe ${gi + 1}</h5>`;
                     // Tabelle
-                    html += `<div style="overflow-x:auto;"><table class="tp-table"><thead><tr><th>#</th><th>Spieler</th><th>Verein</th><th>Sp</th><th>S-N</th><th>Pkt</th><th>Sätze</th><th>Bälle</th></tr></thead><tbody>`;
+                    html += `<div style="overflow-x:auto;"><table class="tp-table"><thead><tr><th>#</th><th>Spieler</th><th>Verein</th><th>Spiele</th><th>Siege&nbsp;&ndash;&nbsp;Niederlagen</th><th>Punkte</th><th>Sätze</th><th>Bälle</th>${multiGroups ? '<th>Gruppe</th>' : ''}</tr></thead><tbody>`;
                     standings.forEach(s => {
                         const adv = comp.mode.type !== 'round-robin' && s.place <= (comp.mode.advance || 0);
-                        html += `<tr style="${adv ? 'background:#e8f7f0;font-weight:700;' : ''}"><td>${s.place}</td><td>${tpEsc(tpLabel(k, s.id))}</td><td style="font-size:11.5px;color:#64748b;">${tpEsc(tpClub(k, s.id))}</td><td>${s.games}</td><td>${s.wins}:${s.losses}</td><td><b>${s.pts}</b></td><td>${s.setsW}:${s.setsL}</td><td>${s.ballsW}:${s.ballsL}</td></tr>`;
+                        let moveCell = '';
+                        if (multiGroups) {
+                            const anyDone = comp.groupMatches.some(g => g.some(m => m.done));
+                            const opts = comp.groups.map((_, oi) => `<option value="${oi}"${oi === gi ? ' selected' : ''}>Gruppe ${oi + 1}</option>`).join('');
+                            moveCell = `<td><select style="width:auto;font-size:11.5px;" ${anyDone ? 'disabled title="Erst möglich, solange keine Gruppenspiele eingetragen sind"' : ''} onchange="tpMovePlayer('${k}','${s.id}',${gi},this.value)">${opts}</select></td>`;
+                        }
+                        html += `<tr style="${adv ? 'background:#e8f7f0;font-weight:700;' : ''}"><td>${s.place}</td><td>${tpEsc(tpLabel(k, s.id))}</td><td style="font-size:11.5px;color:#64748b;">${tpEsc(tpClub(k, s.id))}</td><td>${s.games}</td><td>${s.wins}&nbsp;&ndash;&nbsp;${s.losses}</td><td><b>${s.pts}</b></td><td>${s.setsW}:${s.setsL}</td><td>${s.ballsW}:${s.ballsL}</td>${moveCell}</tr>`;
                     });
                     html += `</tbody></table></div>`;
+                    // Kreuztabelle (Spieler × Spieler)
+                    html += tpCrossTable(k, ids, matches, standings);
                     // Spiele
                     html += `<div style="margin-top:8px;">`;
                     matches.forEach(m => { html += tpMatchRow(k, m); });
@@ -5135,6 +5148,56 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             return `<div class="tp-match${cls}" onclick="tpOpenMatch('${k}','${m.id}')">
                 <span class="tp-match-names">${tpEsc(tpLabel(k, m.aId))} <span style="color:#94a3b8;">vs</span> ${tpEsc(tpLabel(k, m.bId))}</span>
                 <span style="display:flex;gap:8px;align-items:center;">${res}${badge}</span></div>`;
+        }
+
+        // ------------- Spieler manuell in andere Gruppe verschieben -------------
+        function tpMovePlayer(k, pid, fromG, toGStr) {
+            const comp = T.comps[k]; const toG = +toGStr;
+            if (!comp || toG === fromG) return;
+            const anyDone = comp.groupMatches.some(g => g.some(m => m.done));
+            if (anyDone) { alert('Verschieben ist nur möglich, solange noch keine Gruppenspiele eingetragen sind.'); tpRenderLive(); return; }
+            // Spieler aus alter Gruppe entfernen, in neue einfügen
+            comp.groups[fromG] = comp.groups[fromG].filter(id => id !== pid);
+            comp.groups[toG].push(pid);
+            // Spiele der beiden betroffenen Gruppen neu erzeugen (noch keine Ergebnisse da)
+            comp.groupMatches[fromG] = tpMakeGroupMatches(fromG, comp.groups[fromG]);
+            comp.groupMatches[toG] = tpMakeGroupMatches(toG, comp.groups[toG]);
+            // Falls KO schon vorbereitet war -> verwerfen (Basis hat sich geändert)
+            comp.ko = null;
+            tpMark(); tpRenderLive();
+        }
+
+        // ------------- Kreuztabelle (Spieler × Spieler) -------------
+        function tpCrossTable(k, ids, matches, standings) {
+            if (ids.length < 2) return '';
+            // Reihenfolge nach Tabellenplatz für Übersichtlichkeit
+            const order = standings.map(s => s.id);
+            // Ergebnis-Lookup: resById[aId][bId] = {setsA,setsB} aus Sicht von a
+            const res = {};
+            matches.forEach(m => {
+                if (!m.done || !m.sets) return;
+                const v = TP.validateResult(m.sets, T.winSets, T.winPts);
+                (res[m.aId] = res[m.aId] || {})[m.bId] = { s: v.setsA + ':' + v.setsB, win: v.winner === 'a' };
+                (res[m.bId] = res[m.bId] || {})[m.aId] = { s: v.setsB + ':' + v.setsA, win: v.winner === 'b' };
+            });
+            const shortName = id => { const l = tpLabel(k, id); return l.length > 14 ? l.slice(0, 13) + '…' : l; };
+            let html = `<details style="margin-top:8px;"><summary style="cursor:pointer;font-size:12.5px;font-weight:700;color:var(--emerald-dark);">✋ Kreuztabelle (Spieler gegen Spieler)</summary>`;
+            html += `<div style="overflow-x:auto;margin-top:6px;"><table class="tp-table tp-cross"><thead><tr><th style="text-align:left;">Spieler</th>`;
+            order.forEach((id, i) => { html += `<th title="${tpEsc(tpLabel(k, id))}">${i + 1}</th>`; });
+            html += `<th>Punkte</th></tr></thead><tbody>`;
+            order.forEach((rowId, ri) => {
+                const st = standings.find(s => s.id === rowId);
+                html += `<tr><td style="text-align:left;white-space:nowrap;"><b>${ri + 1}.</b> ${tpEsc(shortName(rowId))} <span style="color:#94a3b8;font-size:10.5px;">${tpEsc(tpClub(k, rowId))}</span></td>`;
+                order.forEach((colId) => {
+                    if (rowId === colId) { html += `<td style="background:#d8e3df;"></td>`; return; }
+                    const cell = res[rowId] && res[rowId][colId];
+                    if (cell) html += `<td style="${cell.win ? 'color:var(--emerald-dark);font-weight:700;' : 'color:#b91c1c;'}">${cell.s}</td>`;
+                    else html += `<td style="color:#cbd5c9;">–</td>`;
+                });
+                html += `<td><b>${st ? st.pts : 0}</b></td></tr>`;
+            });
+            html += `</tbody></table></div><p class="tp-help">Zeile = Sicht des Spielers; Wert = Satzergebnis gegen den jeweiligen Gegner (Spalte). Grün = gewonnen.</p></details>`;
+            return html;
         }
 
         // ------------- KO-Tableau befüllen -------------
