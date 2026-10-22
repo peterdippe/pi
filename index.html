@@ -1169,7 +1169,8 @@
          =================================================================== -->
     <script>
         const CONFIG = {
-            fotoPasswort: "dippe",
+            fotoPasswort: "pidippi",
+            turnierPasswort: "pidippi", // <-- HIER DEIN PASSWORT EINTRAGEN
             // HIER DEINE GOOGLE APPS SCRIPT WEB-APP-URL EINTRAGEN (beginnt mit https://script.google.com/macros/s/.../exec):
             pinnwandCloudUrl: "https://script.google.com/macros/s/AKfycbwFmMZHX_0rJhVZiWZUkV8AmH0Adv7gJJU1IQrqh8WiE-t9seSMpggv2iozrLFzKL0jGg/exec",
             alben: [
@@ -1675,12 +1676,12 @@
             <div class="tp-wrap">
                 <!-- Steuerleiste -->
                 <div class="tp-toolbar">
-                    <button class="btn btn-emerald" onclick="tpNewTournament()">➕ Lege neues Turnier an</button>
-                    <button class="btn btn-sand" onclick="tpSaveLocal()">💾 Speichern</button>
+                    <button id="tp-btn-new" class="btn btn-emerald hidden" onclick="tpNewTournament()">➕ Neues Turnier anlegen</button>
+                    <button id="tp-btn-save" class="btn btn-emerald hidden" onclick="tpSaveToCloudAndLocal()">💾 Speichern & in Drive</button>
                     <button class="btn btn-sand" onclick="tpOpenLoad()">📂 Turnier laden</button>
-                    <button class="btn btn-sand" onclick="tpSaveToDrive()" title="In Google Drive sichern">☁️ In Drive sichern</button>
-                    <button class="btn btn-dark" onclick="tpExportExcel()">📊 Excel-Export</button>
-                    <span id="tp-save-hint" class="tp-help" style="margin-left:auto;"></span>
+                    <button id="tp-btn-excel" class="btn btn-dark" onclick="tpExportExcel()">📊 Excel-Export</button>
+                    <button id="tp-admin-lock-btn" class="btn btn-amber" style="margin-left:auto;" onclick="tpToggleAdminMode()">🔒 Admin-Modus entsperren</button>
+                    <span id="tp-save-hint" class="tp-help">Ansichts-Modus (Nur Lesen)</span>
                 </div>
 
                 <!-- Metadaten-Formular -->
@@ -5673,6 +5674,47 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         })();
 
         // ------------------- State -------------------
+        // -----------------------------------------------------------------
+        // ADMIN-SICHERHEIT & BERECHTIGUNGEN
+        // -----------------------------------------------------------------
+        let tpAdminMode = false;
+
+        function tpToggleAdminMode() {
+            if (tpAdminMode) {
+                tpAdminMode = false;
+                document.getElementById('tp-admin-lock-btn').textContent = '🔒 Admin-Modus entsperren';
+                document.getElementById('tp-admin-lock-btn').className = 'btn btn-amber';
+                tpUpdateUIPermissions();
+                alert('Admin-Modus gesperrt. Die Seite ist jetzt im Nur-Lese-Modus.');
+            } else {
+                const pwd = prompt('Bitte gib das Turnier-Admin-Passwort ein:');
+                if (pwd === (CONFIG.turnierPasswort || 'dippe')) {
+                    tpAdminMode = true;
+                    document.getElementById('tp-admin-lock-btn').textContent = '🔓 Admin aktiv (Sperren)';
+                    document.getElementById('tp-admin-lock-btn').className = 'btn btn-emerald';
+                    tpUpdateUIPermissions();
+                    alert('Admin-Modus erfolgreich entsperrt! Du kannst nun Turniere bearbeiten und speichern.');
+                } else if (pwd !== null) {
+                    alert('Falsches Passwort!');
+                }
+            }
+        }
+
+        function tpUpdateUIPermissions() {
+            const show = tpAdminMode ? 'inline-flex' : 'none';
+            const btnNew = document.getElementById('tp-btn-new');
+            const btnSave = document.getElementById('tp-btn-save');
+            if (btnNew) btnNew.style.display = show;
+            if (btnSave) btnSave.style.display = show;
+            const hint = document.getElementById('tp-save-hint');
+            if (hint) hint.textContent = tpAdminMode ? '✏️ Admin-Modus aktiv' : '👁️ Nur-Lese-Modus (Gast)';
+        }
+
+        async function tpSaveToCloudAndLocal() {
+            if (!tpAdminMode) { alert('Keine Berechtigung! Bitte erst den Admin-Modus entsperren.'); return; }
+            await tpSaveLocal(true);
+            await tpSaveToDrive();
+        }
         let T = null;            // aktuelles Turnier-Objekt
         let tpSortKey = 'lpz', tpSortDir = -1;  // Default: LPZ absteigend
         let tpDirty = false;
@@ -5709,6 +5751,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
 
         // ------------------- Metadaten-Panel rendern -------------------
         function tpRenderMetaPanel() {
+            tpUpdateUIPermissions();
             document.getElementById('tp-empty').style.display = 'none';
             document.getElementById('tp-live').style.display = 'none';
             const panel = document.getElementById('tp-meta-panel');
@@ -6101,6 +6144,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         // =====================================================================
         let tpActiveComp = 'single';
         function tpRenderLive() {
+            tpUpdateUIPermissions();
             document.getElementById('tp-meta-panel').style.display = 'none';
             document.getElementById('tp-empty').style.display = 'none';
             document.getElementById('tp-live').style.display = 'block';
