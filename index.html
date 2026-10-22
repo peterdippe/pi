@@ -1681,7 +1681,7 @@
                     <button class="btn btn-sand" onclick="tpOpenLoad()">📂 Turnier laden</button>
                     <button id="tp-btn-excel" class="btn btn-dark" onclick="tpExportExcel()">📊 Excel-Export</button>
                     <button id="tp-admin-lock-btn" class="btn btn-amber" style="margin-left:auto;" onclick="tpToggleAdminMode()">🔒 Admin-Modus entsperren</button>
-                    <span id="tp-save-hint" class="tp-help">Ansichts-Modus (Nur Lesen)</span>
+                    <span id="tp-save-hint" class="tp-help">Nur-Lese-Modus (Gast)</span>
                 </div>
 
                 <!-- Metadaten-Formular -->
@@ -5701,11 +5701,12 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         }
 
         function tpUpdateUIPermissions() {
-            const show = tpAdminMode ? 'inline-flex' : 'none';
             const btnNew = document.getElementById('tp-btn-new');
             const btnSave = document.getElementById('tp-btn-save');
-            if (btnNew) btnNew.style.display = show;
-            if (btnSave) btnSave.style.display = show;
+            
+            if (btnNew) btnNew.classList.toggle('hidden', !tpAdminMode);
+            if (btnSave) btnSave.classList.toggle('hidden', !tpAdminMode);
+            
             const hint = document.getElementById('tp-save-hint');
             if (hint) hint.textContent = tpAdminMode ? '✏️ Admin-Modus aktiv' : '👁️ Nur-Lese-Modus (Gast)';
         }
