@@ -6268,7 +6268,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         // SAUBERER HTML-PARSER FÜR TTLIVE (FILTERT SKRIPTE & jQuery HERAUS)
         // -----------------------------------------------------------------
         function parseTTLiveOverviewHtml(htmlString) {
-            // Skript-Tags komplett entfernen, damit kein jQuery-Code im Text landet
             const cleanHtml = htmlString.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
             const doc = new DOMParser().parseFromString(cleanHtml, 'text/html');
             const tables = Array.from(doc.querySelectorAll('table'));
@@ -6279,46 +6278,53 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                 const rows = Array.from(tbl.querySelectorAll('tr'));
                 if (rows.length < 3) return;
 
-                const textContent = tbl.textContent;
-                if (!/TSV\s+Graupa/i.test(textContent)) return;
-
-                // Finde die Graupa-Zeile und den Link zur Mannschaft
+                // Prüfen, ob diese Tabelle eine Zeile enthält, in der TSV Graupa als eigentlicher Mannschaftseintrag vorkommt
+                let graupaRow = null;
                 let teamAnchor = null;
-                let graupaTeamName = 'TSV Graupa';
+                let graupaTeamName = '';
+
                 for (const r of rows) {
                     const links = Array.from(r.querySelectorAll('a'));
-                    const found = links.find(a => /TSV\s+Graupa/i.test(a.textContent) || /L3=Mannschaft|L3P=/i.test(a.getAttribute('href') || ''));
-                    if (found) {
-                        teamAnchor = found;
-                        graupaTeamName = found.textContent.replace(/\s+/g, ' ').trim();
+                    // Suche nach Links, die zu einer Graupa-Mannschaft gehören (enthält L3P= oder Mannschaft im href)
+                    const foundLink = links.find(a => {
+                        const href = a.getAttribute('href') || '';
+                        const txt = a.textContent.replace(/\s+/g, ' ').trim();
+                        return (/TSV\s+Graupa/i.test(txt) || /L3P=/i.test(href)) && /L3=Mannschaft|L3P=/i.test(href);
+                    });
+
+                    if (foundLink) {
+                        graupaRow = r;
+                        teamAnchor = foundLink;
+                        graupaTeamName = foundLink.textContent.replace(/\s+/g, ' ').trim();
                         break;
                     }
                 }
-                if (!teamAnchor) return;
+
+                if (!graupaRow || !teamAnchor) return;
 
                 const rawHref = teamAnchor.getAttribute('href') || '';
                 const teamUrl = resolveTTLiveHref(rawHref);
 
-                // Liga-Namen über der Tabelle suchen
+                // Liga-Titel aus vorherigem Element ermitteln
                 let leagueTitle = '';
                 let prev = tbl.previousElementSibling;
                 while (prev && !leagueTitle) {
                     const txt = prev.textContent.replace(/\s+/g, ' ').trim();
-                    if (txt.length > 3 && txt.length < 100 && !/jquery|\$/i.test(txt)) leagueTitle = txt;
+                    if (txt.length > 3 && txt.length < 100 && !/jquery|\$|funktion/i.test(txt)) leagueTitle = txt;
                     prev = prev.previousElementSibling;
                 }
 
+                // Tabellen-Header & Zeilen extrahieren
                 const standingsHeaders = [];
                 const standingsRows = [];
 
                 rows.forEach(r => {
-                    // Ignorieren, falls Zeile Skripte enthält
                     if (/script|\$/i.test(r.textContent)) return;
                     const cells = Array.from(r.querySelectorAll('th, td')).map(c => c.textContent.replace(/\s+/g, ' ').trim());
                     const nonEmpty = cells.filter(Boolean);
                     if (nonEmpty.length < 3) return;
 
-                    if (!standingsHeaders.length && cells.some(c => /Mannschaft|Team/i.test(c)) && cells.some(c => /Pkt|Punkte|Sp\./i.test(c))) {
+                    if (!standingsHeaders.length && (cells.some(c => /Mannschaft|Team/i.test(c)) || cells.some(c => /Pkt|Sp\./i.test(c)))) {
                         cells.forEach(c => { if (c) standingsHeaders.push(c); });
                         return;
                     }
@@ -6338,16 +6344,17 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                 const id = l3pMatch ? ('team_' + l3pMatch[1]) : ('team_' + (teamCounter++));
                 if (teams.some(t => t.id === id)) return;
 
+                // Veredelter Name für den Reiter (z.B. "1. Erwachsene", "Damen" etc.)
                 let tabLabel = graupaTeamName.replace(/^TSV\s+Graupa\s*[,·-]?\s*/i, '').trim();
-                if (!tabLabel || tabLabel.toLowerCase() === 'tsv graupa') {
-                    tabLabel = `${teams.length + 1}. Mannschaft`;
+                if (!tabLabel || /^TSV\s+Graupa$/i.test(tabLabel)) {
+                    tabLabel = `${teamCounter}. Mannschaft`;
                 }
 
                 teams.push({
                     id,
                     tabName: tabLabel,
                     fullTeamName: graupaTeamName,
-                    league: leagueTitle || 'Saison 2026/27',
+                    league: leagueTitle || 'Punktspielbetrieb 2026/27',
                     teamUrl,
                     standingsHeaders: standingsHeaders.length ? standingsHeaders : ['Pl.', 'Mannschaft', 'Sp.', 'S', 'U', 'N', 'Spiele', 'Pkt.'],
                     standingsRows
