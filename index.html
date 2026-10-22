@@ -1169,10 +1169,8 @@
          =================================================================== -->
     <script>
         const CONFIG = {
-            fotoPasswort: "pidippi",
-            turnierPasswort: "pidippi", // <-- HIER DEIN PASSWORT EINTRAGEN
             // HIER DEINE GOOGLE APPS SCRIPT WEB-APP-URL EINTRAGEN (beginnt mit https://script.google.com/macros/s/.../exec):
-            pinnwandCloudUrl: "https://script.google.com/macros/s/AKfycbwFmMZHX_0rJhVZiWZUkV8AmH0Adv7gJJU1IQrqh8WiE-t9seSMpggv2iozrLFzKL0jGg/exec",
+            pinnwandCloudUrl: "https://script.google.com/macros/s/AKfycbxEMXBOjWhw9IFh909pZCcxVrPQI1siQMSMRFVibFZoWOy_khZuSayS_fecxOX1nGpOxA/exec",
             alben: [
                 {
                     titel: "Familienfotos & Schnappschüsse",
@@ -2681,19 +2679,32 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             `).join('');
         }
 
-        function unlockPhotos(e) {
+        async function unlockPhotos(e) {
             e.preventDefault();
             const val = document.getElementById('foto-password-input').value.trim();
             const err = document.getElementById('foto-error-msg');
-            if (val === CONFIG.fotoPasswort) {
-                err.classList.add('hidden');
-                document.getElementById('foto-login-gate').classList.add('hidden');
-                document.getElementById('foto-content').classList.remove('hidden');
-                document.getElementById('logout-btn').classList.remove('hidden');
-                document.getElementById('lock-indicator').textContent = '🔓';
-                renderAlbums();
-            } else {
+            
+            if (!val || !CONFIG.pinnwandCloudUrl) {
                 err.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                const res = await fetch(CONFIG.pinnwandCloudUrl + `?kind=auth&type=foto&password=${encodeURIComponent(val)}`);
+                const j = await res.json();
+                
+                if (j && j.ok === true) {
+                    err.classList.add('hidden');
+                    document.getElementById('foto-login-gate').classList.add('hidden');
+                    document.getElementById('foto-content').classList.remove('hidden');
+                    document.getElementById('logout-btn').classList.remove('hidden');
+                    document.getElementById('lock-indicator').textContent = '🔓';
+                    renderAlbums();
+                } else {
+                    err.classList.remove('hidden');
+                }
+            } catch (ex) {
+                alert('Verbindungsfehler zum Authentifizierungs-Server.');
             }
         }
 
@@ -5682,21 +5693,43 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         function tpToggleAdminMode() {
             if (tpAdminMode) {
                 tpAdminMode = false;
+                sessionStorage.removeItem('dippe_admin_pwd');
                 document.getElementById('tp-admin-lock-btn').textContent = '🔒 Admin-Modus entsperren';
                 document.getElementById('tp-admin-lock-btn').className = 'btn btn-amber';
                 tpUpdateUIPermissions();
-                alert('Admin-Modus gesperrt. Die Seite ist jetzt im Nur-Lese-Modus.');
+                alert('Admin-Modus gesperrt. Die Seite ist wieder im Nur-Lese-Modus.');
             } else {
-                const pwd = prompt('Bitte gib das Turnier-Admin-Passwort ein:');
-                if (pwd === (CONFIG.turnierPasswort || 'dippe')) {
-                    tpAdminMode = true;
-                    document.getElementById('tp-admin-lock-btn').textContent = '🔓 Admin aktiv (Sperren)';
-                    document.getElementById('tp-admin-lock-btn').className = 'btn btn-emerald';
-                    tpUpdateUIPermissions();
-                    alert('Admin-Modus erfolgreich entsperrt! Du kannst nun Turniere bearbeiten und speichern.');
-                } else if (pwd !== null) {
-                    alert('Falsches Passwort!');
-                }
+                const pwd = prompt('Bitte gib das Admin-Passwort ein:');
+                if (!pwd) return;
+                
+                // Teste das Passwort direkt mit einem leisen Check gegen Google Drive
+                tpTestPassword(pwd).then(ok => {
+                    if (ok) {
+                        tpAdminMode = true;
+                        sessionStorage.setItem('dippe_admin_pwd', pwd);
+                        document.getElementById('tp-admin-lock-btn').textContent = '🔓 Admin aktiv (Sperren)';
+                        document.getElementById('tp-admin-lock-btn').className = 'btn btn-emerald';
+                        tpUpdateUIPermissions();
+                        alert('Admin-Modus erfolgreich entsperrt!');
+                    } else {
+                        alert('Falsches Passwort!');
+                    }
+                });
+            }
+        }
+
+        async function tpTestPassword(pwd) {
+            if (!tpDriveReady()) return false;
+            try {
+                const res = await fetch(TP_DRIVE_URL, {
+                    method: 'POST', redirect: 'follow',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({ kind: 'turnier', password: pwd, tournaments: tpReadStore() })
+                });
+                const j = await res.json();
+                return j && j.ok === true;
+            } catch (e) {
+                return false;
             }
         }
 
@@ -6682,18 +6715,45 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         // Gesamte Turnier-Map in die Drive-Datei (kind=turnier) schreiben.
         async function tpPushToDrive(store) {
             if (!tpDriveReady()) return false;
+            
+            let pwd = sessionStorage.getItem('dippe_admin_pwd');
+            if (!pwd) {
+                pwd = prompt('Admin-Passwort erforderlich, um in Google Drive zu speichern:');
+                if (!pwd) {
+                    tpSetSaveHint('⚠️ Abgebrochen (kein Passwort)');
+                    return false;
+                }
+            }
+
             try {
                 tpSetSaveHint('☁️ sichere in Drive …');
-                const res = await fetch(TP_DRIVE_URL, { method: 'POST', redirect: 'follow',
+                const res = await fetch(TP_DRIVE_URL, { 
+                    method: 'POST', 
+                    redirect: 'follow',
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({ kind: 'turnier', tournaments: store || tpReadStore() }) });
-                // Apps-Script-Antwort pruefen (bei altem Script evtl. anders)
-                let ok = res.ok;
-                try { const j = await res.json(); if (j && j.ok === false) ok = false; } catch (e) {}
-                tpSetSaveHint(ok ? ('☁️ in Drive gesichert ' + new Date().toLocaleTimeString('de-DE'))
-                                 : '⚠️ Drive-Script antwortet unerwartet – lokal gesichert. (Apps Script aktualisieren)');
-                return ok;
-            } catch (e) { tpSetSaveHint('⚠️ Drive nicht erreichbar – lokal gesichert.'); return false; }
+                    body: JSON.stringify({ 
+                        kind: 'turnier', 
+                        password: pwd, 
+                        tournaments: store || tpReadStore() 
+                    }) 
+                });
+                const j = await res.json();
+                if (j && j.ok) {
+                    sessionStorage.setItem('dippe_admin_pwd', pwd);
+                    tpSetSaveHint('☁️ in Drive gesichert ' + new Date().toLocaleTimeString('de-DE'));
+                    return true;
+                } else {
+                    sessionStorage.removeItem('dippe_admin_pwd');
+                    tpAdminMode = false;
+                    tpUpdateUIPermissions();
+                    alert('Speichern fehlgeschlagen: Falsches Passwort! Admin-Modus wurde gesperrt.');
+                    tpSetSaveHint('⚠️ Falsches Passwort');
+                    return false;
+                }
+            } catch (e) { 
+                tpSetSaveHint('⚠️ Drive nicht erreichbar.'); 
+                return false; 
+            }
         }
         // Manueller Button „In Drive sichern“
         async function tpSaveToDrive() {
