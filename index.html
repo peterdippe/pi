@@ -1171,7 +1171,7 @@
         const CONFIG = {
             fotoPasswort: "dippe",
             // HIER DEINE GOOGLE APPS SCRIPT WEB-APP-URL EINTRAGEN (beginnt mit https://script.google.com/macros/s/.../exec):
-            pinnwandCloudUrl: "https://script.google.com/macros/s/AKfycbzHgvunOjNSElrtj-SuRoMuqzlzqWiL6t6FMXGpq172xTKl13gbrq-9-E36BE12ijG9-g/exec",
+            pinnwandCloudUrl: "https://script.google.com/macros/s/AKfycbwFmMZHX_0rJhVZiWZUkV8AmH0Adv7gJJU1IQrqh8WiE-t9seSMpggv2iozrLFzKL0jGg/exec",
             alben: [
                 {
                     titel: "Familienfotos & Schnappschüsse",
@@ -2825,34 +2825,26 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
 
         async function loadPinnwandFromCloud(manualClick) {
             const url = (CONFIG.pinnwandCloudUrl || '').trim();
-            if (!url) {
-                if (manualClick) {
-                    alert('Bitte trage zuerst deine Google Apps Script Web-App-URL oben in der index.html unter CONFIG.pinnwandCloudUrl ein.');
-                }
+            if (!url || !url.startsWith('https://script.google.com/')) {
+                if (manualClick) alert('Bitte trage zuerst deine Google Apps Script Web-App-URL unter CONFIG.pinnwandCloudUrl ein.');
                 return;
             }
             setPinnwandSyncStatus('⏳ Lade aus Google Drive …', '#fbbf24');
             try {
-                const res = await fetch(url + '?kind=pinnwand&t=' + Date.now(), { method: 'GET' });
+                const res = await fetch(url + '?kind=pinnwand&t=' + Date.now(), { method: 'GET', redirect: 'follow' });
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 const cloudData = await res.json();
-                if (cloudData && cloudData.empty) {
-                    // Noch keine Datei in Google Drive -> aktuellen Stand initial hochladen
-                    await savePinnwandState();
-                    return;
-                }
+
                 if (cloudData && Array.isArray(cloudData.categories) && Array.isArray(cloudData.posts)) {
                     const currentActive = pinnwandData?.activeCat || 'alle';
                     pinnwandData = ensureTermineCategory(cloudData);
                     pinnwandData.activeCat = currentActive;
                     localStorage.setItem('dippe_pinnwand_v1', JSON.stringify(pinnwandData));
                     renderPinnwand();
-                    renderAllHighscores();
                     setPinnwandSyncStatus('☁️ Synchronisiert mit Google Drive', '#a7f3d0');
                 } else {
-                    // Fremde Antwort (z.B. alter Turnier-Blob aus einer einzelnen Datei):
-                    // lokalen Stand NICHT ueberschreiben, nur Hinweis geben.
-                    setPinnwandSyncStatus('☁️ Lokaler Stand aktiv (Cloud hatte keine Pinnwand-Daten)', '#fcd34d');
+                    // Datei war leer oder hatte Altlasten -> lokalen Stand jetzt initial in Drive speichern!
+                    await savePinnwandState();
                 }
             } catch (err) {
                 setPinnwandSyncStatus('⚠️ Offline / Lokal gespeichert', '#fca5a5');
@@ -2860,27 +2852,31 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         }
 
         async function savePinnwandState() {
-         // 1. Sofort lokal speichern & Oberfläche aktualisieren
-         try {
-             localStorage.setItem('dippe_pinnwand_v1', JSON.stringify(pinnwandData));
-         } catch (err) {}
-         renderPinnwand();
+            try {
+                localStorage.setItem('dippe_pinnwand_v1', JSON.stringify(pinnwandData));
+            } catch (err) {}
+            renderPinnwand();
 
-         // 2. Im Hintergrund automatisch in dippe_pinnwand_db.json auf Google Drive speichern
-         //    kind=pinnwand -> eigene Datei, trennt strikt von Turnier-Daten.
-         if (CONFIG.pinnwandCloudUrl && CONFIG.pinnwandCloudUrl.startsWith('https://script.google.com/')) {
-             try {
-                 await fetch(CONFIG.pinnwandCloudUrl, {
-                     method: 'POST',
-                     redirect: 'follow',
-                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                     body: JSON.stringify({ kind: 'pinnwand', data: pinnwandData })
-                 });
-             } catch (err) {
-                 console.error('Fehler beim Cloud-Speichern:', err);
-             }
-         }
-     }
+            if (CONFIG.pinnwandCloudUrl && CONFIG.pinnwandCloudUrl.startsWith('https://script.google.com/')) {
+                setPinnwandSyncStatus('⏳ Speichere in Google Drive …', '#fbbf24');
+                try {
+                    const res = await fetch(CONFIG.pinnwandCloudUrl, {
+                        method: 'POST',
+                        redirect: 'follow',
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify({ kind: 'pinnwand', data: pinnwandData })
+                    });
+                    const j = await res.json();
+                    if (j && j.ok) {
+                        setPinnwandSyncStatus('☁️ Synchronisiert mit Google Drive', '#a7f3d0');
+                    } else {
+                        setPinnwandSyncStatus('⚠️ Lokal gespeichert (Cloud-Antwort prüfen)', '#fcd34d');
+                    }
+                } catch (err) {
+                    setPinnwandSyncStatus('⚠️ Offline / Lokal gespeichert', '#fca5a5');
+                }
+            }
+        }
 
         function compressAndSetPinImage(file) {
             const reader = new FileReader();
@@ -5021,7 +5017,11 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                 if (!res.ok) return;
                 const j = await res.json();
                 const cloud = (j && j.data) ? j.data : (j && !j.empty && (j.tetris || j.snake || j.minesweeper) ? j : null);
-                if (!cloud) return;
+                if (!cloud) {
+                    // Noch keine Highscore-Datei in Drive -> aktuellen Stand initial anlegen
+                    saveHighscoreStore(getHighscoreStore());
+                    return;
+                }
                 const local = getHighscoreStore();
                 const merged = {};
                 ['tetris', 'minesweeper', 'snake'].forEach(game => {
