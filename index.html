@@ -86,16 +86,78 @@
             width: 44px;
             height: 44px;
             border-radius: 13px;
-            background: linear-gradient(135deg, var(--emerald-dark), var(--amber));
+            background: #ffffff;
+            border: 2px solid var(--emerald);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-family: 'Outfit', sans-serif;
-            font-weight: 800;
-            font-size: 19px;
-            color: #fff;
             flex-shrink: 0;
-            box-shadow: 0 6px 16px rgba(0,0,0,0.35);
+            overflow: hidden;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+        }
+        .brand-logo img {
+            width: 100%;
+            height: 109%;
+            object-fit: cover;
+            object-position: center top;
+            display: block;
+        }
+
+        /* Vibe-Pills & Personal Hero Showcase */
+        .vibe-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+        .vibe-pill {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 7px 13px; border-radius: 99px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--border-green);
+            color: var(--text-cream); font-size: 12.5px; font-weight: 700;
+            cursor: pointer; transition: all 0.2s ease; font-family: inherit;
+        }
+        .vibe-pill:hover {
+            background: linear-gradient(135deg, var(--emerald-dark), #0d9488);
+            border-color: #34d399; transform: translateY(-2px); color: #fff;
+        }
+
+        .pi-telemetry-card {
+            position: relative; overflow: hidden;
+            background: linear-gradient(145deg, rgba(9, 21, 18, 0.92), rgba(16, 48, 39, 0.88));
+            border: 1px solid rgba(52, 211, 153, 0.35);
+            border-radius: 20px; padding: 22px;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 18px 36px rgba(0,0,0,0.4);
+        }
+        .pi-watermark {
+            position: absolute; right: -10px; bottom: -28px;
+            font-family: 'Outfit', serif; font-size: 150px; font-weight: 800;
+            color: rgba(52, 211, 153, 0.07); line-height: 1; pointer-events: none; user-select: none;
+        }
+        .telemetry-grid {
+            display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 12px; position: relative; z-index: 1;
+        }
+        .telemetry-item {
+            background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(52, 211, 153, 0.18);
+            border-radius: 12px; padding: 10px 12px;
+        }
+        .telemetry-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: #fbbf24; font-weight: 700; }
+        .telemetry-val { font-size: 13.5px; font-weight: 700; color: #fff; margin-top: 3px; }
+
+        /* Sport-Ecke Spezial-Styles */
+        .cybershape-badge {
+            width: 58px; height: 58px;
+            background: linear-gradient(135deg, #ef4444, #d97706);
+            clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 26px; flex-shrink: 0; box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+        }
+        .sport-stat-box {
+            background: rgba(255,255,255,0.05); border: 1px solid var(--border-green);
+            border-radius: 14px; padding: 14px 16px;
+        }
+        .sport-stat-val {
+            font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 800; color: #34d399;
+        }
+        .score-big {
+            font-family: 'JetBrains Mono', monospace; font-size: clamp(32px, 4vw, 48px);
+            font-weight: 800; color: var(--text-dark); line-height: 1;
         }
 
         .brand-title { font-size: clamp(18px, 1.4vw, 21px); font-weight: 800; color: #fff; }
@@ -941,8 +1003,10 @@
     <!-- MOBILE HEADER -->
     <div class="mobile-bar">
         <div style="display:flex; align-items:center; gap:10px;">
-            <div class="brand-logo" style="width:34px; height:34px; font-size:14px;">DS</div>
-            <strong class="font-display" style="font-size:17px;">Dippe-Sippe</strong>
+            <div class="brand-logo" style="width:34px; height:34px;">
+                <img src="Pi-vektor.jpg" alt="π" onerror="if(!this.dataset.low){this.dataset.low='1';this.src='pi-vektor.jpg';}else{this.outerHTML='<span style=\'color:#122620;font-weight:800;\'>π</span>';}">
+            </div>
+            <strong class="font-display" style="font-size:17px;">Pi @ Dippe-Sippe</strong>
         </div>
         <button class="btn btn-sand" style="padding:7px 13px; font-size:13px;" onclick="toggleSidebar()">Menü ☰</button>
     </div>
@@ -951,10 +1015,12 @@
     <aside id="sidebar" class="sidebar">
         <div>
             <div class="brand-box">
-                <div class="brand-logo">DS</div>
+                <div class="brand-logo">
+                    <img src="Pi-vektor.jpg" alt="π" onerror="if(!this.dataset.low){this.dataset.low='1';this.src='pi-vektor.jpg';}else{this.outerHTML='<span style=\'color:#122620;font-weight:800;font-size:22px;\'>π</span>';}">
+                </div>
                 <div>
-                    <div class="brand-title">Dippe-Sippe</div>
-                    <div class="brand-sub">🌲 Pirna · Sächsische Schweiz</div>
+                    <div class="brand-title">Pi @ Dippe-Sippe</div>
+                    <div class="brand-sub">⚡ Mathe · Geo · Sport · Vibe</div>
                 </div>
             </div>
 
@@ -964,16 +1030,32 @@
                 </button>
 
                 <button onclick="toggleNavGroup('familie')" id="nav-familie" class="nav-btn group-open">
-                    <span>🏡 Familie & Zuhause</span>
+                    <span>⚡ π's Kosmos & Cloud</span>
                     <span id="caret-familie" class="nav-caret">▸</span>
                 </button>
                 <div class="sub-nav open" id="subnav-group-familie">
+                    <button onclick="switchPage('pinnwand')" id="subnav-pinnwand" class="sub-nav-btn">
+                        <span>📌 π's Pinnwand</span>
+                    </button>
                     <button onclick="switchPage('fotos')" id="subnav-fotos" class="sub-nav-btn">
                         <span>📸 Fotos & Cloud</span>
                         <span id="lock-indicator">🔒</span>
                     </button>
-                    <button onclick="switchPage('pinnwand')" id="subnav-pinnwand" class="sub-nav-btn">
-                        <span>📌 Familien-Pinnwand</span>
+                </div>
+
+                <button onclick="toggleNavGroup('sport')" id="nav-sport" class="nav-btn group-open">
+                    <span>🏅 Sport-Ecke</span>
+                    <span id="caret-sport" class="nav-caret">▸</span>
+                </button>
+                <div class="sub-nav open" id="subnav-group-sport">
+                    <button onclick="switchPage('tischtennis')" id="subnav-tischtennis" class="sub-nav-btn">
+                        <span>🏓 Tischtennis</span>
+                    </button>
+                    <button onclick="switchPage('radfahren')" id="subnav-radfahren" class="sub-nav-btn">
+                        <span>🚴 Fahrradfahren</span>
+                    </button>
+                    <button onclick="switchPage('wandern')" id="subnav-wandern" class="sub-nav-btn">
+                        <span>🥾 Wanderungen</span>
                     </button>
                 </div>
 
@@ -1022,8 +1104,8 @@
         </div>
 
         <div class="sidebar-footer">
-            <div style="font-weight:700; color:#34d399;">● www.dippe-sippe.de</div>
-            <div style="color:var(--text-muted); margin-top:4px;">Emil-Gast-Str. 4 · 01796 Pirna</div>
+            <div style="font-weight:700; color:#34d399;">● pi.dippe-sippe.de</div>
+            <div style="color:var(--text-muted); margin-top:4px;">Basecamp Graupa · Pirna</div>
         </div>
     </aside>
 
@@ -1031,28 +1113,57 @@
     <main class="main-content">
 
         <!-- ===============================================================
-             1. HOME SEITE
+             1. HOME SEITE (PETERS PERSÖNLICHE SPIELWIESE)
              =============================================================== -->
         <section id="page-home" class="page-section active">
             <div class="hero-card">
                 <div class="hero-grid">
                     <div>
-                        <img src="ScrabbleFamilieDippe.jpeg" alt="Scrabble Familie Dippe"
-                             style="display:block; height:155px; width:auto; max-width:100%; border-radius:8px; margin-bottom:12px;"
-                             onerror="this.onerror=null; this.style.display='none';">
-                        <span class="eyebrow">🌿 Willkommen bei Familie Dippe</span>
+                        <span class="eyebrow">π = 3.14159265… · Peters digitales Labor & Basecamp</span>
                         <h2 class="hero-title">
-                            Unser Familienzuhause im Tor zur <span class="highlight-grad">Sächsischen Schweiz</span>.
+                            Sport, Geographie, Mathe & <span class="highlight-grad">Vibe-Coding</span>.
                         </h2>
-                        <p style="color:var(--text-muted); font-size:15.5px; line-height:1.65; margin-bottom:0;">
-                            Herzlich willkommen auf der Homepage unserer Familie! Von unserem Zuhause in Pirna aus teilen wir hier Erinnerungen, Fotoalben, unsere interaktive Pinnwand sowie Karten- und Geometrie-Tools.
+                        <p style="color:var(--text-muted); font-size:15.2px; line-height:1.65; margin-bottom:0;">
+                            Willkommen auf meiner persönlichen Spielwiese! Hier treffen meine Leidenschaften aufeinander: Tischtennis mit 8 Ecken, Gravel- und Rennradtouren, Wanderungen durch die Sächsische Schweiz, topografische Karten-Experimente, angewandte Mathematik und handgemachtes Vibe-Coding.
                         </p>
+                        <div class="vibe-pills">
+                            <button class="vibe-pill" onclick="switchPage('tischtennis')">🏓 Tischtennis</button>
+                            <button class="vibe-pill" onclick="switchPage('radfahren')">🚴 Fahrradfahren</button>
+                            <button class="vibe-pill" onclick="switchPage('wandern')">🥾 Wanderungen</button>
+                            <button class="vibe-pill" onclick="switchPage('dominanz')">⛰️ Geographie & Gipfel</button>
+                            <button class="vibe-pill" onclick="switchPage('area-maps')">📐 Mathe-Spielereien</button>
+                            <button class="vibe-pill" onclick="switchPage('pinnwand')">📌 π's Pinnwand</button>
+                            <button class="vibe-pill" onclick="switchPage('tetris')">🕹️ Arcade & Highscores</button>
+                        </div>
                     </div>
 
-                    <div class="wappen-frame">
-                        <img src="DippeSippeWappen.jpg"
-                             alt="Wappen der Dippe-Sippe"
-                             onerror="this.onerror=null; this.parentElement.innerHTML='<div style=\'padding:40px; text-align:center; color:#f4efe6;\'><h3 style=\'color:#fbbf24; margin-bottom:8px;\'>DippeSippeWappen.jpg</h3><p style=\'font-size:13px; opacity:0.85;\'>Bitte stelle sicher, dass die Datei exakt <b>DippeSippeWappen.jpg</b> heißt und im gleichen Ordner wie die index.html liegt.</p></div>';">
+                    <div class="pi-telemetry-card">
+                        <div class="pi-watermark">π</div>
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; position:relative; z-index:1;">
+                            <div>
+                                <span class="eyebrow" style="margin-bottom:2px;">Live-Status · System π</span>
+                                <h3 style="font-size:20px; font-weight:800; color:#fff;">Peters Themen-Radar</h3>
+                            </div>
+                            <span class="badge" style="background:rgba(16,185,129,0.2); color:#34d399; border:1px solid rgba(52,211,153,0.4); font-size:11px; padding:4px 9px;">v3.14 aktiv</span>
+                        </div>
+                        <div class="telemetry-grid">
+                            <div class="telemetry-item">
+                                <div class="telemetry-label">🏓 Tischtennis</div>
+                                <div class="telemetry-val">Spin, Tempo & Punktspiel</div>
+                            </div>
+                            <div class="telemetry-item">
+                                <div class="telemetry-label">🚴 Gravel & Road</div>
+                                <div class="telemetry-val">Titan, Wachs & Höhenmeter</div>
+                            </div>
+                            <div class="telemetry-item">
+                                <div class="telemetry-label">🥾 Outdoor-Revier</div>
+                                <div class="telemetry-val">Elbsandstein & Gipfel</div>
+                            </div>
+                            <div class="telemetry-item">
+                                <div class="telemetry-label">💻 Vibe-Coding</div>
+                                <div class="telemetry-val">Welzl, Geodäsie & Games</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1061,7 +1172,7 @@
                 <div class="sand-card">
                     <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px;">
                         <div>
-                            <span class="eyebrow-dark">Unser Standort</span>
+                            <span class="eyebrow-dark">Basecamp & Startpunkt für Touren</span>
                             <h3 style="font-size:21px; font-weight:800;" id="home-loc-title">📍 Emil-Gast-Straße 4, 01796 Pirna</h3>
                         </div>
                         <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
@@ -1077,30 +1188,32 @@
                 </div>
 
                 <div style="display:flex; flex-direction:column; gap:20px;">
-                    <div class="hero-card" style="margin-bottom:0; padding:24px; flex:1; display:flex; flex-direction:column; justify-content:space-between;">
+                    <div class="hero-card" style="margin-bottom:0; padding:22px; flex:1; display:flex; flex-direction:column; justify-content:space-between;">
                         <div>
-                            <span class="eyebrow">Cloud-Tresor</span>
-                            <h3 style="font-size:21px; font-weight:800; margin-bottom:8px;">📸 Familienfotos & Alben</h3>
-                            <p style="color:var(--text-muted); font-size:14px; line-height:1.55;">
-                                Im passwortgeschützten Bereich findet ihr unsere gesammelten Ordner auf Google Drive und OneDrive zum Anschauen, Herunterladen und Mitmachen.
+                            <span class="eyebrow">🏅 Action & Bewegung</span>
+                            <h3 style="font-size:21px; font-weight:800; margin-bottom:8px;">Die neue Sport-Ecke</h3>
+                            <p style="color:var(--text-muted); font-size:13.8px; line-height:1.55;">
+                                Vom Tischtennis-Zählgerät für die Halle über den Gravel-Steigungsrechner bis zur Tourenplanung in der Sächsischen Schweiz.
                             </p>
                         </div>
-                        <button class="btn btn-amber" style="width:100%; margin-top:16px;" onclick="switchPage('fotos')">
-                            🔑 Foto-Bereich öffnen
-                        </button>
+                        <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-top:14px;">
+                            <button class="btn btn-amber" style="padding:9px 8px; font-size:12.5px;" onclick="switchPage('tischtennis')">🏓 TT</button>
+                            <button class="btn btn-emerald" style="padding:9px 8px; font-size:12.5px;" onclick="switchPage('radfahren')">🚴 Rad</button>
+                            <button class="btn btn-sand" style="padding:9px 8px; font-size:12.5px;" onclick="switchPage('wandern')">🥾 Wandern</button>
+                        </div>
                     </div>
 
                     <div class="sand-card" style="flex:1; display:flex; flex-direction:column; justify-content:space-between;">
                         <div>
-                            <span class="eyebrow-dark">Neu unter Map-Tools</span>
-                            <h3 style="font-size:21px; font-weight:800; margin-bottom:6px;">🗺️ Maps Math & Berg-Dominanz</h3>
+                            <span class="eyebrow-dark">Geographie, Mathe & Ideen</span>
+                            <h3 style="font-size:21px; font-weight:800; margin-bottom:6px;">🗺️ Map-Tools & π's Pinnwand</h3>
                             <p style="font-size:13.5px; line-height:1.55; opacity:0.9;">
-                                Vermesse Flächen und Welzl-Umkreise direkt auf Satellitenkarten oder erkunde im neuen <b>Berg-Dominanz-Atlas</b> die Dominanz-Radien und Schartenhöhen der Gipfel!
+                                Berechne Polygone und kleinste Umkreise nach Welzl, klicke dich über den <b>Berg-Dominanz-Atlas</b> bis zum Mount Everest oder halte Projekte auf <b>π's Pinnwand</b> fest.
                             </p>
                         </div>
                         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:14px;">
-                            <button class="btn btn-emerald" onclick="switchPage('area-maps')">🌍 Maps Math</button>
                             <button class="btn btn-dark" onclick="switchPage('dominanz')">⛰️ Berg-Atlas</button>
+                            <button class="btn btn-emerald" onclick="switchPage('pinnwand')">📌 π's Pinnwand</button>
                         </div>
                     </div>
                 </div>
@@ -1148,8 +1261,8 @@
         <section id="page-pinnwand" class="page-section">
             <div class="section-header">
                 <div>
-                    <span class="eyebrow">Termine, Wissen, Rezepte, Bilder & Ideen</span>
-                    <h2 style="font-size:32px; font-weight:800;">📌 Unsere Familien-Pinnwand</h2>
+                    <span class="eyebrow">Projekte, Notizen, Links, Bilder & Ideen</span>
+                    <h2 style="font-size:32px; font-weight:800;">📌 π's Pinnwand</h2>
                 </div>
                 <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
                     <span id="pinnwand-sync-status" class="pin-sync-pill">💾 Lokal gespeichert</span>
@@ -1225,6 +1338,289 @@
                         <span id="pin-lightbox-caption" style="color:#fff; font-weight:700; font-size:15px;"></span>
                         <button class="btn btn-amber" style="padding:6px 14px; font-size:12.5px;" onclick="closePinLightbox()">Schließen ✕</button>
                     </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===============================================================
+             3b. SPORT-ECKE (1): TISCHTENNIS
+             =============================================================== -->
+        <section id="page-tischtennis" class="page-section">
+            <div class="section-header">
+                <div>
+                    <span class="eyebrow">Sport-Ecke · Schnellste Rückschlagsportart der Welt</span>
+                    <h2 style="font-size:32px; font-weight:800;">🏓 Tischtennis</h2>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    <button class="btn btn-emerald" onclick="switchPage('tischtennis')">🏓 Tischtennis</button>
+                    <button class="btn btn-sand" onclick="switchPage('radfahren')">🚴 Fahrradfahren</button>
+                    <button class="btn btn-sand" onclick="switchPage('wandern')">🥾 Wanderungen</button>
+                </div>
+            </div>
+
+            <div class="hero-card">
+                <div style="display:flex; flex-wrap:wrap; align-items:center; gap:20px;">
+                    <div class="cybershape-badge" title="8-eckige Cybershape-Geometrie">🏓</div>
+                    <div style="flex:1; min-width:240px;">
+                        <span class="eyebrow">Vereinsleben, Punktspiele & Turnier-Fieber</span>
+                        <h3 style="font-size:24px; font-weight:800; color:#fff; margin-bottom:6px;">Rotation, Geometrie & Millisekunden-Entscheidungen</h3>
+                        <p style="color:var(--text-muted); font-size:14.5px; line-height:1.6;">
+                            Tischtennis ist angewandte Physik und Schach auf Höchstgeschwindigkeit: Spin-Kurven, Schnittwechsel, ein vergrößerter Sweetspot in markanter 8-Eck-Geometrie und der besondere Teamgeist in der Halle – vom Nachwuchstraining bis zum engen Entscheidungsdoppel.
+                        </p>
+                    </div>
+                </div>
+                <div class="grid-3" style="margin-top:18px;">
+                    <div class="sport-stat-box">
+                        <div class="telemetry-label">Schläger-Geometrie</div>
+                        <div class="sport-stat-val">8-Eck / Cybershape</div>
+                        <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">Optimierter Sweetspot & markante Kanten für präzise Winkel am Tisch.</div>
+                    </div>
+                    <div class="sport-stat-box">
+                        <div class="telemetry-label">Abteilung & Verein</div>
+                        <div class="sport-stat-val">~100 Aktive · 12 Teams</div>
+                        <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">Organisation, Punktspielbetrieb, Nachwuchsförderung & Vereinsturniere.</div>
+                    </div>
+                    <div class="sport-stat-box">
+                        <div class="telemetry-label">Spielfokus</div>
+                        <div class="sport-stat-val">Spin × Platzierung</div>
+                        <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">Aufschlagvarianten, Vorhand-Topspin und aktives Block-/Konterspiel.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <!-- Interaktives Punktspiel-Zählgerät -->
+                <div class="sand-card" style="display:flex; flex-direction:column; justify-content:space-between;">
+                    <div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                            <span class="eyebrow-dark">Vibe-Coding Hallen-Tool</span>
+                            <span id="tt-serve-badge" class="badge" style="background:var(--emerald-dark); color:#fff;">Aufschlag: Spieler A (2×)</span>
+                        </div>
+                        <h3 style="font-size:21px; font-weight:800; margin-bottom:14px;">🔢 Digitales Satz- & Match-Zählgerät</h3>
+
+                        <div class="grid-2" style="gap:12px; text-align:center; margin-bottom:14px;">
+                            <div style="background:var(--bg-sand-light); border:2px solid var(--border-sand); border-radius:16px; padding:14px;">
+                                <input type="text" id="tt-name-a" value="Pi" class="form-input" style="text-align:center; font-weight:800; margin-bottom:8px;">
+                                <div style="font-size:12px; color:var(--emerald-dark); font-weight:700; margin-bottom:4px;">Sätze: <span id="tt-sets-a">0</span></div>
+                                <div id="tt-pts-a" class="score-big">0</div>
+                                <div style="display:flex; gap:6px; justify-content:center; margin-top:12px;">
+                                    <button class="btn btn-emerald" style="flex:1;" onclick="ttAddPoint('a', 1)">+1 Punkt</button>
+                                    <button class="btn btn-sand" onclick="ttAddPoint('a', -1)">-1</button>
+                                </div>
+                            </div>
+
+                            <div style="background:var(--bg-sand-light); border:2px solid var(--border-sand); border-radius:16px; padding:14px;">
+                                <input type="text" id="tt-name-b" value="Gegner" class="form-input" style="text-align:center; font-weight:800; margin-bottom:8px;">
+                                <div style="font-size:12px; color:var(--amber); font-weight:700; margin-bottom:4px;">Sätze: <span id="tt-sets-b">0</span></div>
+                                <div id="tt-pts-b" class="score-big">0</div>
+                                <div style="display:flex; gap:6px; justify-content:center; margin-top:12px;">
+                                    <button class="btn btn-amber" style="flex:1;" onclick="ttAddPoint('b', 1)">+1 Punkt</button>
+                                    <button class="btn btn-sand" onclick="ttAddPoint('b', -1)">-1</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                        <span id="tt-match-status" style="font-size:12.5px; font-weight:700; color:var(--emerald-dark);">Gewinnsätze bis 11 Punkte (2 Pkt. Vorsprung).</span>
+                        <button class="btn btn-dark" style="padding:7px 12px; font-size:12px;" onclick="ttResetMatch()">🔄 Match-Reset</button>
+                    </div>
+                </div>
+
+                <!-- Taktik & Trainings-Impulse -->
+                <div class="sand-card" style="display:flex; flex-direction:column; justify-content:space-between;">
+                    <div>
+                        <span class="eyebrow-dark">Training & Matchplan</span>
+                        <h3 style="font-size:21px; font-weight:800; margin-bottom:10px;">⚡ Fokus-Punkte am Tisch</h3>
+                        <div style="display:flex; flex-direction:column; gap:10px; font-size:13.8px; line-height:1.55;">
+                            <div class="person-box">
+                                <span class="person-role">1. Aufschlag & Rückschlag (Erste 3 Bälle)</span>
+                                Kurze Unterschnitt-/Seitschnitt-Aufschläge variieren, mit langem Überraschungsaufschlag in die tiefe Rückhand kombinieren und sofort den ersten offenen Ball aktiv übernehmen.
+                            </div>
+                            <div class="person-box">
+                                <span class="person-role">2. Beinarbeit & Balance</span>
+                                Nach jedem Schlag zurück in die neutrale Grundstellung – Körperschwerpunkt tief halten, um zwischen tischnahem Block und Halbdistanz-Topspin nahtlos umzuschalten.
+                            </div>
+                            <div class="person-box">
+                                <span class="person-role">3. Mentale Ruhe in der Verlängerung</span>
+                                Ab 9:9 klare, entschlossene Spielzüge wählen: Den eigenen stärksten Aufschlag bringen und keine halben Notbälle spielen.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ===============================================================
+             3c. SPORT-ECKE (2): FAHRRADFAHREN
+             =============================================================== -->
+        <section id="page-radfahren" class="page-section">
+            <div class="section-header">
+                <div>
+                    <span class="eyebrow">Sport-Ecke · Gravel, Asphalt & Höhenmeter</span>
+                    <h2 style="font-size:32px; font-weight:800;">🚴 Fahrradfahren</h2>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    <button class="btn btn-sand" onclick="switchPage('tischtennis')">🏓 Tischtennis</button>
+                    <button class="btn btn-emerald" onclick="switchPage('radfahren')">🚴 Fahrradfahren</button>
+                    <button class="btn btn-sand" onclick="switchPage('wandern')">🥾 Wanderungen</button>
+                </div>
+            </div>
+
+            <div class="hero-card">
+                <span class="eyebrow">Titan-Ästhetik, Heißwachs & GPS-Tracks</span>
+                <h3 style="font-size:24px; font-weight:800; color:#fff; margin-bottom:6px;">Zwischen Elbradweg, Borsberg-Anstiegen & Schotterpisten</h3>
+                <p style="color:var(--text-muted); font-size:14.5px; line-height:1.6;">
+                    Ob schnelle Feierabendrunde aus Graupa heraus, ausgedehnte Gravel-Abenteuer über Wald- und Schotterwege oder knackige Anstiege aus dem Elbtal hinauf ins Osterzgebirge und die Sächsische Schweiz – wenn der Antrieb frisch gewachst schnurrt und die Route auf dem Radcomputer steht, beginnt die beste Zeit des Tages.
+                </p>
+                <div class="grid-3" style="margin-top:18px;">
+                    <div class="sport-stat-box">
+                        <div class="telemetry-label">Bike & Rahmenbau</div>
+                        <div class="sport-stat-val">Titan Gravel GT</div>
+                        <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">Zeitloses Titan-Design kombiniert mit drahtloser 2×12 AXS-Schaltpräzision.</div>
+                    </div>
+                    <div class="sport-stat-box">
+                        <div class="telemetry-label">Antriebs-Philosophie</div>
+                        <div class="sport-stat-val">100 % Heißwachs</div>
+                        <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">Minimaler Reibungsverlust, kein schwarzes Kettenöl und maximale Laufleistung.</div>
+                    </div>
+                    <div class="sport-stat-box">
+                        <div class="telemetry-label">Cockpit & Metriken</div>
+                        <div class="sport-stat-val">Karoo · GPX · HF</div>
+                        <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">Präzise Track-Planung via Locus Map & Strava mit Live-Steigungsprofilen.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <!-- Interaktiver Touren-, Schnitt- & VAM-Rechner -->
+                <div class="sand-card">
+                    <span class="eyebrow-dark">Mathe fürs Cockpit</span>
+                    <h3 style="font-size:21px; font-weight:800; margin-bottom:12px;">⚙️ Touren-Zeit & VAM-Steigungsrechner</h3>
+                    <div class="grid-2" style="gap:12px; margin-bottom:12px;">
+                        <div>
+                            <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Distanz (km):</label>
+                            <input type="number" id="bike-dist" class="form-input" value="65" min="1" step="1" oninput="calcBikeMetrics()">
+                        </div>
+                        <div>
+                            <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Höhenmeter (Hm):</label>
+                            <input type="number" id="bike-hm" class="form-input" value="850" min="0" step="10" oninput="calcBikeMetrics()">
+                        </div>
+                        <div>
+                            <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Flach-Tempo (km/h):</label>
+                            <input type="number" id="bike-speed" class="form-input" value="26" min="10" max="50" step="0.5" oninput="calcBikeMetrics()">
+                        </div>
+                        <div>
+                            <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Steigleistung VAM (Hm/h):</label>
+                            <input type="number" id="bike-vam" class="form-input" value="650" min="200" max="1800" step="25" oninput="calcBikeMetrics()">
+                        </div>
+                    </div>
+                    <div id="bike-calc-result" class="person-box" style="background:#ecfdf5; border-color:#a7f3d0; padding:14px;"></div>
+                </div>
+
+                <!-- Hausrunden & Klassiker -->
+                <div class="sand-card">
+                    <span class="eyebrow-dark">Heimat-Sektoren ab Graupa / Pirna</span>
+                    <h3 style="font-size:21px; font-weight:800; margin-bottom:10px;">🗺️ Lieblings-Runden & Segmente</h3>
+                    <div style="display:flex; flex-direction:column; gap:10px; font-size:13.8px; line-height:1.55;">
+                        <div class="person-box">
+                            <span class="person-role">🌲 Borsberg & Schönfelder Hochland (Gravel)</span>
+                            Direkt vor der Haustür: Über abwechslungsreiche Wald- und Schotterpfade hinauf Richtung Borsberg, Jagdwege und Panoramablicke über das Elbtal.
+                        </div>
+                        <div class="person-box">
+                            <span class="person-role">⛰️ Hohnstein, Polenztal & Kirnitzschtal</span>
+                            Klassische Wellenprofile durch die Vordere und Hintere Sächsische Schweiz – ruhige Nebenstraßen, feiner Schotter und knackige Rampen aus den Tälern.
+                        </div>
+                        <div class="person-box">
+                            <span class="person-role">🌊 Elbradweg-Tempofahrt (Dresden ↔ Bad Schandau)</span>
+                            Flaches Rollen entlang der Elbe für Grundlagenausdauer, Aero-Abschnitte oder als entspannter Ausklang nach einer Höhenmeter-Etappe.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ===============================================================
+             3d. SPORT-ECKE (3): WANDERUNGEN
+             =============================================================== -->
+        <section id="page-wandern" class="page-section">
+            <div class="section-header">
+                <div>
+                    <span class="eyebrow">Sport-Ecke · Elbsandstein, Tafelberge & Gipfelziele</span>
+                    <h2 style="font-size:32px; font-weight:800;">🥾 Wanderungen</h2>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    <button class="btn btn-sand" onclick="switchPage('tischtennis')">🏓 Tischtennis</button>
+                    <button class="btn btn-sand" onclick="switchPage('radfahren')">🚴 Fahrradfahren</button>
+                    <button class="btn btn-emerald" onclick="switchPage('wandern')">🥾 Wanderungen</button>
+                </div>
+            </div>
+
+            <div class="hero-card">
+                <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:18px;">
+                    <div style="flex:1; min-width:260px;">
+                        <span class="eyebrow">Direkt vor der Haustür ins Felsrevier</span>
+                        <h3 style="font-size:24px; font-weight:800; color:#fff; margin-bottom:6px;">Felsriffe, Stiegen & weite Blicke über die Sächsische Schweiz</h3>
+                        <p style="color:var(--text-muted); font-size:14.5px; line-height:1.6;">
+                            Wenn das Tor zur Sächsischen Schweiz die eigene Heimat ist, liegen Schrammsteine, Rathen, die Festung Königstein und unzählige verwunschene Gründe nur einen Katzensprung entfernt. Und für die topografische Analyse jedes Gipfels gibt es direkt nebenan den eigenen Berg-Dominanz-Atlas!
+                        </p>
+                    </div>
+                    <button class="btn btn-amber" style="padding:12px 18px; font-size:14px;" onclick="switchPage('dominanz')">
+                        ⛰️ Zum Berg-Dominanz-Atlas ↗
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid-3" style="margin-bottom:20px;">
+                <div class="sand-card">
+                    <span class="eyebrow-dark">Klassiker im Fels</span>
+                    <h3 style="font-size:19px; font-weight:800; margin:4px 0 8px;">🧗 Schrammsteine & Gratwege</h3>
+                    <p style="font-size:13.5px; line-height:1.55;">
+                        Über Leitern, Stiegen und schmale Sandsteinpfade hinauf zur Schrammsteinaussicht – mit einem der eindrucksvollsten 360°-Panoramen des Elbsandsteingebirges.
+                    </p>
+                </div>
+                <div class="sand-card">
+                    <span class="eyebrow-dark">Felsenbühne & Klammen</span>
+                    <h3 style="font-size:19px; font-weight:800; margin:4px 0 8px;">🌲 Kurort Rathen, Bastei & Schwedenlöcher</h3>
+                    <p style="font-size:13.5px; line-height:1.55;">
+                        Abwechslungsreiche Rundtouren zwischen Elbfähre, Amselsee, kühlen Felsschluchten und den berühmten Aussichten hoch über dem Elbbogen.
+                    </p>
+                </div>
+                <div class="sand-card">
+                    <span class="eyebrow-dark">Tafelberge & Ferne</span>
+                    <h3 style="font-size:19px; font-weight:800; margin:4px 0 8px;">🏰 Festung Königstein, Lilienstein & Vogtland</h3>
+                    <p style="font-size:13.5px; line-height:1.55;">
+                        Markante Tafelberge links und rechts der Elbe sowie ausgedehnte Familien- und Herbstwanderungen durch das grüne Vogtland rund um das Mühlental.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Interaktiver Gehzeit-Rechner (DIN 33466) -->
+            <div class="sand-card">
+                <div class="grid-2" style="align-items:center;">
+                    <div>
+                        <span class="eyebrow-dark">Tourenplanung nach DIN 33466</span>
+                        <h3 style="font-size:21px; font-weight:800; margin-bottom:6px;">⏱️ Wander-Gehzeit-Rechner</h3>
+                        <p style="font-size:13.5px; line-height:1.55; margin-bottom:12px;">
+                            Berechnet die realistische reine Gehzeit aus Horizontaldistanz, Aufstieg und Abstieg nach der offiziellen Bergwander-Formel (4 km/h horizontal, 300 Hm/h im Aufstieg, 500 Hm/h im Abstieg – wobei der kleinere Zeitwert zur Hälfte auf den größeren addiert wird).
+                        </p>
+                        <div class="grid-3" style="gap:10px;">
+                            <div>
+                                <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Strecke (km):</label>
+                                <input type="number" id="hike-km" class="form-input" value="14" min="0.5" step="0.5" oninput="calcHikeTime()">
+                            </div>
+                            <div>
+                                <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Aufstieg (Hm):</label>
+                                <input type="number" id="hike-up" class="form-input" value="520" min="0" step="20" oninput="calcHikeTime()">
+                            </div>
+                            <div>
+                                <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Abstieg (Hm):</label>
+                                <input type="number" id="hike-down" class="form-input" value="520" min="0" step="20" oninput="calcHikeTime()">
+                            </div>
+                        </div>
+                    </div>
+                    <div id="hike-calc-result" class="person-box" style="background:#ecfdf5; border-color:#a7f3d0; padding:18px; text-align:center;"></div>
                 </div>
             </div>
         </section>
@@ -1641,6 +2037,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
 
         const NAV_GROUPS = {
             familie:     ['fotos', 'pinnwand'],
+            sport:       ['tischtennis', 'radfahren', 'wandern'],
             maptools:    ['area-maps', 'dominanz', 'area-pur'],
             spiele:      ['tetris', 'minesweeper', 'snake'],
             rechtliches: ['impressum']
@@ -3839,6 +4236,98 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         window.addEventListener('DOMContentLoaded', () => {
             setTimeout(renderAllHighscores, 400);
         });
+
+        // -----------------------------------------------------------------
+        // SPORT-ECKE: LIVE-TOOLS (TISCHTENNIS, RADFAHREN, WANDERN)
+        // -----------------------------------------------------------------
+        let ttState = { a: 0, b: 0, setsA: 0, setsB: 0 };
+
+        function ttAddPoint(player, delta) {
+            ttState[player] = Math.max(0, ttState[player] + delta);
+            const a = ttState.a, b = ttState.b;
+            const nameA = document.getElementById('tt-name-a')?.value || 'Spieler A';
+            const nameB = document.getElementById('tt-name-b')?.value || 'Spieler B';
+
+            // Satzgewinn prüfen (ab 11 Punkten und mind. 2 Punkten Vorsprung)
+            if ((a >= 11 || b >= 11) && Math.abs(a - b) >= 2 && delta > 0) {
+                const winner = a > b ? nameA : nameB;
+                if (a > b) ttState.setsA++; else ttState.setsB++;
+                document.getElementById('tt-match-status').textContent = `🏆 Satz an ${winner} (${a}:${b})! Neuer Satz läuft.`;
+                ttState.a = 0; ttState.b = 0;
+            }
+
+            document.getElementById('tt-pts-a').textContent = ttState.a;
+            document.getElementById('tt-pts-b').textContent = ttState.b;
+            document.getElementById('tt-sets-a').textContent = ttState.setsA;
+            document.getElementById('tt-sets-b').textContent = ttState.setsB;
+
+            // Aufschlagwechsel-Logik (alle 2 Punkte, ab 10:10 jeden Punkt)
+            const total = ttState.a + ttState.b;
+            const deuce = ttState.a >= 10 && ttState.b >= 10;
+            const serverIdx = deuce ? (total % 2) : (Math.floor(total / 2) % 2);
+            const serverName = serverIdx === 0 ? nameA : nameB;
+            const badge = document.getElementById('tt-serve-badge');
+            if (badge) badge.textContent = `🏓 Aufschlag: ${serverName} (${deuce ? '1× Wechsel' : '2× Wechsel'})`;
+        }
+
+        function ttResetMatch() {
+            ttState = { a: 0, b: 0, setsA: 0, setsB: 0 };
+            document.getElementById('tt-match-status').textContent = 'Gewinnsätze bis 11 Punkte (2 Pkt. Vorsprung).';
+            ttAddPoint('a', 0);
+        }
+
+        function calcBikeMetrics() {
+            const dist = Math.max(0.1, parseFloat(document.getElementById('bike-dist')?.value) || 0);
+            const hm = Math.max(0, parseFloat(document.getElementById('bike-hm')?.value) || 0);
+            const flatSpeed = Math.max(5, parseFloat(document.getElementById('bike-speed')?.value) || 25);
+            const vam = Math.max(100, parseFloat(document.getElementById('bike-vam')?.value) || 600);
+
+            const flatHours = dist / flatSpeed;
+            const climbHours = hm / vam;
+            const totalHours = flatHours + climbHours * 0.55;
+            const avgSpeed = dist / totalHours;
+            const hmPerKm = hm / dist;
+
+            const h = Math.floor(totalHours);
+            const m = Math.round((totalHours - h) * 60);
+            const box = document.getElementById('bike-calc-result');
+            if (box) {
+                box.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+                        <div><span class="person-role">Geschätzte Fahrzeit</span><div class="person-name" style="font-size:20px;">${h} Std. ${m} Min.</div></div>
+                        <div><span class="person-role">Effektiver Schnitt</span><div class="person-name" style="font-size:20px;">${avgSpeed.toFixed(1)} km/h</div></div>
+                        <div><span class="person-role">Profil-Härte</span><div class="person-name" style="font-size:20px;">${hmPerKm.toFixed(1)} Hm/km</div></div>
+                    </div>
+                `;
+            }
+        }
+
+        function calcHikeTime() {
+            const km = Math.max(0, parseFloat(document.getElementById('hike-km')?.value) || 0);
+            const up = Math.max(0, parseFloat(document.getElementById('hike-up')?.value) || 0);
+            const down = Math.max(0, parseFloat(document.getElementById('hike-down')?.value) || 0);
+
+            const tHoriz = km / 4.0;
+            const tVert = (up / 300.0) + (down / 500.0);
+            const totalHours = Math.max(tHoriz, tVert) + 0.5 * Math.min(tHoriz, tVert);
+
+            const h = Math.floor(totalHours);
+            const m = Math.round((totalHours - h) * 60);
+            const box = document.getElementById('hike-calc-result');
+            if (box) {
+                box.innerHTML = `
+                    <span class="person-role">Reine Gehzeit (DIN 33466)</span>
+                    <div class="score-big" style="color:var(--emerald-dark); margin:6px 0;">${h} h ${m} min</div>
+                    <div style="font-size:12px; color:#475569;">Horizontal: ${(tHoriz*60).toFixed(0)} Min. · Vertikal: ${(tVert*60).toFixed(0)} Min. (ohne Pausen)</div>
+                `;
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            calcBikeMetrics();
+            calcHikeTime();
+        });
+        
     </script>
 </body>
 </html>
