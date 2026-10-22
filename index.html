@@ -1043,7 +1043,7 @@
         const CONFIG = {
             fotoPasswort: "dippe",
             // HIER DEINE GOOGLE APPS SCRIPT WEB-APP-URL EINTRAGEN (beginnt mit https://script.google.com/macros/s/.../exec):
-            pinnwandCloudUrl: "https://script.google.com/macros/s/AKfycbzHgvunOjNSElrtj-SuRoMuqzlzqWiL6t6FMXGpq172xTKl13gbrq-9-E36BE12ijG9-g/exec",
+            pinnwandCloudUrl: "https://script.google.com/macros/s/AKfycbyX8Nri_BsYKymxb-E81gW5tZKp_TuSl3_CDKhl72GjD_etSJlCBS_7KJF07ftW1-7Duw/exec",
             alben: [
                 {
                     titel: "Familienfotos & Schnappschüsse",
@@ -2547,6 +2547,8 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
              }
              renderPinnwand();
              renderAllHighscores();
+             // Highscores aus eigener Drive-Datei nachladen (getrennt von Pinnwand)
+             loadHighscoresFromCloud();
     
              // 2. Strg+V Bild-Upload im Formular aktivieren
              const postForm = document.getElementById('pinnwand-post-form');
@@ -2569,16 +2571,17 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
              // 3. Aktuellen Stand aus dippe_pinnwand_db.json in Google Drive laden
              if (CONFIG.pinnwandCloudUrl && CONFIG.pinnwandCloudUrl.startsWith('https://script.google.com/')) {
                  try {
-                     const res = await fetch(CONFIG.pinnwandCloudUrl, { method: 'GET', redirect: 'follow' });
+                     const res = await fetch(CONFIG.pinnwandCloudUrl + '?kind=pinnwand', { method: 'GET', redirect: 'follow' });
                      const cloudData = await res.json();
                      if (cloudData && Array.isArray(cloudData.posts) && Array.isArray(cloudData.categories)) {
                          pinnwandData = cloudData;
                          localStorage.setItem('dippe_pinnwand_v1', JSON.stringify(pinnwandData));
                          renderPinnwand();
                      } else if (cloudData && cloudData.empty) {
-                         // Noch keine Datei in Drive vorhanden -> jetzt automatisch anlegen
+                         // Noch keine Pinnwand-Datei in Drive vorhanden -> jetzt automatisch anlegen
                          savePinnwandState();
                      }
+                     // Fremde Antwort -> lokalen Stand behalten, nichts ueberschreiben.
                  } catch (err) {
                      console.warn('Cloud-Pinnwand konnte nicht geladen werden:', err);
                  }
@@ -2595,7 +2598,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             }
             setPinnwandSyncStatus('⏳ Lade aus Google Drive …', '#fbbf24');
             try {
-                const res = await fetch(url + '?t=' + Date.now(), { method: 'GET' });
+                const res = await fetch(url + '?kind=pinnwand&t=' + Date.now(), { method: 'GET' });
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 const cloudData = await res.json();
                 if (cloudData && cloudData.empty) {
@@ -2612,7 +2615,9 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                     renderAllHighscores();
                     setPinnwandSyncStatus('☁️ Synchronisiert mit Google Drive', '#a7f3d0');
                 } else {
-                    setPinnwandSyncStatus('⚠️ Cloud-Antwort unerwartet', '#fca5a5');
+                    // Fremde Antwort (z.B. alter Turnier-Blob aus einer einzelnen Datei):
+                    // lokalen Stand NICHT ueberschreiben, nur Hinweis geben.
+                    setPinnwandSyncStatus('☁️ Lokaler Stand aktiv (Cloud hatte keine Pinnwand-Daten)', '#fcd34d');
                 }
             } catch (err) {
                 setPinnwandSyncStatus('⚠️ Offline / Lokal gespeichert', '#fca5a5');
@@ -2627,13 +2632,14 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
          renderPinnwand();
 
          // 2. Im Hintergrund automatisch in dippe_pinnwand_db.json auf Google Drive speichern
+         //    kind=pinnwand -> eigene Datei, trennt strikt von Turnier-Daten.
          if (CONFIG.pinnwandCloudUrl && CONFIG.pinnwandCloudUrl.startsWith('https://script.google.com/')) {
              try {
                  await fetch(CONFIG.pinnwandCloudUrl, {
                      method: 'POST',
                      redirect: 'follow',
                      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                     body: JSON.stringify(pinnwandData)
+                     body: JSON.stringify({ kind: 'pinnwand', data: pinnwandData })
                  });
              } catch (err) {
                  console.error('Fehler beim Cloud-Speichern:', err);
@@ -4027,26 +4033,57 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         };
 
         let pendingHighscore = null;
+        // Highscores liegen in EIGENER Drive-Datei (kind=highscores), komplett
+        // getrennt von Pinnwand und Turnieren. Lokaler Cache: dippe_highscores_v1.
+        let highscoreData = null;
 
         function getHighscoreStore() {
-            if (pinnwandData && typeof pinnwandData === 'object') {
-                if (!pinnwandData.highscores) {
-                    const localHs = localStorage.getItem('dippe_highscores_v1');
-                    pinnwandData.highscores = localHs ? JSON.parse(localHs) : JSON.parse(JSON.stringify(DEFAULT_HIGHSCORES));
-                }
-                return pinnwandData.highscores;
+            if (!highscoreData) {
+                // Migration: alter Stand lag evtl. in pinnwandData.highscores
+                const legacy = (pinnwandData && typeof pinnwandData === 'object') ? pinnwandData.highscores : null;
+                const raw = localStorage.getItem('dippe_highscores_v1');
+                highscoreData = raw ? JSON.parse(raw) : (legacy || JSON.parse(JSON.stringify(DEFAULT_HIGHSCORES)));
             }
-            const raw = localStorage.getItem('dippe_highscores_v1');
-            return raw ? JSON.parse(raw) : JSON.parse(JSON.stringify(DEFAULT_HIGHSCORES));
+            return highscoreData;
         }
 
         function saveHighscoreStore(store) {
+            highscoreData = store;
             try { localStorage.setItem('dippe_highscores_v1', JSON.stringify(store)); } catch (e) {}
-            if (pinnwandData && typeof pinnwandData === 'object') {
-                pinnwandData.highscores = store;
-                savePinnwandState(); // Synchronisiert automatisch mit Google Drive!
+            // In eigene Drive-Datei sichern (kind=highscores)
+            if (CONFIG.pinnwandCloudUrl && CONFIG.pinnwandCloudUrl.startsWith('https://script.google.com/')) {
+                fetch(CONFIG.pinnwandCloudUrl, {
+                    method: 'POST', redirect: 'follow',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({ kind: 'highscores', data: store })
+                }).catch(err => console.warn('Highscore-Cloud-Save fehlgeschlagen:', err));
             }
             renderAllHighscores();
+        }
+
+        // Highscores aus eigener Drive-Datei laden und mit lokalem Stand mergen
+        // (hoechster Score pro Spiel/Name bleibt; nichts geht verloren).
+        async function loadHighscoresFromCloud() {
+            if (!(CONFIG.pinnwandCloudUrl && CONFIG.pinnwandCloudUrl.startsWith('https://script.google.com/'))) return;
+            try {
+                const res = await fetch(CONFIG.pinnwandCloudUrl + '?kind=highscores&t=' + Date.now(), { method: 'GET', redirect: 'follow' });
+                if (!res.ok) return;
+                const j = await res.json();
+                const cloud = (j && j.data) ? j.data : (j && !j.empty && (j.tetris || j.snake || j.minesweeper) ? j : null);
+                if (!cloud) return;
+                const local = getHighscoreStore();
+                const merged = {};
+                ['tetris', 'minesweeper', 'snake'].forEach(game => {
+                    const all = [].concat(local[game] || [], cloud[game] || []);
+                    // Duplikate (gleicher Name+Score) entfernen, nach Score sortieren, Top 10
+                    const seen = new Set(); const uniq = [];
+                    all.sort((a, b) => b.score - a.score).forEach(e => { const key = e.name + '|' + e.score; if (!seen.has(key)) { seen.add(key); uniq.push(e); } });
+                    merged[game] = uniq.slice(0, 10);
+                });
+                highscoreData = merged;
+                try { localStorage.setItem('dippe_highscores_v1', JSON.stringify(merged)); } catch (e) {}
+                renderAllHighscores();
+            } catch (err) { console.warn('Highscores laden fehlgeschlagen:', err); }
         }
 
         function renderAllHighscores() {
@@ -4690,7 +4727,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         }
         function tpDefaultMode() {
             return { type: 'group-ko', groupSize: 4, advance: 2, fillBest: true, allPlaces: false,
-                     koSize: 0, started: false };
+                     placeScope: 'full', koSize: 0, started: false };
         }
         function tpAddPlayer(data) {
             T.players.push(Object.assign({ id: tpUid(), name: '', vorname: '', lpz: 0, geschlecht: 'm', verein: '' }, data || {}));
@@ -4718,10 +4755,9 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
 
         function tpBindMeta() {
             const map = { 'tp-m-name': 'name', 'tp-m-date': 'date', 'tp-m-leader': 'leader' };
-            Object.entries(map).forEach(([id, k]) => { const e = document.getElementById(id); if (e) e.oninput = () => { T[k] = e.value; tpMark(); }; });
-
-            document.getElementById('tp-m-winsets').oninput = e => { T.winSets = Math.max(1, +e.target.value || 3); tpMark(); };
-            document.getElementById('tp-m-winpts').oninput = e => { T.winPts = Math.max(1, +e.target.value || 11); tpMark(); };
+            Object.entries(map).forEach(([id, k]) => { const e = document.getElementById(id); if (e) { e.oninput = () => { T[k] = e.value; tpMark(); }; T[k] = e.value; } });
+            const ws = document.getElementById('tp-m-winsets'); if (ws) { ws.oninput = e => { T.winSets = Math.max(1, +e.target.value || 3); tpMark(); }; T.winSets = Math.max(1, +ws.value || 3); }
+            const wp = document.getElementById('tp-m-winpts'); if (wp) { wp.oninput = e => { T.winPts = Math.max(1, +e.target.value || 11); tpMark(); }; T.winPts = Math.max(1, +wp.value || 11); }
         }
 
         // ------------------- Spieler-Tabelle -------------------
@@ -4787,13 +4823,23 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                     <label style="font-size:12.5px; display:block; margin-top:6px;"><input type="checkbox" id="${pfx}-fill" ${mode.fillBest ? 'checked' : ''} onchange="tpModeSet('${which}','fillBest',this.checked)"> Nächstbeste aus allen Gruppen auffüllen, falls Tableau nicht aufgeht</label>
                 </div>
                 <label style="font-size:12.5px; display:block; margin-top:8px;"><input type="checkbox" id="${pfx}-allp" ${mode.allPlaces ? 'checked' : ''} onchange="tpModeSet('${which}','allPlaces',this.checked)"> Alle Platzierungen ausspielen (Platzierungsspiele)</label>
+                <div id="${pfx}-scope" class="tp-conditional" style="display:${mode.allPlaces ? 'block' : 'none'}; margin-top:6px;">
+                    <div class="tp-field" style="max-width:360px;">
+                        <label>Umfang der Platzierungsspiele</label>
+                        <select id="${pfx}-pscope" onchange="tpModeSet('${which}','placeScope',this.value)">
+                            <option value="full"${(mode.placeScope || 'full') === 'full' ? ' selected' : ''}>Alle Plätze 1 bis N komplett ausspielen</option>
+                            <option value="top4"${mode.placeScope === 'top4' ? ' selected' : ''}>Nur Plätze 1–4 (Verliererbaum bis Platz 3)</option>
+                        </select>
+                        <p class="tp-help">Gewinner steigen im Gewinnerbaum auf, Verlierer in den Verliererbaum (Doppel-K.o.).</p>
+                    </div>
+                </div>
             `;
         }
         function tpModeSet(which, k, v) {
             const mode = which === 'single' ? T.single : which === 'women' ? T.women.mode : T.doubles.mode;
             if (['groupSize', 'advance'].includes(k)) v = Math.max(1, +v || 1);
             mode[k] = v; tpMark();
-            if (k === 'type') {
+            if (k === 'type' || k === 'allPlaces') {
                 const cont = which === 'single' ? document.getElementById('tp-mode-single')
                     : which === 'women' ? document.getElementById('tp-women-config')
                         : document.getElementById('tp-dbl-config');
@@ -4867,7 +4913,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             } else if (mode.type === 'ko') {
                 const size = TP.defaultKoSize(sorted.length);
                 const qualifiers = sorted.map((e, i) => ({ playerId: e.id, group: null, rank: i + 1, seedStrength: e.seedStrength }));
-                comp.ko = tpMakeKo(TP.buildKoBracket(qualifiers, size).slots, mode.allPlaces);
+                comp.ko = tpMakeKo(TP.buildKoBracket(qualifiers, size).slots, tpModePlaceValue(mode));
             } else { // group-ko
                 const numGroups = Math.max(1, Math.ceil(sorted.length / mode.groupSize));
                 const groups = TP.snakeSeedGroups(sorted, numGroups);
@@ -4881,18 +4927,16 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             return pairs.map((p, i) => ({ id: `g${groupIdx}_${i}`, group: groupIdx,
                 aId: ids[p.a], bId: ids[p.b], sets: null, done: false, running: false, table: null }));
         }
+        // allPlaces: false = einfaches K.o. (nur Platz 1-3), 'full' / 'top4' = Doppel-K.o.
         function tpMakeKo(slots, allPlaces) {
             const size = slots.length, rounds = [];
-            let roundSize = size, prevCount = size / 2, rIdx = 0;
-            // Runde 0: aus slots
             let cur = [];
             for (let i = 0; i < size; i += 2) {
                 cur.push({ id: `ko_r0_${i / 2}`, round: 0, aId: slots[i], bId: slots[i + 1],
                     sets: null, done: false, running: false, table: null, aFrom: null, bFrom: null });
             }
             rounds.push(cur);
-            let count = cur.length;
-            let r = 1;
+            let count = cur.length, r = 1;
             while (count > 1) {
                 const nxt = [];
                 for (let i = 0; i < count; i += 2) {
@@ -4902,43 +4946,128 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                 }
                 rounds.push(nxt); count = nxt.length; r++;
             }
-            const ko = { size, rounds, allPlaces, third: null };
-            // Spiel um Platz 3
-            ko.third = { id: 'ko_third', round: -1, aId: null, bId: null, sets: null, done: false, running: false, table: null,
-                aFrom: null, bFrom: null, isThird: true };
-            // Auto-advance Freilose (bye)
+            const de = allPlaces && allPlaces !== false;
+            const scope = (allPlaces === 'top4') ? 'top4' : (de ? 'full' : null);
+            const ko = { size, rounds, allPlaces, de, scope, third: null, placement: [] };
+            if (de) {
+                tpBuildPlacementBrackets(ko);
+            } else {
+                ko.third = { id: 'ko_third', round: -1, aId: null, bId: null, sets: null, done: false, running: false, table: null, aFrom: null, bFrom: null, isThird: true };
+            }
             tpKoResolveByes(ko);
             return ko;
         }
+        // Verliererbaum / Platzierungs-Runden aufbauen.
+        // Modell: pro Haupt-KO-Runde fallen Verlierer in "Trostbaum"-Runden.
+        // placement = array von {level, label, matches:[...], placeHigh, placeLow}
+        // placeHigh/placeLow = Platzbereich, den diese Runde letztlich vergibt.
+        function tpBuildPlacementBrackets(ko) {
+            const size = ko.size;
+            // Fuer jede Hauptrunde r (ausser Finale) entsteht ein Loser-Pool.
+            // Wir bilden pro "Platzgruppe" eine kleine Trost-KO.
+            // Anzahl Hauptrunden:
+            const mainRounds = ko.rounds.length; // inkl. Finale
+            ko.placement = [];
+            if (ko.scope === 'top4') {
+                // Nur Spiel um Platz 3 (Verlierer der Halbfinals)
+                ko.third = { id: 'pl_3_0', round: -1, aId: null, bId: null, sets: null, done: false, running: false, table: null, aFrom: null, bFrom: null, isThird: true, placeHigh: 3, placeLow: 4 };
+                return;
+            }
+            // scope 'full': fuer jede Platz-Zweiergruppe (3/4, 5/8, 9/16, ...) einen vollen
+            // Platzierungsbaum. Verlierer von Hauptrunde r spielen um die Plaetze
+            //   [ 2^(mainRounds-1-r)+1 .. 2^(mainRounds-r) ].
+            // Innerhalb des Baums steigen Sieger in den hoeheren Platzbereich auf,
+            // Verlierer in den niedrigeren (rekursive Aufteilung), bis jedes Spiel
+            // genau zwei benachbarte Plaetze vergibt. So werden ALLE Plaetze ausgespielt.
+            ko._plSeq = 0;
+            for (let r = 0; r < mainRounds - 1; r++) {
+                const losersCount = ko.rounds[r].length;
+                const placeHigh = Math.pow(2, mainRounds - 1 - r) + 1;
+                const placeLow = Math.pow(2, mainRounds - r);
+                if (losersCount === 1) {
+                    ko.placement.push({ placeHigh, placeLow, label: `Platz ${placeHigh}`, rounds: [], single: ko.rounds[r][0] });
+                    continue;
+                }
+                // Startquellen: die Verlierer der Hauptrunde r
+                const sources = ko.rounds[r].map(m => ({ from: m.id, loser: true }));
+                const rounds = [];
+                tpBuildPlacementTree(ko, placeHigh, placeLow, sources, rounds);
+                ko.placement.push({ placeHigh, placeLow, label: placeHigh === placeLow ? `Platz ${placeHigh}` : `Plätze ${placeHigh}–${placeLow}`, rounds });
+            }
+        }
+        // Rekursiver Platzierungsbaum: teilt die Teilnehmer in Sieger (hoehere Plaetze)
+        // und Verlierer (niedrigere Plaetze), bis jeder Platzbereich 2 Plaetze umfasst.
+        // sources = array von {from, loser} (Quelle + ob Sieger/Verlierer dieser Quelle).
+        // rounds = flache Liste von Match-Runden (wird befuellt); matches tragen placeHigh/placeLow.
+        function tpBuildPlacementTree(ko, high, low, sources, rounds) {
+            const n = sources.length;
+            if (n < 2) return;
+            // Eine Runde: paare die Quellen
+            const matches = [];
+            for (let i = 0; i < n; i += 2) {
+                const id = `pl_${high}_${low}_s${ko._plSeq++}`;
+                matches.push({ id, round: rounds.length, aId: null, bId: null, sets: null, done: false, running: false, table: null,
+                    aFrom: sources[i] ? sources[i].from : null, aFromLoser: sources[i] ? sources[i].loser : false,
+                    bFrom: sources[i + 1] ? sources[i + 1].from : null, bFromLoser: sources[i + 1] ? sources[i + 1].loser : false,
+                    placeHigh: high, placeLow: low });
+            }
+            rounds.push(matches);
+            if (matches.length === 1) {
+                // Einziges Spiel: Sieger = high, Verlierer = low. Fertig.
+                matches[0].decidesHigh = high; matches[0].decidesLow = low;
+                return;
+            }
+            // Sieger steigen in obere Haelfte, Verlierer in untere Haelfte
+            const winnerSrc = matches.map(m => ({ from: m.id, loser: false }));
+            const loserSrc = matches.map(m => ({ from: m.id, loser: true }));
+            const mid = Math.floor((high + low) / 2);
+            tpBuildPlacementTree(ko, high, mid, winnerSrc, rounds);
+            tpBuildPlacementTree(ko, mid + 1, low, loserSrc, rounds);
+        }
+        function tpKoAllMatches(ko) {
+            const arr = [];
+            ko.rounds.forEach(rd => rd.forEach(m => arr.push(m)));
+            if (ko.third) arr.push(ko.third);
+            (ko.placement || []).forEach(pl => pl.rounds.forEach(rd => rd.forEach(m => arr.push(m))));
+            return arr;
+        }
         function tpKoResolveByes(ko) {
             ko.rounds[0].forEach(m => {
-                if (m.aId && !m.bId) { m._byeWinner = m.aId; }
-                else if (!m.aId && m.bId) { m._byeWinner = m.bId; }
+                if (m.aId && !m.bId) m._byeWinner = m.aId;
+                else if (!m.aId && m.bId) m._byeWinner = m.bId;
             });
             tpKoPropagate(ko);
         }
-        // Advance winners into later rounds based on done matches / byes.
+        // Sieger in Folge-Runden setzen; Verlierer in Platzierungsbaeume setzen.
         function tpKoPropagate(ko) {
-            const byId = {}; ko.rounds.flat().forEach(m => byId[m.id] = m);
+            const byId = {}; tpKoAllMatches(ko).forEach(m => byId[m.id] = m);
+            // Hauptbaum: Sieger weiter
             for (let r = 0; r < ko.rounds.length; r++) {
                 ko.rounds[r].forEach(m => {
                     const w = tpKoWinnerOf(m);
-                    // propagate to next
                     const next = ko.rounds[r + 1] && ko.rounds[r + 1].find(x => x.aFrom === m.id || x.bFrom === m.id);
-                    if (next) {
-                        if (next.aFrom === m.id) next.aId = w;
-                        if (next.bFrom === m.id) next.bId = w;
-                    }
+                    if (next) { if (next.aFrom === m.id) next.aId = w; if (next.bFrom === m.id) next.bId = w; }
                 });
             }
-            // auto-bye at later rounds (a filled, b null & b's source done w/ null)
-            // Platz 3: Verlierer der beiden Halbfinals
-            if (ko.rounds.length >= 2) {
+            // Platzierungsbaeume
+            (ko.placement || []).forEach(pl => {
+                pl.rounds.forEach((rd, lr) => {
+                    rd.forEach(m => {
+                        // Quellen aufloesen (Verlierer bei Level 0, sonst Sieger der Vorrunde)
+                        if (m.aFrom && byId[m.aFrom]) m.aId = m.aFromLoser ? tpKoLoserOf(byId[m.aFrom]) : tpKoWinnerOf(byId[m.aFrom]);
+                        if (m.bFrom && byId[m.bFrom]) m.bId = m.bFromLoser ? tpKoLoserOf(byId[m.bFrom]) : tpKoWinnerOf(byId[m.bFrom]);
+                    });
+                });
+            });
+            // Einfaches K.o.: Platz-3-Spiel = Verlierer der Halbfinals
+            if (!ko.de && ko.third && ko.rounds.length >= 2) {
                 const semis = ko.rounds[ko.rounds.length - 2];
-                if (semis.length === 2) {
-                    ko.third.aId = tpKoLoserOf(semis[0]);
-                    ko.third.bId = tpKoLoserOf(semis[1]);
-                }
+                if (semis.length === 2) { ko.third.aId = tpKoLoserOf(semis[0]); ko.third.bId = tpKoLoserOf(semis[1]); }
+            }
+            // top4-Doppel-K.o.: Platz-3-Spiel ebenfalls aus Halbfinal-Verlierern
+            if (ko.de && ko.scope === 'top4' && ko.third && ko.rounds.length >= 2) {
+                const semis = ko.rounds[ko.rounds.length - 2];
+                if (semis.length === 2) { ko.third.aId = tpKoLoserOf(semis[0]); ko.third.bId = tpKoLoserOf(semis[1]); }
             }
         }
         function tpKoWinnerOf(m) {
@@ -5043,7 +5172,8 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                 (comp.groupMatches || []).forEach(g => g.forEach(m => { total++; if (m.done) played++; }));
                 if (comp.ko) {
                     comp.ko.rounds.forEach(r => r.forEach(m => { if (!m._byeWinner && (m.aId || m.bId) || m.round === 0) { total++; if (m.done || m._byeWinner) played++; } }));
-                    if (comp.ko.allPlaces !== false && comp.ko.third && (comp.ko.third.aId || comp.ko.third.bId)) { total++; if (comp.ko.third.done) played++; }
+                    if (comp.ko.third && (comp.ko.third.aId || comp.ko.third.bId)) { total++; if (comp.ko.third.done) played++; }
+                    (comp.ko.placement || []).forEach(pl => pl.rounds.forEach(r => r.forEach(m => { if (!m._byeWinner && (m.aId || m.bId)) { total++; if (m.done) played++; } })));
                 }
                 totAll += total; totDone += played;
                 const pct = total ? Math.round(played / total * 100) : 0;
@@ -5116,8 +5246,15 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                     html += `<div class="tp-section-card">
                         <h4>🏆 KO-Runde</h4>`;
                     if (!comp.ko) {
+                        const advance = comp.mode.advance || 2;
+                        const baseCount = comp.groups.length * advance;
+                        const def = TP.defaultKoSize(baseCount);
                         html += `<p class="tp-help">${allGroupsDone ? 'Alle Gruppen abgeschlossen.' : 'Gruppen noch nicht fertig – Tableau kann vorbereitet, Spiele erst nach Gruppenende gestartet werden.'}</p>
-                        <button class="btn btn-emerald" onclick="tpFillKo('${k}')">📥 KO-Tableau befüllen</button>`;
+                        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+                          <div class="tp-field" style="max-width:200px;"><label>Größe des KO-Tableaus</label>${tpKoSizeSelect('tp-kosize-' + k, def)}</div>
+                          <button class="btn btn-emerald" onclick="tpFillKo('${k}')">📥 KO-Tableau befüllen</button>
+                        </div>
+                        <p class="tp-help">Default ${def} (so, dass alle ${comp.groups.length}×${advance} Qualifizierten Platz finden).</p>`;
                     } else {
                         html += tpRenderKo(k, comp) + `<div style="margin-top:8px;"><button class="btn btn-sand" onclick="tpResetKo('${k}')">↻ KO-Tableau neu befüllen</button></div>`;
                     }
@@ -5214,11 +5351,9 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                 });
             });
             const baseCount = quals.length;
-            let size = comp.mode.allPlaces ? TP.defaultKoSize(baseCount) : TP.defaultKoSize(baseCount);
-            const def = TP.defaultKoSize(baseCount);
-            const inp = prompt(`Größe des KO-Tableaus?\nQualifiziert: ${baseCount} (${comp.groups.length} Gruppen × ${advance}).\nDefault: ${def}.`, def);
-            if (inp === null) return;
-            size = parseInt(inp, 10); if (!(size >= 2) || (size & (size - 1)) !== 0) { alert('Bitte eine Zweierpotenz angeben (2,4,8,16,...).'); return; }
+            const sel = document.getElementById('tp-kosize-' + k);
+            let size = sel ? +sel.value : TP.defaultKoSize(baseCount);
+            if (!(size >= 2) || (size & (size - 1)) !== 0) { alert('Bitte eine Zweierpotenz wählen (2–64).'); return; }
             // Auffüllen mit nächstbesten, falls Tableau größer als Qualifikanten
             let field = quals.slice();
             if (field.length < size && comp.mode.fillBest) {
@@ -5226,44 +5361,110 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                 while (field.length < size && extras.length) field.push(extras.shift());
             }
             const { slots } = TP.buildKoBracket(field, size);
-            comp.ko = tpMakeKo(slots, comp.mode.allPlaces);
+            comp.ko = tpMakeKo(slots, tpModePlaceValue(comp.mode));
             tpMark(); tpRenderLive();
+        }
+        // Liefert false (einfaches K.o.) oder 'full'/'top4' (Doppel-K.o.)
+        function tpModePlaceValue(mode) { return mode.allPlaces ? (mode.placeScope === 'top4' ? 'top4' : 'full') : false; }
+        // Dropdown mit 2er-Potenzen 2..64, Default vorausgewählt.
+        function tpKoSizeSelect(id, def) {
+            const sizes = [2, 4, 8, 16, 32, 64];
+            const opts = sizes.map(s => `<option value="${s}"${s === def ? ' selected' : ''}>${s}er-Tableau</option>`).join('');
+            return `<select id="${id}">${opts}</select>`;
         }
         function tpResetKo(k) { if (confirm('KO-Tableau verwerfen und neu befüllen? Eingetragene KO-Ergebnisse gehen verloren.')) { T.comps[k].ko = null; tpMark(); tpRenderLive(); } }
         function tpSeedOf(k, comp, id) { const i = comp.entrants.indexOf(id); const e = comp.entrants.map(eid => ({ id: eid, lpz: k === 'doubles' ? tpTeamLpz(T.doubles.teams.find(t => t.id === eid)) : (+(T.players.find(p => p.id === eid) || {}).lpz || 0) })); e.sort((a, b) => b.lpz - a.lpz); return e.findIndex(x => x.id === id) + 1; }
 
         // ------------- KO rendern -------------
+        function tpRoundTitle(idxFromEnd, nTotal) {
+            const names = ['Finale', 'Halbfinale', 'Viertelfinale', 'Achtelfinale'];
+            if (idxFromEnd < names.length) return names[idxFromEnd];
+            return `Runde ${nTotal - idxFromEnd}`;
+        }
         function tpRenderKo(k, comp) {
-            const ko = comp.ko; const names = ['Finale', 'Halbfinale', 'Viertelfinale', 'Achtelfinale', 'Runde 1'];
-            const n = ko.rounds.length;
-            let html = '<div class="tp-ko">';
+            const ko = comp.ko; const n = ko.rounds.length;
+            const koStarted = tpKoAllMatches(ko).some(m => m.done || m.running);
+            let html = '';
+            // Manuelles Setzen vor Start
+            if (!koStarted) {
+                html += `<div class="tp-ok-note" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;"><span>✏️ Tableau anpassbar: zwei Startplätze wählen und tauschen, bis die KO-Runde startet.</span><button class="btn btn-sand" style="padding:4px 10px;" onclick="tpKoSwapApply('${k}')">⇄ Gewählte Plätze tauschen (${_koSwap.length}/2)</button></div>`;
+            }
+            html += `<div style="font-weight:800;margin:6px 0;color:var(--emerald-dark);">🏆 Gewinnerbaum</div>`;
+            html += '<div class="tp-ko">';
             ko.rounds.forEach((round, r) => {
-                const fromEnd = n - 1 - r;
-                const title = names[fromEnd] || `Runde ${r + 1}`;
-                html += `<div class="tp-ko-round"><h5>${title}</h5>`;
-                round.forEach(m => { html += tpKoMatchBox(k, m); });
+                html += `<div class="tp-ko-round"><h5>${tpRoundTitle(n - 1 - r, n)}</h5>`;
+                round.forEach((m, mi) => { html += tpKoMatchBox(k, m, (r === 0 && !koStarted) ? (m.id + ':a') : null, (r === 0 && !koStarted) ? (m.id + ':b') : null); });
                 html += `</div>`;
             });
             html += '</div>';
-            // Platz 3
-            if (ko.allPlaces !== false && ko.third && (ko.third.aId || ko.third.bId)) {
+            // Einfaches K.o.: Spiel um Platz 3
+            if (!ko.de && ko.third && (ko.third.aId || ko.third.bId)) {
                 html += `<div style="margin-top:10px;"><h5 style="font-weight:800;color:var(--amber);">Spiel um Platz 3</h5>${tpKoMatchBox(k, ko.third)}</div>`;
+            }
+            // Doppel-K.o. top4: Platz-3-Spiel
+            if (ko.de && ko.scope === 'top4' && ko.third && (ko.third.aId || ko.third.bId)) {
+                html += `<div style="margin-top:10px;"><h5 style="font-weight:800;color:var(--amber);">Spiel um Platz 3</h5>${tpKoMatchBox(k, ko.third)}</div>`;
+            }
+            // Doppel-K.o. full: Verliererbaum / Platzierungsrunden
+            if (ko.de && ko.scope === 'full' && (ko.placement || []).length) {
+                html += `<div style="font-weight:800;margin:16px 0 6px;color:var(--amber);">🥈 Verliererbaum – Platzierungsrunden</div>`;
+                ko.placement.forEach(pl => {
+                    html += `<div class="tp-section-card" style="margin-bottom:10px;"><h5 style="font-weight:800;margin:0 0 6px;">${pl.label}</h5>`;
+                    if (pl.single) { html += `<p class="tp-help">${tpEsc(tpLabel(k, tpKoLoserOf(pl.single) || ''))} erhält diesen Platz direkt.</p>`; }
+                    else {
+                        html += '<div class="tp-ko">';
+                        pl.rounds.forEach((round) => {
+                            // Titel aus dem Platzbereich der Matches dieser Runde ableiten
+                            const spans = round.map(m => m.decidesHigh != null ? `um Platz ${m.decidesHigh}/${m.decidesLow}` : `Plätze ${m.placeHigh}–${m.placeLow}`);
+                            const uniq = [...new Set(spans)];
+                            html += `<div class="tp-ko-round"><h5>${uniq.join(' / ')}</h5>`;
+                            round.forEach(m => { html += tpKoMatchBox(k, m); });
+                            html += `</div>`;
+                        });
+                        html += '</div>';
+                    }
+                    html += `</div>`;
+                });
             }
             return html;
         }
-        function tpKoMatchBox(k, m) {
+        // slotA/slotB: wenn gesetzt, sind die Slots in Runde 0 vor Start klickbar zum Tauschen.
+        function tpKoMatchBox(k, m, slotA, slotB) {
             const w = tpKoWinnerOf(m);
-            function slot(id, from) {
-                if (!id) return `<div class="tp-ko-slot bye">${from ? 'Sieger ' + tpRoundShort(from) : '—'}</div>`;
+            function slot(id, from, slotKey) {
+                const selCls = slotKey && _koSwap.includes(slotKey) ? ' style="outline:2px solid var(--emerald-dark);border-radius:5px;"' : '';
+                const clickAttr = slotKey ? ` onclick="event.stopPropagation();tpKoSwapPick('${slotKey}')"` : '';
+                if (!id) return `<div class="tp-ko-slot bye"${selCls}${clickAttr}>${from ? 'Sieger' : '—'}</div>`;
                 const win = w && w === id;
-                return `<div class="tp-ko-slot${win ? ' winner' : ''}">${tpEsc(tpLabel(k, id))}</div>`;
+                return `<div class="tp-ko-slot${win ? ' winner' : ''}"${selCls}${clickAttr}>${tpEsc(tpLabel(k, id))}</div>`;
             }
+            // Inline-Sätze
             let score = '';
-            if (m.done && m.sets) { const v = TP.validateResult(m.sets, T.winSets, T.winPts); score = `<div style="text-align:center;font-weight:800;color:var(--emerald-dark);font-size:11px;">${v.setsA}:${v.setsB}</div>`; }
+            if (m.done && m.sets) {
+                const v = TP.validateResult(m.sets, T.winSets, T.winPts);
+                const setStr = m.sets.map(s => s[0] + ':' + s[1]).join(', ');
+                score = `<div style="text-align:center;font-weight:800;color:var(--emerald-dark);font-size:11px;">${v.setsA}:${v.setsB}</div><div style="text-align:center;font-size:9.5px;color:#64748b;">${setStr}</div>`;
+            }
             else if (m._byeWinner) score = `<div style="text-align:center;font-size:10px;color:#94a3b8;">Freilos</div>`;
-            else if (m.running) score = `<div style="text-align:center;font-size:10px;color:var(--amber);">läuft</div>`;
-            const clickable = tpKoPlayable(m) && !m._byeWinner;
-            return `<div class="tp-ko-match" ${clickable ? `onclick="tpOpenMatch('${k}','${m.id}')"` : ''}>${slot(m.aId, m.aFrom)}${score}${slot(m.bId, m.bFrom)}</div>`;
+            else if (m.running) score = `<div style="text-align:center;font-size:10px;color:var(--amber);">läuft${m.table ? ' · Tisch ' + m.table : ''}</div>`;
+            const clickable = tpKoPlayable(m) && !m._byeWinner && !slotA;
+            return `<div class="tp-ko-match" ${clickable ? `onclick="tpOpenMatch('${k}','${m.id}')"` : ''}>${slot(m.aId, m.aFrom, slotA)}${score}${slot(m.bId, m.bFrom, slotB)}</div>`;
+        }
+        // Manuelles Tauschen von Startplätzen
+        let _koSwap = [];
+        function tpKoSwapPick(slotKey) { const i = _koSwap.indexOf(slotKey); if (i >= 0) _koSwap.splice(i, 1); else if (_koSwap.length < 2) _koSwap.push(slotKey); tpRenderLive(); }
+        function tpKoSwapApply(k) {
+            if (_koSwap.length !== 2) { alert('Bitte genau zwei Startplätze wählen.'); return; }
+            const ko = T.comps[k].ko;
+            function ref(key) { const [mid, side] = key.split(':'); const m = ko.rounds[0].find(x => x.id === mid); return { m, side }; }
+            const a = ref(_koSwap[0]), b = ref(_koSwap[1]);
+            if (!a.m || !b.m) { _koSwap = []; return; }
+            const va = a.side === 'a' ? a.m.aId : a.m.bId;
+            const vb = b.side === 'a' ? b.m.aId : b.m.bId;
+            if (a.side === 'a') a.m.aId = vb; else a.m.bId = vb;
+            if (b.side === 'a') b.m.aId = va; else b.m.bId = va;
+            _koSwap = [];
+            tpKoResolveByes(ko); tpMark(); tpRenderLive();
         }
         function tpRoundShort(id) { return ''; }
 
@@ -5275,10 +5476,15 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                 if (!final || !final.done) return null;
                 const first = tpKoWinnerOf(final), second = tpKoLoserOf(final);
                 let thirds = [];
-                if (ko.allPlaces !== false && ko.third && ko.third.done) { thirds = [tpKoWinnerOf(ko.third)]; }
+                if (ko.de && ko.scope === 'full') {
+                    // Platz 3/4 kommt aus der Platzierungsrunde mit placeHigh===3
+                    const pl3 = (ko.placement || []).find(pl => pl.placeHigh === 3);
+                    if (pl3 && pl3.rounds.length) { const fin = pl3.rounds[pl3.rounds.length - 1][0]; if (fin && fin.done) thirds = [tpKoWinnerOf(fin)]; }
+                    else { const semis = ko.rounds[ko.rounds.length - 2]; if (semis) thirds = semis.map(s => tpKoLoserOf(s)).filter(Boolean); }
+                } else if (ko.third && ko.third.done) { thirds = [tpKoWinnerOf(ko.third)]; }
                 else { const semis = ko.rounds[ko.rounds.length - 2]; if (semis) thirds = semis.map(s => tpKoLoserOf(s)).filter(Boolean); }
                 if (!first) return null;
-                return { kind: k, first, second, thirds };
+                return { kind: k, first, second, thirds, placements: tpKoFullPlacements(k, ko) };
             }
             // Round-robin: einzige Gruppe, alle gespielt
             if (comp.mode.type === 'round-robin') {
@@ -5294,13 +5500,18 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             const club = id => id ? tpEsc(tpClub(p.kind, id)) : '';
             let thirdsHtml = (p.thirds || []).filter(Boolean).map(id =>
                 `<div class="tp-podium-col"><div class="tp-podium-block tp-podium-3"><div class="tp-podium-rank">🥉</div><div class="tp-podium-name">${name(id)}</div><div class="tp-podium-club">${club(id)}</div></div></div>`).join('');
+            let fullList = '';
+            if (p.placements && p.placements.length) {
+                const rows = p.placements.map(r => `<tr><td style="text-align:right;width:40px;"><b>${r.place}.</b></td><td style="text-align:left;">${name(r.id)}</td><td style="text-align:left;font-size:11px;color:#64748b;">${club(r.id)}</td></tr>`).join('');
+                fullList = `<details style="margin-top:12px;text-align:left;"><summary style="cursor:pointer;font-weight:700;color:var(--emerald-dark);font-size:12.5px;">📋 Vollständige Platzierung (Platz 1–N)</summary><table class="tp-table" style="margin-top:6px;"><tbody>${rows}</tbody></table></details>`;
+            }
             return `<div class="tp-section-card" style="text-align:center;">
                 <h4>🏅 Siegertreppchen</h4>
                 <div class="tp-podium">
                     <div class="tp-podium-col"><div class="tp-podium-block tp-podium-2"><div class="tp-podium-rank">🥈</div><div class="tp-podium-name">${name(p.second)}</div><div class="tp-podium-club">${club(p.second)}</div></div></div>
                     <div class="tp-podium-col"><div class="tp-podium-block tp-podium-1"><div class="tp-podium-rank">🥇</div><div class="tp-podium-name">${name(p.first)}</div><div class="tp-podium-club">${club(p.first)}</div></div></div>
                     ${thirdsHtml}
-                </div></div>`;
+                </div>${fullList}</div>`;
         }
 
         // =====================================================================
@@ -5311,8 +5522,30 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             const comp = T.comps[k]; if (!comp) return null;
             let found = null;
             (comp.groupMatches || []).forEach(g => g.forEach(m => { if (m.id === mid) found = m; }));
-            if (comp.ko) { comp.ko.rounds.forEach(r => r.forEach(m => { if (m.id === mid) found = m; })); if (comp.ko.third && comp.ko.third.id === mid) found = comp.ko.third; }
+            if (comp.ko) {
+                comp.ko.rounds.forEach(r => r.forEach(m => { if (m.id === mid) found = m; }));
+                if (comp.ko.third && comp.ko.third.id === mid) found = comp.ko.third;
+                (comp.ko.placement || []).forEach(pl => pl.rounds.forEach(r => r.forEach(m => { if (m.id === mid) found = m; })));
+            }
             return found;
+        }
+        // Vollständige Platzierungsliste (Doppel-K.o. full) für Podium/Export.
+        function tpKoFullPlacements(k, ko) {
+            if (!ko.de || ko.scope !== 'full') return null;
+            const res = [];
+            const final = ko.rounds[ko.rounds.length - 1][0];
+            if (final && final.done) { res.push({ place: 1, id: tpKoWinnerOf(final) }); res.push({ place: 2, id: tpKoLoserOf(final) }); }
+            (ko.placement || []).forEach(pl => {
+                if (pl.single) { res.push({ place: pl.placeHigh, id: tpKoLoserOf(pl.single) }); return; }
+                // Jedes End-Spiel des Baums vergibt zwei benachbarte Plätze (decidesHigh/Low).
+                pl.rounds.forEach(rd => rd.forEach(m => {
+                    if (m.decidesHigh != null && m.done) {
+                        res.push({ place: m.decidesHigh, id: tpKoWinnerOf(m) });
+                        res.push({ place: m.decidesLow, id: tpKoLoserOf(m) });
+                    }
+                }));
+            });
+            return res.filter(r => r.id).sort((a, b) => a.place - b.place);
         }
         function tpOpenMatch(k, mid) {
             const m = tpFindMatch(k, mid); if (!m) return;
@@ -5383,29 +5616,88 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         }
 
         // ------------------- Speichern / Laden -------------------
+        // Modell: alle Turniere liegen als Map {id -> turnier} sowohl lokal (localStorage)
+        // als auch in EINER Drive-Datei (kind=turnier). Speichern schreibt beide,
+        // Laden fuehrt Drive + lokal zusammen (neuester _savedAt gewinnt). So gehen
+        // keine Daten verloren und Turniere erscheinen auf jedem Rechner.
         function tpReadStore() { try { return JSON.parse(localStorage.getItem(TP_LS_KEY) || '{}'); } catch (e) { return {}; } }
         function tpWriteStore(s) { localStorage.setItem(TP_LS_KEY, JSON.stringify(s)); }
-        function tpSaveLocal(silent) {
+        function tpDriveReady() { return TP_DRIVE_URL && TP_DRIVE_URL.startsWith('https://script.google.com/'); }
+
+        // Lokal speichern (immer, sofort) und danach in Drive sichern (wenn konfiguriert).
+        async function tpSaveLocal(silent) {
             if (!T) { if (!silent) alert('Kein Turnier aktiv.'); return; }
             tpBindMeta();
             if (!T.name) T.name = 'Turnier ' + new Date().toLocaleDateString('de-DE');
             const s = tpReadStore(); s[T.id] = JSON.parse(JSON.stringify(T)); s[T.id]._savedAt = Date.now();
             tpWriteStore(s); tpDirty = false;
-            const hint = document.getElementById('tp-save-hint'); if (hint) { hint.textContent = '💾 gespeichert ' + new Date().toLocaleTimeString('de-DE'); }
-            if (!silent) return true;
+            tpSetSaveHint('💾 lokal gespeichert ' + new Date().toLocaleTimeString('de-DE'));
+            // Immer auch in Drive sichern, damit andere Rechner den Stand sehen.
+            await tpPushToDrive(s);
+            return true;
         }
-        function tpOpenLoad() {
-            const s = tpReadStore(); const ids = Object.keys(s);
+        function tpSetSaveHint(txt) { const h = document.getElementById('tp-save-hint'); if (h) h.textContent = txt; }
+
+        // Gesamte Turnier-Map in die Drive-Datei (kind=turnier) schreiben.
+        async function tpPushToDrive(store) {
+            if (!tpDriveReady()) return false;
+            try {
+                tpSetSaveHint('☁️ sichere in Drive …');
+                const res = await fetch(TP_DRIVE_URL, { method: 'POST', redirect: 'follow',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({ kind: 'turnier', tournaments: store || tpReadStore() }) });
+                // Apps-Script-Antwort pruefen (bei altem Script evtl. anders)
+                let ok = res.ok;
+                try { const j = await res.json(); if (j && j.ok === false) ok = false; } catch (e) {}
+                tpSetSaveHint(ok ? ('☁️ in Drive gesichert ' + new Date().toLocaleTimeString('de-DE'))
+                                 : '⚠️ Drive-Script antwortet unerwartet – lokal gesichert. (Apps Script aktualisieren)');
+                return ok;
+            } catch (e) { tpSetSaveHint('⚠️ Drive nicht erreichbar – lokal gesichert.'); return false; }
+        }
+        // Manueller Button „In Drive sichern“
+        async function tpSaveToDrive() {
+            if (!T) { alert('Kein Turnier aktiv.'); return; }
+            await tpSaveLocal(true);
+            if (!tpDriveReady()) alert('Kein Google-Drive-Endpoint konfiguriert (CONFIG.pinnwandCloudUrl). Es wurde lokal gespeichert.');
+        }
+
+        // Turniere aus Drive holen (Map). Toleriert altes Einzel-Format {kind:'turnier',tournament:{}}.
+        async function tpFetchDrive() {
+            if (!tpDriveReady()) return {};
+            try {
+                const res = await fetch(TP_DRIVE_URL + '?kind=turnier&t=' + Date.now(), { method: 'GET', redirect: 'follow' });
+                if (!res.ok) return {};
+                const j = await res.json();
+                if (!j) return {};
+                if (j.tournaments && typeof j.tournaments === 'object') return j.tournaments;
+                if (j.tournament && j.tournament.id) { const m = {}; m[j.tournament.id] = j.tournament; return m; } // altes Format
+                return {};
+            } catch (e) { return {}; }
+        }
+        // Lokal + Drive zusammenfuehren (neuester _savedAt gewinnt). Schreibt Ergebnis lokal zurueck.
+        async function tpMergeStores() {
+            const local = tpReadStore();
+            const drive = await tpFetchDrive();
+            const merged = Object.assign({}, local);
+            Object.keys(drive).forEach(id => {
+                if (!merged[id] || (drive[id]._savedAt || 0) >= (merged[id]._savedAt || 0)) merged[id] = drive[id];
+            });
+            tpWriteStore(merged);
+            return merged;
+        }
+
+        async function tpOpenLoad() {
             const listEl = document.getElementById('tp-load-list');
-            if (!ids.length) { listEl.innerHTML = '<p class="tp-help">Keine gespeicherten Turniere gefunden.</p>'; }
-            else {
-                ids.sort((a, b) => (s[b]._savedAt || 0) - (s[a]._savedAt || 0));
-                listEl.innerHTML = ids.map(id => {
-                    const t = s[id];
-                    return `<div class="tp-match"><span class="tp-match-names" style="cursor:pointer;" onclick="tpLoadTournament('${id}')">${tpEsc(t.name || id)}${t.date ? ' · ' + t.date : ''}<br><span class="tp-help">${t.players ? t.players.length : 0} Spieler · gespeichert ${t._savedAt ? new Date(t._savedAt).toLocaleString('de-DE') : '?'}</span></span><span style="display:flex;gap:6px;"><button class="tp-mini-btn" style="background:var(--emerald-dark);color:#fff;" onclick="tpLoadTournament('${id}')">Laden</button><button class="tp-mini-btn tp-mini-del" onclick="tpDeleteSaved('${id}')">✕</button></span></div>`;
-                }).join('');
-            }
+            listEl.innerHTML = '<p class="tp-help">⏳ Lade lokale und Drive-Turniere …</p>';
             document.getElementById('tp-load-modal').classList.add('open');
+            const s = await tpMergeStores();
+            const ids = Object.keys(s);
+            if (!ids.length) { listEl.innerHTML = '<p class="tp-help">Keine gespeicherten Turniere gefunden (weder lokal noch in Drive).</p>'; return; }
+            ids.sort((a, b) => (s[b]._savedAt || 0) - (s[a]._savedAt || 0));
+            listEl.innerHTML = `<p class="tp-help">${tpDriveReady() ? '☁️ Lokal + Google Drive zusammengeführt.' : 'Nur lokal (kein Drive konfiguriert).'}</p>` + ids.map(id => {
+                const t = s[id];
+                return `<div class="tp-match"><span class="tp-match-names" style="cursor:pointer;" onclick="tpLoadTournament('${id}')">${tpEsc(t.name || id)}${t.date ? ' · ' + t.date : ''}<br><span class="tp-help">${t.players ? t.players.length : 0} Spieler · gespeichert ${t._savedAt ? new Date(t._savedAt).toLocaleString('de-DE') : '?'}</span></span><span style="display:flex;gap:6px;"><button class="tp-mini-btn" style="background:var(--emerald-dark);color:#fff;" onclick="tpLoadTournament('${id}')">Laden</button><button class="tp-mini-btn tp-mini-del" onclick="tpDeleteSaved('${id}')">✕</button></span></div>`;
+            }).join('');
         }
         function tpCloseLoad() { document.getElementById('tp-load-modal').classList.remove('open'); }
         function tpLoadTournament(id) {
@@ -5414,19 +5706,11 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             T = JSON.parse(JSON.stringify(s[id])); tpDirty = false; tpCloseLoad();
             if (T.started) tpRenderLive(); else tpRenderMetaPanel();
         }
-        function tpDeleteSaved(id) { if (!confirm('Dieses gespeicherte Turnier löschen?')) return; const s = tpReadStore(); delete s[id]; tpWriteStore(s); tpOpenLoad(); }
-
-        // ------------------- Google Drive (via Apps-Script-Endpoint) -------------------
-        async function tpSaveToDrive() {
-            tpSaveLocal(true);
-            if (!TP_DRIVE_URL || !TP_DRIVE_URL.startsWith('https://script.google.com/')) { alert('Kein Google-Drive-Endpoint konfiguriert. Lokal gespeichert.'); return; }
-            const hint = document.getElementById('tp-save-hint'); if (hint) hint.textContent = '☁️ sende an Drive …';
-            try {
-                await fetch(TP_DRIVE_URL, { method: 'POST', redirect: 'follow',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({ kind: 'turnier', tournament: T }) });
-                if (hint) hint.textContent = '☁️ in Drive gesichert ' + new Date().toLocaleTimeString('de-DE');
-            } catch (e) { if (hint) hint.textContent = '⚠️ Drive-Sync fehlgeschlagen (lokal gespeichert).'; }
+        async function tpDeleteSaved(id) {
+            if (!confirm('Dieses gespeicherte Turnier löschen (lokal und in Drive)?')) return;
+            const s = tpReadStore(); delete s[id]; tpWriteStore(s);
+            await tpPushToDrive(s); // Drive-Map ohne das geloeschte Turnier neu schreiben
+            tpOpenLoad();
         }
 
         // ------------------- Beende-Warnung (Datenverlust vermeiden) -------------------
@@ -5482,8 +5766,11 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                     tpRenderPlayerTable();
                 });
             });
-            // Autosave alle 30s falls dirty
+            // Autosave alle 30s falls dirty (lokal + Drive)
             setInterval(() => { if (T && tpDirty) tpSaveLocal(true); }, 30000);
+            // Beim Start Drive + lokal zusammenfuehren, damit auf jedem Rechner
+            // die anderswo gespeicherten Turniere verfuegbar sind.
+            if (tpDriveReady()) { tpMergeStores().catch(() => {}); }
         }
 
         // ---- Turnierplaner Boot ----
