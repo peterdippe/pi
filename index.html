@@ -5383,17 +5383,26 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         }
         function tpRenderKo(k, comp) {
             const ko = comp.ko; const n = ko.rounds.length;
-            const koStarted = tpKoAllMatches(ko).some(m => m.done || m.running);
+            // Swap-Phase läuft, solange das Tableau nicht per Button „gestartet“ wurde
+            // UND noch kein Ergebnis eingetragen ist. tpKoStart() beendet sie.
+            const koPlayed = tpKoAllMatches(ko).some(m => m.done || m.running);
+            const swapPhase = !ko.locked && !koPlayed;
             let html = '';
-            // Manuelles Setzen vor Start
-            if (!koStarted) {
-                html += `<div class="tp-ok-note" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;"><span>✏️ Tableau anpassbar: zwei Startplätze wählen und tauschen, bis die KO-Runde startet.</span><button class="btn btn-sand" style="padding:4px 10px;" onclick="tpKoSwapApply('${k}')">⇄ Gewählte Plätze tauschen (${_koSwap.length}/2)</button></div>`;
+            if (swapPhase) {
+                html += `<div class="tp-ok-note" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+                    <span>✏️ <b>Setz-Phase:</b> Startplätze zum Tauschen anklicken (zwei wählen → tauschen). Danach „KO-Runde starten“.</span>
+                    <span style="display:flex;gap:6px;">
+                      <button class="btn btn-sand" style="padding:4px 10px;" onclick="tpKoSwapApply('${k}')">⇄ Plätze tauschen (${_koSwap.length}/2)</button>
+                      <button class="btn btn-emerald" style="padding:4px 12px;" onclick="tpKoStart('${k}')">▶️ KO-Runde starten</button>
+                    </span></div>`;
+            } else {
+                html += `<div class="tp-help" style="margin-bottom:6px;">KO-Runde läuft – auf eine Ansetzung klicken, um Tisch/Ergebnis einzutragen. <button class="btn btn-sand" style="padding:2px 8px;font-size:11px;" onclick="tpKoUnlock('${k}')">✏️ Setzung erneut ändern</button></div>`;
             }
             html += `<div style="font-weight:800;margin:6px 0;color:var(--emerald-dark);">🏆 Gewinnerbaum</div>`;
             html += '<div class="tp-ko">';
             ko.rounds.forEach((round, r) => {
                 html += `<div class="tp-ko-round"><h5>${tpRoundTitle(n - 1 - r, n)}</h5>`;
-                round.forEach((m, mi) => { html += tpKoMatchBox(k, m, (r === 0 && !koStarted) ? (m.id + ':a') : null, (r === 0 && !koStarted) ? (m.id + ':b') : null); });
+                round.forEach((m, mi) => { html += tpKoMatchBox(k, m, (r === 0 && swapPhase) ? (m.id + ':a') : null, (r === 0 && swapPhase) ? (m.id + ':b') : null); });
                 html += `</div>`;
             });
             html += '</div>';
@@ -5465,6 +5474,19 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             if (b.side === 'a') b.m.aId = va; else b.m.bId = va;
             _koSwap = [];
             tpKoResolveByes(ko); tpMark(); tpRenderLive();
+        }
+        // KO-Runde starten: Setz-Phase beenden -> Spiele werden anklickbar/startbar.
+        function tpKoStart(k) {
+            const ko = T.comps[k].ko; if (!ko) return;
+            if (!confirm('KO-Runde starten? Die Setzung wird fixiert – du kannst sie später bei Bedarf wieder öffnen.')) return;
+            ko.locked = true; _koSwap = []; tpMark(); tpRenderLive();
+        }
+        // Setzung erneut ändern (nur solange noch kein KO-Ergebnis eingetragen ist).
+        function tpKoUnlock(k) {
+            const ko = T.comps[k].ko; if (!ko) return;
+            const played = tpKoAllMatches(ko).some(m => m.done || m.running);
+            if (played) { alert('Es sind bereits KO-Spiele eingetragen – die Setzung lässt sich nicht mehr ändern. („KO-Tableau neu befüllen“ verwirft dagegen alles.)'); return; }
+            ko.locked = false; tpMark(); tpRenderLive();
         }
         function tpRoundShort(id) { return ''; }
 
