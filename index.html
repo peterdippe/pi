@@ -1851,11 +1851,15 @@
             <div class="sand-card">
                 <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px;">
                     <div>
-                        <span class="eyebrow-dark">Saison 2026/27 · Punktspielbetrieb · Tabellen, Bilanzen & Spielpläne</span>
+                        <span id="tt-saison-eyebrow" class="eyebrow-dark">Saison 2026/27 · Punktspielbetrieb · Tabellen, Bilanzen & Spielpläne</span>
                         <h3 style="font-size:23px; font-weight:800;">🏅 Mannschaften des TSV Graupa</h3>
                     </div>
                     <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
-                        <span id="tt-live-sync-badge" class="badge" style="background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; font-size:11.5px; padding:5px 10px;">✓ Datenstand Saison 2026</span>
+                        <label style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; color:var(--text-dark);">
+                            📅 Saison:
+                            <select id="tt-saison-select" class="form-input" style="width:auto; padding:5px 10px; font-weight:700; cursor:pointer;" onchange="changeTTSaison(this.value)"></select>
+                        </label>
+                        <span id="tt-live-sync-badge" class="badge" style="background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; font-size:11.5px; padding:5px 10px;">Lade Saison …</span>
                         <a id="tt-team-direct-link" href="https://dresden.tischtennislive.de/?L1=Public&L2=Verein&L2P=870&Page=Spielbetrieb&Sportart=96&Page2=Tabellen&Saison=2026" target="_blank" rel="noopener" class="btn btn-dark" style="padding:7px 12px; font-size:12px;">
                             Original in TischtennisLive öffnen ↗
                         </a>
@@ -6149,14 +6153,41 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             { channel: 'Adam Bobrow', title: 'The Snake, Around the Net & Crazy Exhibition Points!', url: 'https://www.youtube.com/@AdamBobrow/videos', badge: '⚡ Viral TT' }
         ];
 
+        let ttCurrentSaison = '2026';  // Standard: aktuelle Saison
         let ttTeamsList = [];          // Wird live aus der TTLive-Übersichtsseite (L2P=870) befüllt
         let ttTeamDetailsCache = {};   // Cache: teamId -> geparste Detaildaten der Mannschaft
         let activeGraupaTeamId = null;
         let ttHubInitialized = false;
 
+        function initTTSaisonSelect() {
+            const sel = document.getElementById('tt-saison-select');
+            if (!sel || sel.children.length > 0) return;
+            const years = [];
+            for (let y = 2026; y >= 2009; y--) {
+                const nextShort = String(y + 1).slice(-2);
+                years.push(`<option value="${y}"${y === 2026 ? ' selected' : ''}>${y}/${nextShort}</option>`);
+            }
+            sel.innerHTML = years.join('');
+        }
+
+        function changeTTSaison(newSaison) {
+            ttCurrentSaison = String(newSaison);
+            ttTeamsList = [];
+            ttTeamDetailsCache = {};
+            activeGraupaTeamId = null;
+
+            const eb = document.getElementById('tt-saison-eyebrow');
+            if (eb) {
+                eb.textContent = `Saison ${newSaison}/${String(+newSaison + 1).slice(-2)} · Punktspielbetrieb · Tabellen, Bilanzen & Spielpläne`;
+            }
+
+            loadAllGraupaTeamsFromTTLive(false);
+        }
+
         function initTTHubIfNeeded() {
             if (!ttHubInitialized) {
                 ttHubInitialized = true;
+                initTTSaisonSelect();  // <--- Hier einfügen
                 renderTTNewsAndVideos(DEFAULT_TT_NEWS, DEFAULT_TT_VIDEOS);
                 loadTTNewsFeed(false);
                 loadAllGraupaTeamsFromTTLive(false);
@@ -6246,7 +6277,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             if (cloudUrl && cloudUrl.startsWith('https://script.google.com/')) {
                 try {
                     const gasUrl = kind === 'overview'
-                        ? `${cloudUrl}?kind=tt_overview&saison=2026${forceRefresh ? '&force=1' : ''}&t=${Date.now()}`
+                        ? `${cloudUrl}?kind=tt_overview&saison=${ttCurrentSaison}${forceRefresh ? '&force=1' : ''}&t=${Date.now()}`
                         : `${cloudUrl}?kind=tt_team&url=${encodeURIComponent(targetUrl)}&t=${Date.now()}`;
                     const res = await fetch(gasUrl, { redirect: 'follow' });
                     if (res.ok) {
@@ -6316,13 +6347,13 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                 return;
             }
             ttTeamsList = parsedTeams;
-            try { localStorage.setItem('dippe_tt_overview_v1', JSON.stringify(ttTeamsList)); } catch (e) {}
+            try { localStorage.setItem('dippe_tt_overview_' + ttCurrentSaison, JSON.stringify(ttTeamsList)); } catch (e) {}
             const cloudUrl = (CONFIG.pinnwandCloudUrl || '').trim();
             if (cloudUrl) {
                 fetch(cloudUrl, {
                     method: 'POST', redirect: 'follow',
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({ kind: 'tt_save_cache', key: 'overview_2026', html: pasted })
+                    body: JSON.stringify({ kind: 'tt_save_cache', key: 'overview_' + ttCurrentSaison, html: pasted })
                 }).catch(() => {});
             }
             activeGraupaTeamId = ttTeamsList[0].id;
@@ -6335,11 +6366,20 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             const cont = document.getElementById('tt-team-content');
             if (forceRefresh) ttTeamDetailsCache = {};
 
-            // Lokalen Browser-Cache sofort (0 ms) anzeigen, falls vorhanden
+            initTTSaisonSelect();
+            const saisonLabel = `${ttCurrentSaison}/${String(+ttCurrentSaison + 1).slice(-2)}`;
+            const saisonCacheKey = 'overview_' + ttCurrentSaison;
+            const overviewUrl = `https://dresden.tischtennislive.de/?L1=Public&L2=Verein&L2P=870&Page=Spielbetrieb&Sportart=96&Page2=Tabellen&Saison=${ttCurrentSaison}`;
+
+            // Direktlink oben rechts auf gewählte Saison anpassen
+            const directLink = document.getElementById('tt-team-direct-link');
+            if (directLink) directLink.href = overviewUrl;
+
+            // 1. Lokalen Browser-Cache pro Saison sofort (0 ms) anzeigen, falls vorhanden
             if (!ttTeamsList.length && !forceRefresh) {
                 try {
-                    const cachedOverview = localStorage.getItem('dippe_tt_overview_v1');
-                    const cachedDetails = localStorage.getItem('dippe_tt_details_v1');
+                    const cachedOverview = localStorage.getItem('dippe_tt_overview_' + ttCurrentSaison);
+                    const cachedDetails = localStorage.getItem('dippe_tt_details_' + ttCurrentSaison);
                     if (cachedOverview) {
                         const parsedCache = JSON.parse(cachedOverview);
                         if (Array.isArray(parsedCache) && parsedCache.length) {
@@ -6348,40 +6388,46 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                             activeGraupaTeamId = ttTeamsList[0].id;
                             renderGraupaTeamTabs();
                             selectGraupaTeamTab(activeGraupaTeamId);
+
+                            // Abgeschlossene Archiv-Saisons (< 2026) sind fertig geladen -> kein Neu-Abruf nötig!
+                            if (Number(ttCurrentSaison) < 2026) {
+                                setTTLiveSyncBadge(`⚡ Archiv ${saisonLabel} (${ttTeamsList.length} Mannschaften)`, '#e0f2fe', '#0369a1');
+                                return;
+                            }
                         }
                     }
                 } catch (e) {}
             }
 
-            setTTLiveSyncBadge('⏳ Synchronisiere live mit TischtennisLive …', '#fef3c7', '#92400e');
+            setTTLiveSyncBadge(`⏳ Lade Saison ${saisonLabel} …`, '#fef3c7', '#92400e');
             if (cont && !ttTeamsList.length) {
                 cont.innerHTML = `<div class="tp-section-card" style="grid-column:1/-1; text-align:center; padding:28px;">
                     <div style="font-size:28px; margin-bottom:8px;">🏓</div>
-                    <h4 style="font-size:18px; font-weight:800;">Lade alle Mannschaften & Liga-Tabellen des TSV Graupa live …</h4>
-                    <p class="tp-help" style="margin-top:6px;">Quelle: dresden.tischtennislive.de (Verein 870 · Saison 2026)</p>
+                    <h4 style="font-size:18px; font-weight:800;">Lade TSV Graupa Saison ${saisonLabel} …</h4>
+                    <p class="tp-help" style="margin-top:6px;">Quelle: dresden.tischtennislive.de (Verein 870 · Saison ${ttCurrentSaison})</p>
                 </div>`;
             }
 
             try {
-                const result = await fetchTTLiveHtmlCascade('overview', TTLIVE_OVERVIEW_URL, 'overview_2026', forceRefresh);
+                const result = await fetchTTLiveHtmlCascade('overview', overviewUrl, saisonCacheKey, forceRefresh);
                 const parsedTeams = parseTTLiveOverviewHtml(result.html);
                 if (!parsedTeams.length) throw new Error('Keine Graupa-Tabellen im HTML gefunden');
 
                 ttTeamsList = parsedTeams;
-                try { localStorage.setItem('dippe_tt_overview_v1', JSON.stringify(ttTeamsList)); } catch (e) {}
+                try { localStorage.setItem('dippe_tt_overview_' + ttCurrentSaison, JSON.stringify(ttTeamsList)); } catch (e) {}
 
                 if (!activeGraupaTeamId || !ttTeamsList.some(t => t.id === activeGraupaTeamId)) {
                     activeGraupaTeamId = ttTeamsList[0].id;
                 }
 
                 const timeStr = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-                setTTLiveSyncBadge(`☁️ ${result.source} (${ttTeamsList.length} Mannschaften · ${timeStr})`, '#d1fae5', '#065f46');
+                setTTLiveSyncBadge(`☁️ ${result.source} · Saison ${saisonLabel} (${ttTeamsList.length} Teams · ${timeStr})`, '#d1fae5', '#065f46');
                 renderGraupaTeamTabs();
                 selectGraupaTeamTab(activeGraupaTeamId);
             } catch (err) {
                 console.warn('Live-Abruf Hinweis:', err);
                 if (ttTeamsList.length) {
-                    setTTLiveSyncBadge(`⚡ Gespeicherter Live-Stand (${ttTeamsList.length} Mannschaften)`, '#e0f2fe', '#0369a1');
+                    setTTLiveSyncBadge(`⚡ Gespeicherter Stand ${saisonLabel} (${ttTeamsList.length} Mannschaften)`, '#e0f2fe', '#0369a1');
                 } else {
                     setTTLiveSyncBadge('⚠️ TTLive Bot-Weiche aktiv', '#fee2e2', '#b91c1c');
                     if (cont) {
@@ -6392,8 +6438,8 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                                 Stelle sicher, dass das aktualisierte Google Apps Script als <b>Neue Version</b> bereitgestellt ist, oder übernimm die Tabellen per 1-Klick-Sync direkt in dein Google Drive:
                             </p>
                             <div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap;">
-                                <a href="${TTLIVE_OVERVIEW_URL}" target="_blank" rel="noopener" class="btn btn-amber">
-                                    🏓 1. TTLive-Tabellen öffnen ↗
+                                <a href="${overviewUrl}" target="_blank" rel="noopener" class="btn btn-amber">
+                                    🏓 1. TTLive-Tabellen (${saisonLabel}) öffnen ↗
                                 </a>
                                 <button class="btn btn-emerald" onclick="loadAllGraupaTeamsFromTTLive(true)">
                                     🔄 2. Erneut automatisch abrufen
@@ -6407,7 +6453,6 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                 }
             }
         }
-
         /**
          * Parst die Vereins-Tabellen-Seite (Page2=Tabellen) von tischtennislive.de:
          * Findet jede Liga-Tabelle, extrahiert den Liganamen, alle Tabellenzeilen
@@ -6609,16 +6654,16 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
 
             try {
                 const l3p = (team.teamUrl.match(/L3P=(\d+)/i) || [])[1] || teamId;
-                const result = await fetchTTLiveHtmlCascade('team', team.teamUrl, 'team_' + l3p, false);
+                const result = await fetchTTLiveHtmlCascade('team', team.teamUrl, 'team_' + l3p + '_' + ttCurrentSaison, false);
                 const details = parseTTLiveTeamDetailHtml(result.html, '');
                 ttTeamDetailsCache[teamId] = details;
-                try { localStorage.setItem('dippe_tt_details_v1', JSON.stringify(ttTeamDetailsCache)); } catch (e) {}
+                try { localStorage.setItem('dippe_tt_details_' + ttCurrentSaison, JSON.stringify(ttTeamDetailsCache)); } catch (e) {}
 
                 if (details.headerTitle) {
                     const cleanSub = details.headerTitle.replace(/^TSV\s+Graupa\s*[,·-]?\s*/i, '').trim();
                     if (cleanSub) {
                         team.tabName = cleanSub;
-                        try { localStorage.setItem('dippe_tt_overview_v1', JSON.stringify(ttTeamsList)); } catch (e) {}
+                        try { localStorage.setItem('dippe_tt_overview_' + ttCurrentSaison, JSON.stringify(ttTeamsList)); } catch (e) {}
                         renderGraupaTeamTabs();
                     }
                 }
