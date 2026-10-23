@@ -1,0 +1,1447 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>π | Peters Page</title>
+    <link rel="icon" type="image/jpeg" href="Skorpion.jpg">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Zentrales Stylesheet -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <!-- Zentrale Konfiguration -->
+    <script src="js/config.js"></script>
+
+    <!-- MOBILE HEADER -->
+    <div class="mobile-bar">
+        <div style="display:flex; align-items:center; gap:10px;">
+            <div class="brand-logo" style="width:34px; height:34px;">
+                <img src="Pi-vektor.jpg" alt="π" onerror="if(!this.dataset.low){this.dataset.low='1';this.src='pi-vektor.jpg';}else{this.outerHTML='<span style=\'color:#122620;font-weight:800;\'>π</span>';}">
+            </div>
+            <strong class="font-display" style="font-size:17px;">Pi @ Dippe-Sippe</strong>
+        </div>
+        <button class="btn btn-sand" style="padding:7px 13px; font-size:13px;" onclick="toggleSidebar()">Menü ☰</button>
+    </div>
+
+    <!-- SEITENLEISTE (SIDEBAR) -->
+    <aside id="sidebar" class="sidebar">
+        <div>
+            <div class="brand-box">
+                <div class="brand-logo">
+                    <img src="Pi-vektor.jpg" alt="π" onerror="if(!this.dataset.low){this.dataset.low='1';this.src='pi-vektor.jpg';}else{this.outerHTML='<span style=\'color:#122620;font-weight:800;font-size:22px;\'>π</span>';}">
+                </div>
+                <div>
+                    <div class="brand-title">Pi @ Dippe-Sippe</div>
+                    <div class="brand-sub">⚡ Mathe · Geo · Sport · Vibe</div>
+                </div>
+            </div>
+
+            <nav class="nav-list">
+                <button onclick="switchPage('home')" id="nav-home" class="nav-btn active">
+                    <span>🏠 Home</span>
+                </button>
+
+                <button onclick="toggleNavGroup('familie')" id="nav-familie" class="nav-btn">
+                    <span>⚡ π's Kosmos & Cloud</span>
+                    <span id="caret-familie" class="nav-caret">▸</span>
+                </button>
+                <div class="sub-nav" id="subnav-group-familie">
+                    <button onclick="switchPage('pinnwand')" id="subnav-pinnwand" class="sub-nav-btn">
+                        <span>📌 π's Pinnwand</span>
+                    </button>
+                    <button onclick="switchPage('fotos')" id="subnav-fotos" class="sub-nav-btn">
+                        <span>📸 Fotos & Cloud</span>
+                        <span id="lock-indicator">🔒</span>
+                    </button>
+                </div>
+
+                <button onclick="toggleNavGroup('sport')" id="nav-sport" class="nav-btn">
+                    <span>🏅 Sport-Ecke</span>
+                    <span id="caret-sport" class="nav-caret">▸</span>
+                </button>
+                <div class="sub-nav" id="subnav-group-sport">
+                    <button onclick="switchPage('tischtennis')" id="subnav-tischtennis" class="sub-nav-btn">
+                        <span>🏓 Tischtennis</span>
+                    </button>
+                    <button onclick="switchPage('zaehlboard')" id="subnav-zaehlboard" class="sub-nav-btn">
+                        <span>🔢 Digitales Zählboard</span>
+                    </button>
+                    <button onclick="switchPage('turnierplaner')" id="subnav-turnierplaner" class="sub-nav-btn">
+                        <span>🏆 Turnierplaner</span>
+                    </button>
+                    <button onclick="switchPage('radfahren')" id="subnav-radfahren" class="sub-nav-btn">
+                        <span>🚴 Fahrradfahren</span>
+                    </button>
+                    <button onclick="switchPage('wandern')" id="subnav-wandern" class="sub-nav-btn">
+                        <span>🥾 Wanderungen</span>
+                    </button>
+                </div>
+
+                <button onclick="toggleNavGroup('maptools')" id="nav-maptools" class="nav-btn">
+                    <span>🗺️ Map-Tools</span>
+                    <span id="caret-maptools" class="nav-caret">▸</span>
+                </button>
+                <div class="sub-nav" id="subnav-group-maptools">
+                    <button onclick="switchPage('area-maps')" id="subnav-area-maps" class="sub-nav-btn">
+                        <span>🌍 Maps Math</span>
+                    </button>
+                    <button onclick="switchPage('dominanz')" id="subnav-dominanz" class="sub-nav-btn">
+                        <span>⛰️ Berg-Dominanz-Atlas</span>
+                    </button>
+                    <button onclick="switchPage('luftlinie')" id="subnav-luftlinie" class="sub-nav-btn">
+                        <span>✈️ Luftlinien-Entfernung</span>
+                    </button>
+                    <button onclick="switchPage('area-pur')" id="subnav-area-pur" class="sub-nav-btn">
+                        <span>📏 Pure Math</span>
+                    </button>
+                </div>
+
+                <button onclick="toggleNavGroup('spiele')" id="nav-spiele" class="nav-btn">
+                    <span>🎮 Spiele-Ecke</span>
+                    <span id="caret-spiele" class="nav-caret">▸</span>
+                </button>
+                <div class="sub-nav" id="subnav-group-spiele">
+                    <button onclick="switchPage('tetris')" id="subnav-tetris" class="sub-nav-btn">
+                        <span>🧱 Tetris</span>
+                    </button>
+                    <button onclick="switchPage('minesweeper')" id="subnav-minesweeper" class="sub-nav-btn">
+                        <span>💣 Minesweeper</span>
+                    </button>
+                    <button onclick="switchPage('snake')" id="subnav-snake" class="sub-nav-btn">
+                        <span>🐍 Snake</span>
+                    </button>
+                </div>
+
+                <button onclick="toggleNavGroup('rechtliches')" id="nav-rechtliches" class="nav-btn">
+                    <span>⚖️ Rechtliches</span>
+                    <span id="caret-rechtliches" class="nav-caret">▸</span>
+                </button>
+                <div class="sub-nav" id="subnav-group-rechtliches">
+                    <button onclick="switchPage('impressum')" id="subnav-impressum" class="sub-nav-btn">
+                        <span>📄 Impressum</span>
+                    </button>
+                </div>
+            </nav>
+        </div>
+
+        <div class="sidebar-footer">
+            <div style="font-weight:700; color:#34d399;">● pi.dippe-sippe.de</div>
+            <div style="color:var(--text-muted); margin-top:4px;">Basecamp Graupa · Pirna</div>
+        </div>
+    </aside>
+
+    <!-- HAUPTBEREICH -->
+    <main class="main-content">
+
+        <!-- ===============================================================
+             1. HOME SEITE (PETERS PERSÖNLICHE SPIELWIESE)
+             =============================================================== -->
+        <section id="page-home" class="page-section active">
+            <div class="hero-card">
+                <div class="hero-grid">
+                    <div>
+                        <span class="eyebrow">π = 3.14159265… · Peters digitales Labor & Basecamp</span>
+                        <h2 class="hero-title">
+                            Sport, Geographie, Mathe & <span class="highlight-grad">Vibe-Coding</span>.
+                        </h2>
+                        <p style="color:var(--text-muted); font-size:15.2px; line-height:1.65; margin-bottom:0;">
+                            Willkommen auf meiner persönlichen Spielwiese! Hier treffen meine Leidenschaften aufeinander: Tischtennis mit 8 Ecken, Gravel- und Rennradtouren, Wanderungen durch die Sächsische Schweiz, topografische Karten-Experimente, angewandte Mathematik und handgemachtes Vibe-Coding.
+                        </p>
+                        <div class="vibe-pills">
+                            <button class="vibe-pill" onclick="switchPage('tischtennis')">🏓 Tischtennis</button>
+                            <button class="vibe-pill" onclick="switchPage('radfahren')">🚴 Fahrradfahren</button>
+                            <button class="vibe-pill" onclick="switchPage('wandern')">🥾 Wanderungen</button>
+                            <button class="vibe-pill" onclick="switchPage('dominanz')">⛰️ Geographie & Gipfel</button>
+                            <button class="vibe-pill" onclick="switchPage('area-maps')">📐 Mathe-Spielereien</button>
+                            <button class="vibe-pill" onclick="switchPage('pinnwand')">📌 π's Pinnwand</button>
+                            <button class="vibe-pill" onclick="switchPage('tetris')">🕹️ Arcade & Highscores</button>
+                        </div>
+                    </div>
+
+                    <div class="pi-telemetry-card">
+                        <div class="pi-watermark">π</div>
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; position:relative; z-index:1;">
+                            <div>
+                                <span class="eyebrow" style="margin-bottom:2px;">Live-Status · System π</span>
+                                <h3 style="font-size:20px; font-weight:800; color:#fff;">Peters Themen-Radar</h3>
+                            </div>
+                            <span class="badge" style="background:rgba(16,185,129,0.2); color:#34d399; border:1px solid rgba(52,211,153,0.4); font-size:11px; padding:4px 9px;">v3.14 aktiv</span>
+                        </div>
+                        <div class="telemetry-grid">
+                            <div class="telemetry-item">
+                                <div class="telemetry-label">🏓 Tischtennis</div>
+                                <div class="telemetry-val">Spin, Tempo & Punktspiel</div>
+                            </div>
+                            <div class="telemetry-item">
+                                <div class="telemetry-label">🚴 Gravel & Road</div>
+                                <div class="telemetry-val">Titan, Wachs & Höhenmeter</div>
+                            </div>
+                            <div class="telemetry-item">
+                                <div class="telemetry-label">🥾 Outdoor-Revier</div>
+                                <div class="telemetry-val">Elbsandstein & Gipfel</div>
+                            </div>
+                            <div class="telemetry-item">
+                                <div class="telemetry-label">💻 Vibe-Coding</div>
+                                <div class="telemetry-val">Welzl, Geodäsie & Games</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="home-bottom-grid">
+                <div class="sand-card">
+                    <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px;">
+                        <div>
+                            <span class="eyebrow-dark">Basecamp & Startpunkt für Touren</span>
+                            <h3 style="font-size:21px; font-weight:800;" id="home-loc-title">📍 Emil-Gast-Straße 4, 01796 Pirna</h3>
+                        </div>
+                        <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
+                            <label style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; white-space:nowrap;">
+                                🗺️ <select id="home-layer-select" class="form-input" style="width:auto; min-width:155px; max-width:210px; padding:6px 10px;" onchange="setHomeLayer(this.value)"></select>
+                            </label>
+                            <a id="home-route-link" href="#" target="_blank" rel="noopener" class="btn btn-dark" style="padding:8px 14px; font-size:12px;">
+                                Größere Karte & Route ↗
+                            </a>
+                        </div>
+                    </div>
+                    <div id="osm-map"></div>
+                </div>
+
+                <div style="display:flex; flex-direction:column; gap:20px;">
+                    <div class="hero-card" style="margin-bottom:0; padding:22px; flex:1; display:flex; flex-direction:column; justify-content:space-between;">
+                        <div>
+                            <span class="eyebrow">🏅 Action & Bewegung</span>
+                            <h3 style="font-size:21px; font-weight:800; margin-bottom:8px;">Die neue Sport-Ecke</h3>
+                            <p style="color:var(--text-muted); font-size:13.8px; line-height:1.55;">
+                                Vom Tischtennis-Zählgerät für die Halle über den Gravel-Steigungsrechner bis zur Tourenplanung in der Sächsischen Schweiz.
+                            </p>
+                        </div>
+                        <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-top:14px;">
+                            <button class="btn btn-amber" style="padding:9px 8px; font-size:12.5px;" onclick="switchPage('tischtennis')">🏓 TT</button>
+                            <button class="btn btn-emerald" style="padding:9px 8px; font-size:12.5px;" onclick="switchPage('radfahren')">🚴 Rad</button>
+                            <button class="btn btn-sand" style="padding:9px 8px; font-size:12.5px;" onclick="switchPage('wandern')">🥾 Wandern</button>
+                        </div>
+                    </div>
+
+                    <div class="sand-card" style="flex:1; display:flex; flex-direction:column; justify-content:space-between;">
+                        <div>
+                            <span class="eyebrow-dark">Geographie, Mathe & Ideen</span>
+                            <h3 style="font-size:21px; font-weight:800; margin-bottom:6px;">🗺️ Map-Tools & π's Pinnwand</h3>
+                            <p style="font-size:13.5px; line-height:1.55; opacity:0.9;">
+                                Berechne Polygone und kleinste Umkreise nach Welzl, klicke dich über den <b>Berg-Dominanz-Atlas</b> bis zum Mount Everest oder halte Projekte auf <b>π's Pinnwand</b> fest.
+                            </p>
+                        </div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:14px;">
+                            <button class="btn btn-dark" onclick="switchPage('dominanz')">⛰️ Berg-Atlas</button>
+                            <button class="btn btn-emerald" onclick="switchPage('pinnwand')">📌 π's Pinnwand</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ===============================================================
+             2. FOTOS & CLOUD (PASSWORTGESCHÜTZT)
+             =============================================================== -->
+        <section id="page-fotos" class="page-section">
+            <div class="section-header">
+                <div>
+                    <span class="eyebrow">Privatbereich</span>
+                    <h2 style="font-size:32px; font-weight:800;">Familienfotos & Cloud-Alben</h2>
+                </div>
+                <button id="logout-btn" class="btn btn-amber hidden" onclick="lockPhotos()">🔒 Bereich wieder sperren</button>
+            </div>
+
+            <div id="foto-login-gate" class="sand-card" style="max-width:460px; margin:40px auto; text-align:center;">
+                <div style="font-size:42px; margin-bottom:10px;">🔐</div>
+                <h3 style="font-size:24px; font-weight:800;">Passwortgeschützter Bereich</h3>
+                <p style="font-size:14px; margin:8px 0 20px; opacity:0.85;">
+                    Bitte gib das Familien-Passwort ein, um unsere Ordner auf Google Drive und OneDrive freizuschalten.
+                </p>
+                <form onsubmit="unlockPhotos(event)" style="display:flex; flex-direction:column; gap:12px;">
+                    <input type="password" id="foto-password-input" placeholder="Passwort eingeben..."
+                           style="padding:12px; border-radius:12px; border:1px solid var(--border-sand); font-size:15px; text-align:center;">
+                    <div id="foto-error-msg" class="hidden" style="color:#dc2626; font-size:13px; font-weight:700;">
+                        Falsches Passwort! Bitte versuche es erneut.
+                    </div>
+                    <button type="submit" class="btn btn-emerald" style="width:100%;">Alben freischalten</button>
+                </form>
+            </div>
+
+            <div id="foto-content" class="hidden">
+                <div id="alben-grid" class="grid-3"></div>
+            </div>
+        </section>
+
+
+        <!-- ===============================================================
+             3. INTERAKTIVE FAMILIEN-PINNWAND (CLOUD-SYNC MIT GOOGLE DRIVE)
+             =============================================================== -->
+        <section id="page-pinnwand" class="page-section">
+            <div class="section-header">
+                <div>
+                    <span class="eyebrow">Projekte, Notizen, Links, Bilder & Ideen</span>
+                    <h2 style="font-size:32px; font-weight:800;">📌 π's Pinnwand</h2>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
+                    <span id="pinnwand-sync-status" class="pin-sync-pill">💾 Lokal gespeichert</span>
+                    <button class="btn btn-sand" style="padding:7px 12px; font-size:12px;" onclick="loadPinnwandFromCloud(true)" title="Aktuellsten Stand aus Google Drive abrufen">🔄 Aktualisieren</button>
+                    <button class="btn btn-emerald" onclick="openNewPinnwandPostForm()">➕ Neuer Beitrag / Bild</button>
+                    <button class="btn btn-amber" onclick="togglePinnwandForm('cat')">📁 Neue Kategorie</button>
+                </div>
+            </div>
+
+            <!-- Formular: Neue Kategorie erstellen -->
+            <div id="pinnwand-cat-form" class="sand-card hidden" style="margin-bottom:20px;">
+                <h3 style="font-size:19px; font-weight:800; margin-bottom:12px;">📁 Neue Pinnwand-Kategorie anlegen</h3>
+                <div style="display:flex; flex-wrap:wrap; gap:10px;">
+                    <input type="text" id="new-cat-icon" class="form-input" style="width:90px;" placeholder="Emoji 🎿" value="🌟">
+                    <input type="text" id="new-cat-name" class="form-input" style="flex:1; min-width:200px;" placeholder="Name der Kategorie (z.B. Garten & Projekte, Urlaubsplanung...)">
+                    <button class="btn btn-emerald" onclick="addPinnwandCategory()">Kategorie speichern</button>
+                    <button class="btn btn-dark" onclick="togglePinnwandForm(null)">Abbrechen</button>
+                </div>
+            </div>
+
+            <!-- Formular: Neuer / Bearbeiteter Pinnwand-Beitrag mit Bild-Einbettung & Datei -->
+            <div id="pinnwand-post-form" class="sand-card hidden" style="margin-bottom:20px;">
+                <h3 id="pin-form-heading" style="font-size:20px; font-weight:800; margin-bottom:14px;">➕ Neuen Pinnwand-Eintrag hinzufügen</h3>
+                <div class="grid-2" style="gap:14px; margin-bottom:14px;">
+                    <div>
+                        <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Kategorie wählen:</label>
+                        <select id="pin-cat-select" class="form-input"></select>
+                    </div>
+                    <div>
+                        <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Titel des Eintrags:</label>
+                        <input type="text" id="pin-title" class="form-input" placeholder="z.B. Großes Sippen-Treffen / Omas Eierschecke">
+                    </div>
+                </div>
+                <div style="margin-bottom:14px;">
+                    <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Beschreibung / Notiz (Tipp: Du kannst hier auch direkt per Strg+V ein Bild aus der Zwischenablage einfügen!):</label>
+                    <textarea id="pin-desc" class="form-input" rows="4" placeholder="Text, Termin-Details, Anleitung, Zutaten oder Infos..."></textarea>
+                </div>
+                <div class="grid-2" style="gap:14px; margin-bottom:14px;">
+                    <div>
+                        <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">🖼️ Bild hochladen (von Festplatte/Handy) oder Bild-URL / Dateiname:</label>
+                        <input type="file" id="pin-img-input" accept="image/*" class="form-input" onchange="previewPinnwandImage(event)" style="margin-bottom:8px;">
+                        <input type="text" id="pin-img-url" class="form-input" placeholder="Oder Bild-Link / Dateiname im Repo (z.B. foto.jpg)..." oninput="previewPinnwandImageUrl(this.value)">
+                    </div>
+                    <div>
+                        <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">📎 Weiterführender Datei- oder Cloud-Link (optional, z.B. PDF, GPX, Drive):</label>
+                        <input type="text" id="pin-file-link" class="form-input" placeholder="https://... oder Dateiname im GitHub-Ordner" style="margin-bottom:8px;">
+                        <div id="pin-img-preview-box" class="hidden" style="background:var(--bg-sand-light); border:1px solid var(--border-sand); border-radius:10px; padding:8px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                            <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+                                <img id="pin-img-preview" src="" alt="Vorschau" style="height:48px; width:64px; object-fit:cover; border-radius:6px; border:1px solid var(--border-sand);">
+                                <span style="font-size:12px; font-weight:600; color:var(--emerald-dark);">Bild eingebettet ✓</span>
+                            </div>
+                            <button type="button" class="btn btn-dark" style="padding:5px 10px; font-size:11.5px;" onclick="clearPinnwandImage()">Bild entfernen ✕</button>
+                        </div>
+                    </div>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:10px;">
+                    <button id="pin-submit-btn" class="btn btn-emerald" onclick="savePinnwandPost()">💾 Speichern</button>
+                    <button class="btn btn-dark" onclick="togglePinnwandForm(null)">Abbrechen</button>
+                </div>
+            </div>
+
+            <!-- Kategorie-Filterleiste -->
+            <div id="pinnwand-categories-bar" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:22px;"></div>
+
+            <!-- Pinnwand-Karten Grid -->
+            <div id="pinnwand-grid" class="grid-3"></div>
+
+            <!-- Lightbox-Modal für vergrößerte Pinnwand-Bilder -->
+            <div class="modal-overlay" id="pin-lightbox-modal" onclick="closePinLightbox()">
+                <div style="max-width:92vw; max-height:90vh; position:relative; text-align:center;" onclick="event.stopPropagation()">
+                    <img id="pin-lightbox-img" src="" alt="Vollbild" style="max-width:92vw; max-height:82vh; border-radius:16px; border:3px solid var(--bg-sand); box-shadow:0 24px 60px rgba(0,0,0,0.65); object-fit:contain; background:#091512;">
+                    <div style="margin-top:10px; display:flex; justify-content:center; gap:12px; align-items:center;">
+                        <span id="pin-lightbox-caption" style="color:#fff; font-weight:700; font-size:15px;"></span>
+                        <button class="btn btn-amber" style="padding:6px 14px; font-size:12.5px;" onclick="closePinLightbox()">Schließen ✕</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===============================================================
+             3b. SPORT-ECKE (1): TISCHTENNIS (NEWSFEED, VIDEOS & TSV GRAUPA)
+             =============================================================== -->
+        <section id="page-tischtennis" class="page-section">
+            <div class="section-header">
+                <div>
+                    <span class="eyebrow">Sport-Ecke · News, Szene-Videos & TSV Graupa Spielbetrieb</span>
+                    <h2 style="font-size:32px; font-weight:800;">🏓 Tischtennis</h2>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    <button class="btn btn-emerald" onclick="switchPage('tischtennis')">🏓 Tischtennis</button>
+                    <button class="btn btn-sand" onclick="switchPage('zaehlboard')">🔢 Digitales Zählboard</button>
+                    <button class="btn btn-sand" onclick="switchPage('turnierplaner')">🏆 Turnierplaner</button>
+                    <button class="btn btn-sand" onclick="switchPage('radfahren')">🚴 Fahrradfahren</button>
+                    <button class="btn btn-sand" onclick="switchPage('wandern')">🥾 Wanderungen</button>
+                </div>
+            </div>
+
+            <!-- OBERES DRITTEL: NEWSFEED, YOUTUBE-HYPE & VEREINS-STREIFEN -->
+            <div class="tt-top-strip">
+                <!-- 1. Aktueller Tischtennis-Newsfeed -->
+                <div class="tt-feed-card">
+                    <div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                            <span class="eyebrow">📰 Szene-Ticker & Portale</span>
+                            <button class="btn btn-sand" style="padding:3px 9px; font-size:11px;" onclick="loadTTNewsFeed(true)">🔄 Live-Update</button>
+                        </div>
+                        <h3 style="font-size:18px; font-weight:800; color:#fff; margin-top:2px;">Aktuelle Tischtennis-News</h3>
+                        <div id="tt-news-container" class="tt-news-list"></div>
+                    </div>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08);">
+                        <a href="https://www.mytischtennis.de/public/home/" target="_blank" rel="noopener" class="badge" style="text-decoration:none;">myTischtennis.de ↗</a>
+                        <a href="https://www.tt-news.de/" target="_blank" rel="noopener" class="badge" style="text-decoration:none;">TT-News.de ↗</a>
+                        <a href="https://worldtabletennis.com/" target="_blank" rel="noopener" class="badge" style="text-decoration:none;">WTT World Tour ↗</a>
+                        <a href="https://www.tischtennis.de/" target="_blank" rel="noopener" class="badge" style="text-decoration:none;">DTTB ↗</a>
+                    </div>
+                </div>
+
+                <!-- 2. Meistgehypte & neueste YouTube-Videos -->
+                <div class="tt-feed-card">
+                    <div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                            <span class="eyebrow">🔥 YouTube · Highlights & Rallies</span>
+                            <span class="badge" style="background:rgba(239,68,68,0.2); color:#fca5a5;">▶ Video-Stream</span>
+                        </div>
+                        <h3 style="font-size:18px; font-weight:800; color:#fff; margin-top:2px;">Trending Tischtennis-Videos</h3>
+                        <div id="tt-yt-container" class="tt-yt-grid"></div>
+                    </div>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08);">
+                        <a href="https://www.youtube.com/@WTTGlobal/videos" target="_blank" rel="noopener" class="badge" style="text-decoration:none;">▶ WTT Global ↗</a>
+                        <a href="https://www.youtube.com/@TableTennisDaily/videos" target="_blank" rel="noopener" class="badge" style="text-decoration:none;">▶ TableTennisDaily ↗</a>
+                        <a href="https://www.youtube.com/@tischtennisdeutschland/videos" target="_blank" rel="noopener" class="badge" style="text-decoration:none;">▶ TT-Deutschland ↗</a>
+                    </div>
+                </div>
+
+                <!-- 3. TSV Graupa Abteilungs-Zentrale & Quick-Links -->
+                <div class="tt-feed-card" style="background:linear-gradient(150deg, rgba(9,21,18,0.95), rgba(5,150,105,0.28));">
+                    <div>
+                        <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
+                            <div class="cybershape-badge" style="width:48px; height:48px; font-size:22px;">🏓</div>
+                            <div>
+                                <span class="eyebrow" style="margin:0;">Abteilung Tischtennis</span>
+                                <h3 style="font-size:19px; font-weight:800; color:#fff;">TSV Graupa e.V.</h3>
+                            </div>
+                        </div>
+                        <p style="font-size:12.8px; color:var(--text-muted); line-height:1.55; margin-bottom:12px;">
+                            Rund 100 aktive Mitglieder und 12 gemeldete Mannschaften im Spielbetrieb von der Landesklasse bis zum Nachwuchs. Heimspiele in der Turnhalle Grundschule Graupa (Badstr. 3).
+                        </p>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:7px;">
+                        <a href="https://www.tsv-graupa.de/index.php?s=Tischtennis&c=TT_Start" target="_blank" rel="noopener" class="btn btn-amber" style="width:100%; justify-content:space-between;">
+                            <span>🏠 Offizielle TSV-Graupa TT-Seite</span><span>↗</span>
+                        </a>
+                        <a href="https://dresden.tischtennislive.de/?L1=Public&L2=Verein&L2P=870&Page=Spielbetrieb&Sportart=96&Page2=Tabellen&Saison=2026" target="_blank" rel="noopener" class="btn btn-emerald" style="width:100%; justify-content:space-between;">
+                            <span>📊 TischtennisLive · Verein (870)</span><span>↗</span>
+                        </a>
+                        <button class="btn btn-sand" style="width:100%; justify-content:space-between;" onclick="switchPage('zaehlboard')">
+                            <span>🔢 Zum Digitalen Hallen-Zählboard</span><span>→</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- UNTERER HAUPTBEREICH: ALLE MANNSCHAFTEN DES TSV GRAUPA (SAISON 2026/27) -->
+            <div class="sand-card">
+                <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px;">
+                    <div>
+                        <span id="tt-saison-eyebrow" class="eyebrow-dark">Saison 2026/27 · Punktspielbetrieb · Tabellen, Bilanzen & Spielpläne</span>
+                        <h3 style="font-size:23px; font-weight:800;">🏅 Mannschaften des TSV Graupa</h3>
+                    </div>
+                    <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
+                        <label style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; color:var(--text-dark);">
+                            📅 Saison:
+                            <select id="tt-saison-select" class="form-input" style="width:auto; padding:5px 10px; font-weight:700; cursor:pointer;" onchange="changeTTSaison(this.value)"></select>
+                        </label>
+                        <span id="tt-live-sync-badge" class="badge" style="background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; font-size:11.5px; padding:5px 10px;">Lade Saison …</span>
+                        <a id="tt-team-direct-link" href="https://dresden.tischtennislive.de/?L1=Public&L2=Verein&L2P=870&Page=Spielbetrieb&Sportart=96&Page2=Tabellen&Saison=2026" target="_blank" rel="noopener" class="btn btn-dark" style="padding:7px 12px; font-size:12px;">
+                            Original in TischtennisLive öffnen ↗
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Reiter (Tabs) für alle Mannschaften -->
+                <div id="tt-team-tabs" class="tt-team-tabs"></div>
+
+                <!-- Zweispaltige Mannschaftsansicht: Links Tabelle + Spielplan, Rechts Einzel-/Doppel-Bilanzen + ML + Halle -->
+                <div id="tt-team-content" class="tt-hub-layout"></div>
+            </div>
+        </section>
+
+
+        <!-- ===============================================================
+             3b-2. SPORT-ECKE (NEU): DIGITALES ZÄHLBOARD (JANOVA-STYLE)
+             =============================================================== -->
+        <section id="page-zaehlboard" class="page-section">
+            <div class="section-header">
+                <div>
+                    <span class="eyebrow">Sport-Ecke · Pro-Scoreboard mit Aufschlag-Tracking, Satz-Historie & Zeitspiel</span>
+                    <h2 style="font-size:32px; font-weight:800;">🔢 Digitales Zählboard</h2>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    <button class="btn btn-sand" onclick="switchPage('tischtennis')">🏓 Tischtennis</button>
+                    <button class="btn btn-emerald" onclick="switchPage('zaehlboard')">🔢 Digitales Zählboard</button>
+                    <button class="btn btn-sand" onclick="switchPage('turnierplaner')">🏆 Turnierplaner</button>
+                    <button class="btn btn-sand" onclick="switchPage('radfahren')">🚴 Fahrradfahren</button>
+                    <button class="btn btn-sand" onclick="switchPage('wandern')">🥾 Wanderungen</button>
+                </div>
+            </div>
+
+            <div id="sb-arena" class="sb-arena">
+                <!-- Obere Steuer- & Modusleiste -->
+                <div class="sb-top-bar">
+                    <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
+                        <label style="font-size:12.5px; font-weight:700; color:var(--text-muted);">Modus:
+                            <select id="sb-bestof" class="form-input" style="width:auto; display:inline-block; padding:5px 10px; margin-left:4px; font-weight:700;" onchange="sbChangeMode()">
+                                <option value="3" selected>Best of 5 (3 Gewinnsätze)</option>
+                                <option value="4">Best of 7 (4 Gewinnsätze)</option>
+                                <option value="2">Best of 3 (2 Gewinnsätze)</option>
+                            </select>
+                        </label>
+                        <button class="btn btn-sand" style="padding:6px 12px; font-size:12px;" onclick="sbToggleInitialServer()" title="Start-Aufschläger wechseln">
+                            🏓 1. Aufschlag wechseln
+                        </button>
+                        <button class="btn btn-sand" style="padding:6px 12px; font-size:12px;" onclick="sbSwapSides()" title="Tischseiten wechseln">
+                            ⇄ Seitenwechsel
+                        </button>
+                        <label style="font-size:12.5px; display:inline-flex; align-items:center; gap:5px; cursor:pointer; color:var(--text-muted);">
+                            <input type="checkbox" id="sb-sound" checked> 🔊 Klick-Ton
+                        </label>
+                    </div>
+
+                    <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
+                        <button class="btn btn-amber" style="padding:6px 12px; font-size:12px;" onclick="sbUndo()" id="sb-undo-btn" disabled>↩ Rückgängig</button>
+                        <button class="btn btn-sand" style="padding:6px 12px; font-size:12px;" onclick="sbToggleFullscreen()">⛶ Vollbild</button>
+                        <button class="btn btn-dark" style="padding:6px 12px; font-size:12px; border:1px solid rgba(255,255,255,0.2);" onclick="sbResetMatch()">🔄 Neues Match</button>
+                    </div>
+                </div>
+
+                <!-- Haupt-Scoreboard: Links Spieler A | Mitte Sätze, Historie & Timer | Rechts Spieler B -->
+                <div class="sb-board-grid">
+                    <!-- SPIELER LINKS -->
+                    <div id="sb-card-left" class="sb-player-card serving">
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                            <div class="sb-serve-indicator">
+                                <span class="sb-ball-icon"></span>
+                                <span id="sb-serve-text-left">Aufschlag (2×)</span>
+                            </div>
+                            <div class="sb-card-badges">
+                                <button id="sb-to-left" class="sb-mini-badge" onclick="sbTriggerTimeout('left')" title="Time-Out (60 Sek.) nehmen">⏱️ Time-Out</button>
+                                <button id="sb-yl-left" class="sb-mini-badge" onclick="sbToggleCard('left')" title="Gelbe / Gelb-Rote Karte">🟨 Karte</button>
+                            </div>
+                        </div>
+
+                        <div style="margin-top:10px;">
+                            <input type="text" id="sb-name-left" class="sb-name-input" value="Pi (TSV Graupa)" oninput="sbSyncNames()">
+                            <input type="text" id="sb-club-left" class="sb-club-input" value="Heim" oninput="sbSyncNames()">
+                        </div>
+
+                        <div id="sb-pts-left" class="sb-score-tap" onclick="sbAddPoint('left', 1)" title="Antippen für +1 Punkt">0</div>
+
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn btn-emerald" style="flex:1; font-size:15px; padding:12px;" onclick="sbAddPoint('left', 1)">+1 Punkt</button>
+                            <button class="btn btn-dark" style="padding:12px 16px; border:1px solid rgba(255,255,255,0.18);" onclick="sbAddPoint('left', -1)">−1</button>
+                        </div>
+                    </div>
+
+                    <!-- MITTE: SÄTZE, SATZ-HISTORIE, STOPPUHR & ZEITSPIEL -->
+                    <div class="sb-center-col">
+                        <div class="sb-sets-pill">
+                            <div style="font-size:10.5px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-muted); font-weight:800;">Sätze</div>
+                            <div class="sb-sets-big"><span id="sb-sets-left">0</span> : <span id="sb-sets-right">0</span></div>
+                            <div id="sb-status-banner" style="font-size:11.5px; color:#34d399; font-weight:700; margin-top:4px;">1. Satz läuft</div>
+                        </div>
+
+                        <!-- Notierte fertige Sätze -->
+                        <div style="text-align:center; width:100%;">
+                            <div style="font-size:10.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); font-weight:700;">Gespielte Sätze</div>
+                            <div id="sb-set-history" class="sb-set-history">
+                                <span style="font-size:11.5px; color:rgba(255,255,255,0.35);">Noch kein Satz beendet</span>
+                            </div>
+                        </div>
+
+                        <!-- Match-Uhr, Einspiel-Timer & Zeitspiel (Expedite) -->
+                        <div style="background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:10px 14px; text-align:center; width:100%;">
+                            <div style="font-family:'JetBrains Mono',monospace; font-size:20px; font-weight:800; color:#fff;" id="sb-timer-display">00:00</div>
+                            <div id="sb-subtimer-display" style="font-size:11.5px; color:#fbbf24; font-weight:700; min-height:16px;"></div>
+                            <div style="display:flex; gap:5px; justify-content:center; flex-wrap:wrap; margin-top:6px;">
+                                <button class="sb-mini-badge" onclick="sbToggleMatchClock()" id="sb-clock-btn">▶ Uhr</button>
+                                <button class="sb-mini-badge" onclick="sbStartCountdown(120, 'Einspielzeit')">🏓 2:00 Einspielen</button>
+                                <button class="sb-mini-badge" id="sb-expedite-btn" onclick="sbToggleExpedite()" title="Zeitspiel (ab 10 Min. Satzdauer: 1× Aufschlagwechsel)">⚡ Zeitspiel</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SPIELER RECHTS -->
+                    <div id="sb-card-right" class="sb-player-card">
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                            <div class="sb-serve-indicator">
+                                <span class="sb-ball-icon"></span>
+                                <span id="sb-serve-text-right">Rückschlag</span>
+                            </div>
+                            <div class="sb-card-badges">
+                                <button id="sb-to-right" class="sb-mini-badge" onclick="sbTriggerTimeout('right')" title="Time-Out (60 Sek.) nehmen">⏱️ Time-Out</button>
+                                <button id="sb-yl-right" class="sb-mini-badge" onclick="sbToggleCard('right')" title="Gelbe / Gelb-Rote Karte">🟨 Karte</button>
+                            </div>
+                        </div>
+
+                        <div style="margin-top:10px;">
+                            <input type="text" id="sb-name-right" class="sb-name-input" value="Gastspieler" oninput="sbSyncNames()">
+                            <input type="text" id="sb-club-right" class="sb-club-input" value="Gast" oninput="sbSyncNames()">
+                        </div>
+
+                        <div id="sb-pts-right" class="sb-score-tap" onclick="sbAddPoint('right', 1)" title="Antippen für +1 Punkt">0</div>
+
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn btn-amber" style="flex:1; font-size:15px; padding:12px;" onclick="sbAddPoint('right', 1)">+1 Punkt</button>
+                            <button class="btn btn-dark" style="padding:12px 16px; border:1px solid rgba(255,255,255,0.18);" onclick="sbAddPoint('right', -1)">−1</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-top:14px; font-size:11.5px; color:var(--text-muted); display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                    <span>💡 <b>Tipp für Smartphone/Tablet:</b> Direkt auf die großen Zahlen tippen (+1). Im Entscheidungssatz meldet das Board bei 5 Punkten automatisch den Seitenwechsel!</span>
+                    <span>⌨️ Tastatur: <b>A</b> (+Links) · <b>L</b> (+Rechts) · <b>S</b> (Aufschlag) · <b>Z</b> (Undo)</span>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ===============================================================
+             TURNIERPLANER (Unterseite von Tischtennis)
+             =============================================================== -->
+        <section id="page-turnierplaner" class="page-section">
+            <div class="section-header">
+                <div>
+                    <span class="eyebrow">Sport-Ecke · Tischtennis</span>
+                    <h2 style="font-size:32px; font-weight:800;">🏆 Turnierplaner</h2>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    <button class="btn btn-sand" onclick="switchPage('tischtennis')">🏓 Tischtennis</button>
+                    <button class="btn btn-sand" onclick="switchPage('zaehlboard')">🔢 Digitales Zählboard</button>
+                    <button class="btn btn-emerald" onclick="switchPage('turnierplaner')">🏆 Turnierplaner</button>
+                    <button class="btn btn-sand" onclick="switchPage('radfahren')">🚴 Fahrradfahren</button>
+                    <button class="btn btn-sand" onclick="switchPage('wandern')">🥾 Wanderungen</button>
+                </div>
+            </div>
+
+            <div class="tp-wrap">
+                <!-- Steuerleiste -->
+                <div class="tp-toolbar">
+                    <button id="tp-btn-new" class="btn btn-emerald hidden" onclick="tpNewTournament()">➕ Neues Turnier anlegen</button>
+                    <button id="tp-btn-save" class="btn btn-emerald hidden" onclick="tpSaveToCloudAndLocal()">💾 Speichern & in Drive</button>
+                    <button class="btn btn-sand" onclick="tpOpenLoad()">📂 Turnier laden</button>
+                    <button id="tp-btn-excel" class="btn btn-dark" onclick="tpExportExcel()">📊 Excel-Export</button>
+                    <button id="tp-admin-lock-btn" class="btn btn-amber" style="margin-left:auto;" onclick="tpToggleAdminMode()">🔒 Admin-Modus entsperren</button>
+                    <span id="tp-save-hint" class="tp-help">Nur-Lese-Modus (Gast)</span>
+                </div>
+
+                <!-- Metadaten-Formular -->
+                <div id="tp-meta-panel" class="tp-panel" style="display:none;">
+                    <h3>📋 Turnier-Metadaten</h3>
+                    <div class="tp-grid">
+                        <div class="tp-field"><label>Name des Turniers</label><input id="tp-m-name" type="text" placeholder="z.B. Vereinsmeisterschaft 2026"></div>
+                        <div class="tp-field"><label>Datum</label><input id="tp-m-date" type="date"></div>
+                        <div class="tp-field"><label>Turnierleitung</label><input id="tp-m-leader" type="text" placeholder="Name"></div>
+                        <div class="tp-field"><label>Anzahl Spieler (automatisch)</label><input id="tp-m-count" type="number" min="2" value="8" readonly style="background:#eef2f0;color:#64748b;" title="Wird automatisch aus der Spielerliste berechnet"></div>
+                        <div class="tp-field"><label>Gewinnsätze</label><input id="tp-m-winsets" type="number" min="1" value="3"></div>
+                        <div class="tp-field"><label>Gewinnpunkte / Satz</label><input id="tp-m-winpts" type="number" min="1" value="11"></div>
+                    </div>
+
+                    <h4 style="margin-top:18px;">👥 Spieler-Liste</h4>
+                    <p class="tp-help">Spalten sind sortierbar (Klick auf Überschrift) – v.a. nach LPZ. „Spieler starten" nutzt die aktuelle Sortierung als Setzliste.</p>
+                    <div style="overflow-x:auto;">
+                        <table class="tp-table" id="tp-player-table">
+                            <thead>
+                                <tr>
+                                    <th data-sort="nr">#<span class="sort-ind"></span></th>
+                                    <th data-sort="name">Name<span class="sort-ind"></span></th>
+                                    <th data-sort="vorname">Vorname<span class="sort-ind"></span></th>
+                                    <th data-sort="lpz">LPZ<span class="sort-ind"></span></th>
+                                    <th data-sort="geschlecht">Geschl.<span class="sort-ind"></span></th>
+                                    <th data-sort="verein">Verein<span class="sort-ind"></span></th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="tp-player-tbody"></tbody>
+                        </table>
+                    </div>
+                    <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
+                        <button class="btn btn-sand" onclick="tpAddPlayerRow()">➕ Spieler hinzufügen</button>
+                    </div>
+
+                    <!-- Einzel-Modus -->
+                    <h4 style="margin-top:20px;">🎯 Modus Herren-/Gemischt-Einzel</h4>
+                    <div id="tp-mode-single"></div>
+
+                    <!-- Doppel -->
+                    <h4 style="margin-top:20px;">👯 Doppel</h4>
+                    <label style="font-size:13px;"><input type="checkbox" id="tp-dbl-enable" onchange="tpToggleDbl()"> Doppel-Wettbewerb spielen</label>
+                    <div id="tp-dbl-config" style="display:none;"></div>
+
+                    <!-- Damen-Runde -->
+                    <h4 style="margin-top:20px;">🚺 Zusätzliche Damen-Runde</h4>
+                    <label style="font-size:13px;"><input type="checkbox" id="tp-women-enable" onchange="tpToggleWomen()"> Separate Damen-Einzel-Runde spielen</label>
+                    <div id="tp-women-config" style="display:none;"></div>
+
+                    <div style="margin-top:22px; display:flex; gap:8px; flex-wrap:wrap;">
+                        <button class="btn btn-emerald" style="font-size:15px; padding:12px 22px;" onclick="tpStartTournament()">🚀 Turnier starten</button>
+                    </div>
+                </div>
+
+                <!-- Live-Ansicht -->
+                <div id="tp-live" style="display:none;">
+                    <!-- Fortschritts-Übersicht -->
+                    <div class="tp-panel">
+                        <h3 id="tp-live-title">Turnier</h3>
+                        <div id="tp-progress-overview"></div>
+                    </div>
+
+                    <!-- Laufende Spiele -->
+                    <div class="tp-panel">
+                        <h3>▶️ Laufende Spiele</h3>
+                        <div id="tp-running-list" class="tp-running-list"><p class="tp-help">Keine laufenden Spiele.</p></div>
+                    </div>
+
+                    <!-- Wettbewerbs-Reiter -->
+                    <div class="tp-panel">
+                        <div class="tp-tabs" id="tp-comp-tabs"></div>
+                        <div id="tp-comp-body"></div>
+                    </div>
+                </div>
+
+                <div id="tp-empty" class="tp-panel" style="text-align:center;">
+                    <h3>Noch kein Turnier</h3>
+                    <p class="tp-help">Lade über „📂 Turnier laden“ ein bestehendes Turnier oder entsperre rechts oben den Admin-Modus, um ein neues Turnier anzulegen.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- TURNIERPLANER MODALS -->
+        <div class="modal-overlay" id="tp-match-modal" onclick="if(event.target===this) tpCloseMatch()">
+            <div class="modal-box" id="tp-match-modal-body"></div>
+        </div>
+        <div class="modal-overlay" id="tp-load-modal" onclick="if(event.target===this) tpCloseLoad()">
+            <div class="modal-box">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <h3>📂 Gespeichertes Turnier laden</h3>
+                    <button class="modal-x" onclick="tpCloseLoad()">×</button>
+                </div>
+                <div id="tp-load-list" style="margin-top:10px;"></div>
+            </div>
+        </div>
+
+
+        <!-- ===============================================================
+             3c. SPORT-ECKE (2): FAHRRADFAHREN
+             =============================================================== -->
+        <section id="page-radfahren" class="page-section">
+            <div class="section-header">
+                <div>
+                    <span class="eyebrow">Sport-Ecke · Gravel, Asphalt & Höhenmeter</span>
+                    <h2 style="font-size:32px; font-weight:800;">🚴 Fahrradfahren</h2>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    <button class="btn btn-sand" onclick="switchPage('tischtennis')">🏓 Tischtennis</button>
+                    <button class="btn btn-sand" onclick="switchPage('zaehlboard')">🔢 Digitales Zählboard</button>
+                    <button class="btn btn-sand" onclick="switchPage('turnierplaner')">🏆 Turnierplaner</button>
+                    <button class="btn btn-emerald" onclick="switchPage('radfahren')">🚴 Fahrradfahren</button>
+                    <button class="btn btn-sand" onclick="switchPage('wandern')">🥾 Wanderungen</button>
+                </div>
+            </div>
+
+            <div class="hero-card">
+                <span class="eyebrow">Titan-Ästhetik, Heißwachs & GPS-Tracks</span>
+                <h3 style="font-size:24px; font-weight:800; color:#fff; margin-bottom:6px;">Zwischen Elbradweg, Borsberg-Anstiegen & Schotterpisten</h3>
+                <p style="color:var(--text-muted); font-size:14.5px; line-height:1.6;">
+                    Ob schnelle Feierabendrunde aus Graupa heraus, ausgedehnte Gravel-Abenteuer über Wald- und Schotterwege oder knackige Anstiege aus dem Elbtal hinauf ins Osterzgebirge und die Sächsische Schweiz – wenn der Antrieb frisch gewachst schnurrt und die Route auf dem Radcomputer steht, beginnt die beste Zeit des Tages.
+                </p>
+                <div class="grid-3" style="margin-top:18px;">
+                    <div class="sport-stat-box">
+                        <div class="telemetry-label">Bike & Rahmenbau</div>
+                        <div class="sport-stat-val">Titan Gravel GT</div>
+                        <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">Zeitloses Titan-Design kombiniert mit drahtloser 2×12 AXS-Schaltpräzision.</div>
+                    </div>
+                    <div class="sport-stat-box">
+                        <div class="telemetry-label">Antriebs-Philosophie</div>
+                        <div class="sport-stat-val">100 % Heißwachs</div>
+                        <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">Minimaler Reibungsverlust, kein schwarzes Kettenöl und maximale Laufleistung.</div>
+                    </div>
+                    <div class="sport-stat-box">
+                        <div class="telemetry-label">Cockpit & Metriken</div>
+                        <div class="sport-stat-val">Karoo · GPX · HF</div>
+                        <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">Präzise Track-Planung via Locus Map & Strava mit Live-Steigungsprofilen.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <!-- Interaktiver Touren-, Schnitt- & VAM-Rechner -->
+                <div class="sand-card">
+                    <span class="eyebrow-dark">Mathe fürs Cockpit</span>
+                    <h3 style="font-size:21px; font-weight:800; margin-bottom:12px;">⚙️ Touren-Zeit & VAM-Steigungsrechner</h3>
+                    <div class="grid-2" style="gap:12px; margin-bottom:12px;">
+                        <div>
+                            <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Distanz (km):</label>
+                            <input type="number" id="bike-dist" class="form-input" value="65" min="1" step="1" oninput="calcBikeMetrics()">
+                        </div>
+                        <div>
+                            <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Höhenmeter (Hm):</label>
+                            <input type="number" id="bike-hm" class="form-input" value="850" min="0" step="10" oninput="calcBikeMetrics()">
+                        </div>
+                        <div>
+                            <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Flach-Tempo (km/h):</label>
+                            <input type="number" id="bike-speed" class="form-input" value="26" min="10" max="50" step="0.5" oninput="calcBikeMetrics()">
+                        </div>
+                        <div>
+                            <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Steigleistung VAM (Hm/h):</label>
+                            <input type="number" id="bike-vam" class="form-input" value="650" min="200" max="1800" step="25" oninput="calcBikeMetrics()">
+                        </div>
+                    </div>
+                    <div id="bike-calc-result" class="person-box" style="background:#ecfdf5; border-color:#a7f3d0; padding:14px;"></div>
+                </div>
+
+                <!-- Hausrunden & Klassiker -->
+                <div class="sand-card">
+                    <span class="eyebrow-dark">Heimat-Sektoren ab Graupa / Pirna</span>
+                    <h3 style="font-size:21px; font-weight:800; margin-bottom:10px;">🗺️ Lieblings-Runden & Segmente</h3>
+                    <div style="display:flex; flex-direction:column; gap:10px; font-size:13.8px; line-height:1.55;">
+                        <div class="person-box">
+                            <span class="person-role">🌲 Borsberg & Schönfelder Hochland (Gravel)</span>
+                            Direkt vor der Haustür: Über abwechslungsreiche Wald- und Schotterpfade hinauf Richtung Borsberg, Jagdwege und Panoramablicke über das Elbtal.
+                        </div>
+                        <div class="person-box">
+                            <span class="person-role">⛰️ Hohnstein, Polenztal & Kirnitzschtal</span>
+                            Klassische Wellenprofile durch die Vordere und Hintere Sächsische Schweiz – ruhige Nebenstraßen, feiner Schotter und knackige Rampen aus den Tälern.
+                        </div>
+                        <div class="person-box">
+                            <span class="person-role">🌊 Elbradweg-Tempofahrt (Dresden ↔ Bad Schandau)</span>
+                            Flaches Rollen entlang der Elbe für Grundlagenausdauer, Aero-Abschnitte oder als entspannter Ausklang nach einer Höhenmeter-Etappe.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ===============================================================
+             3d. SPORT-ECKE (3): WANDERUNGEN
+             =============================================================== -->
+        <section id="page-wandern" class="page-section">
+            <div class="section-header">
+                <div>
+                    <span class="eyebrow">Sport-Ecke · Elbsandstein, Tafelberge & Gipfelziele</span>
+                    <h2 style="font-size:32px; font-weight:800;">🥾 Wanderungen</h2>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    <button class="btn btn-sand" onclick="switchPage('tischtennis')">🏓 Tischtennis</button>
+                    <button class="btn btn-sand" onclick="switchPage('zaehlboard')">🔢 Digitales Zählboard</button>
+                    <button class="btn btn-sand" onclick="switchPage('turnierplaner')">🏆 Turnierplaner</button>
+                    <button class="btn btn-sand" onclick="switchPage('radfahren')">🚴 Fahrradfahren</button>
+                    <button class="btn btn-emerald" onclick="switchPage('wandern')">🥾 Wanderungen</button>
+                </div>
+            </div>
+
+            <div class="hero-card">
+                <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:18px;">
+                    <div style="flex:1; min-width:260px;">
+                        <span class="eyebrow">Direkt vor der Haustür ins Felsrevier</span>
+                        <h3 style="font-size:24px; font-weight:800; color:#fff; margin-bottom:6px;">Felsriffe, Stiegen & weite Blicke über die Sächsische Schweiz</h3>
+                        <p style="color:var(--text-muted); font-size:14.5px; line-height:1.6;">
+                            Wenn das Tor zur Sächsischen Schweiz die eigene Heimat ist, liegen Schrammsteine, Rathen, die Festung Königstein und unzählige verwunschene Gründe nur einen Katzensprung entfernt. Und für die topografische Analyse jedes Gipfels gibt es direkt nebenan den eigenen Berg-Dominanz-Atlas!
+                        </p>
+                    </div>
+                    <button class="btn btn-amber" style="padding:12px 18px; font-size:14px;" onclick="switchPage('dominanz')">
+                        ⛰️ Zum Berg-Dominanz-Atlas ↗
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid-3" style="margin-bottom:20px;">
+                <div class="sand-card">
+                    <span class="eyebrow-dark">Klassiker im Fels</span>
+                    <h3 style="font-size:19px; font-weight:800; margin:4px 0 8px;">🧗 Schrammsteine & Gratwege</h3>
+                    <p style="font-size:13.5px; line-height:1.55;">
+                        Über Leitern, Stiegen und schmale Sandsteinpfade hinauf zur Schrammsteinaussicht – mit einem der eindrucksvollsten 360°-Panoramen des Elbsandsteingebirges.
+                    </p>
+                </div>
+                <div class="sand-card">
+                    <span class="eyebrow-dark">Felsenbühne & Klammen</span>
+                    <h3 style="font-size:19px; font-weight:800; margin:4px 0 8px;">🌲 Kurort Rathen, Bastei & Schwedenlöcher</h3>
+                    <p style="font-size:13.5px; line-height:1.55;">
+                        Abwechslungsreiche Rundtouren zwischen Elbfähre, Amselsee, kühlen Felsschluchten und den berühmten Aussichten hoch über dem Elbbogen.
+                    </p>
+                </div>
+                <div class="sand-card">
+                    <span class="eyebrow-dark">Tafelberge & Ferne</span>
+                    <h3 style="font-size:19px; font-weight:800; margin:4px 0 8px;">🏰 Festung Königstein, Lilienstein & Vogtland</h3>
+                    <p style="font-size:13.5px; line-height:1.55;">
+                        Markante Tafelberge links und rechts der Elbe sowie ausgedehnte Familien- und Herbstwanderungen durch das grüne Vogtland rund um das Mühlental.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Interaktiver Gehzeit-Rechner (DIN 33466) -->
+            <div class="sand-card">
+                <div class="grid-2" style="align-items:center;">
+                    <div>
+                        <span class="eyebrow-dark">Tourenplanung nach DIN 33466</span>
+                        <h3 style="font-size:21px; font-weight:800; margin-bottom:6px;">⏱️ Wander-Gehzeit-Rechner</h3>
+                        <p style="font-size:13.5px; line-height:1.55; margin-bottom:12px;">
+                            Berechnet die realistische reine Gehzeit aus Horizontaldistanz, Aufstieg und Abstieg nach der offiziellen Bergwander-Formel (4 km/h horizontal, 300 Hm/h im Aufstieg, 500 Hm/h im Abstieg – wobei der kleinere Zeitwert zur Hälfte auf den größeren addiert wird).
+                        </p>
+                        <div class="grid-3" style="gap:10px;">
+                            <div>
+                                <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Strecke (km):</label>
+                                <input type="number" id="hike-km" class="form-input" value="14" min="0.5" step="0.5" oninput="calcHikeTime()">
+                            </div>
+                            <div>
+                                <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Aufstieg (Hm):</label>
+                                <input type="number" id="hike-up" class="form-input" value="520" min="0" step="20" oninput="calcHikeTime()">
+                            </div>
+                            <div>
+                                <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Abstieg (Hm):</label>
+                                <input type="number" id="hike-down" class="form-input" value="520" min="0" step="20" oninput="calcHikeTime()">
+                            </div>
+                        </div>
+                    </div>
+                    <div id="hike-calc-result" class="person-box" style="background:#ecfdf5; border-color:#a7f3d0; padding:18px; text-align:center;"></div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ===============================================================
+             4. MAP-TOOLS (1): "MAPS MATH" (KARTENGEOMETRIE)
+             =============================================================== -->
+        <section id="page-area-maps" class="page-section">
+            <div class="section-header">
+                <div>
+                    <span class="eyebrow">Map-Tools · Interaktive Kartengeometrie</span>
+                    <h2 style="font-size:32px; font-weight:800;">🌍 Maps Math</h2>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    <button class="btn btn-emerald" onclick="switchPage('area-maps')">🌍 Maps Math</button>
+                    <button class="btn btn-sand" onclick="switchPage('dominanz')">⛰️ Berg-Dominanz-Atlas</button>
+                    <button class="btn btn-sand" onclick="switchPage('luftlinie')">✈️ Luftlinie</button>
+                    <button class="btn btn-sand" onclick="switchPage('area-pur')">📏 Pure Math</button>
+                </div>
+            </div>
+
+            <div class="sand-card">
+                <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
+                    <button class="btn-start-matlab" onclick="mapsMathStart()">Start (Punkte neu setzen)</button>
+                    <button class="btn btn-emerald" onclick="mapsMathFinishAndCalculate()" style="font-size:15px; padding:12px 20px;">
+                        ✔ Berechnen (ENTER)
+                    </button>
+                    <button class="btn btn-dark" onclick="mapsMathResetToPirna()">🏠 Pirna</button>
+                </div>
+
+                <div class="toolbar-box" style="margin-bottom:16px;">
+                    <div style="display:inline-flex; align-items:center; gap:8px; white-space:nowrap;">
+                        <strong style="font-size:12.5px;">🗺️ Karte:</strong>
+                        <select id="maps-layer-select" class="form-input" style="width:auto; min-width:165px; max-width:220px;" onchange="setMapsMathLayer(this.value)"></select>
+                    </div>
+
+                    <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
+                        <div>
+                            <strong style="font-size:12px;">Lat:</strong>
+                            <input type="text" id="maps-lat-val" class="coord-input" value="50.95850" readonly>
+                        </div>
+                        <div>
+                            <strong style="font-size:12px;">Lng:</strong>
+                            <input type="text" id="maps-lng-val" class="coord-input" value="13.93720" readonly>
+                        </div>
+                        <span id="maps-zoom-badge" class="badge" style="font-size:12px; padding:6px 10px; background:#059669; color:#fff;">Zoom: 16</span>
+                    </div>
+                </div>
+
+                <div class="area-layout">
+                    <div><div id="mapsMathContainer"></div></div>
+                    <div>
+                        <textarea id="maps-output-text" class="output-textarea" readonly>Willkommen bei Maps Math!
+
+1. Scrolle und zoome frei in der Karte.
+2. Klicke mindestens 3 Punkte auf die Karte.
+3. Klicke auf „Berechnen (ENTER)“ oder drücke ENTER.
+
+Das umschließende Polygon, der kleinste Umkreis nach Welzl sowie die Mittelpunkte (nach Breiten- und Längengrad) werden sofort berechnet und mit einer zum Zoom-Faktor passenden Flächeneinheit (m², ha oder km²) ausgegeben.</textarea>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ===============================================================
+             5. MAP-TOOLS (2): "BERG-DOMINANZ-ATLAS" (TOPOLOGIE & GIPFEL)
+             =============================================================== -->
+        <section id="page-dominanz" class="page-section">
+            <div class="section-header">
+                <div>
+                    <span class="eyebrow">Map-Tools · Topografie, Isolation & Prominenz</span>
+                    <h2 style="font-size:32px; font-weight:800;">⛰️ Berg-Dominanz-Atlas</h2>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    <button class="btn btn-sand" onclick="switchPage('area-maps')">🌍 Maps Math</button>
+                    <button class="btn btn-emerald" onclick="switchPage('dominanz')">⛰️ Berg-Dominanz-Atlas</button>
+                    <button class="btn btn-sand" onclick="switchPage('luftlinie')">✈️ Luftlinie</button>
+                    <button class="btn btn-sand" onclick="switchPage('area-pur')">📏 Pure Math</button>
+                </div>
+            </div>
+
+            <div class="sand-card">
+                <!-- Obere Steuerleiste -->
+                <div class="toolbar-box" style="margin-bottom:16px;">
+                    <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
+                        <label style="display:inline-flex; align-items:center; gap:8px; font-size:12.5px; white-space:nowrap;">
+                            <strong>🗺️ Karte:</strong>
+                            <select id="dom-layer-select" class="form-input" style="width:auto; min-width:165px; max-width:220px;" onchange="setDominanzLayer(this.value)"></select>
+                        </label>
+                        <label style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; cursor:pointer; white-space:nowrap;">
+                            <input type="checkbox" id="dom-show-circle" checked> <span id="dom-circle-label">Dominanzradius</span>
+                        </label>
+                    </div>
+                    <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
+                        <button id="dom-pick-btn" class="btn btn-amber" style="padding:8px 12px; font-size:12.5px;" onclick="toggleDomPickMode()">📍 Eigenen Punkt setzen: AUS</button>
+                        <button class="btn btn-emerald" style="padding:8px 14px; font-size:12.5px;" onclick="openDominanzInfo()">❓ Was ist Dominanz?</button>
+                        <button class="btn btn-dark" style="padding:8px 12px; font-size:12.5px;" onclick="dominanzWorldView()">🌍 Weltansicht</button>
+                    </div>
+                </div>
+
+                <!-- Farblegende (Höhenklassen) über der Karte -->
+                <div class="dom-legend" id="dom-legend">
+                    <strong style="font-size:12px; margin-right:2px;">Höhe ü. NN:</strong>
+                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#1a6b2e;"></span> &lt; 1000 m</span>
+                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#5bd16a;"></span> 1000–2000 m</span>
+                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#f2d307;"></span> 2000–3000 m</span>
+                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#d9a406;"></span> 3000–4000 m</span>
+                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#f27405;"></span> 4000–5000 m</span>
+                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#f2766e;"></span> 5000–6000 m</span>
+                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#e01b1b;"></span> 6000–7000 m</span>
+                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#8b2fc9;"></span> &gt; 7000 m</span>
+                    <span class="dom-legend-sep">|</span>
+                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#111;"></span> gewählter Berg</span>
+                    <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#fff; border-color:#111;"></span> Bezugsberg</span>
+                </div>
+
+                <div style="font-size:11.5px; color:#64748b; margin-bottom:12px;">
+                    <span id="dom-count">lade Gipfel …</span> · <span id="dom-visible"></span> Daten aus Wikidata/Wikipedia · Start: Zugspitze
+                </div>
+
+                <!-- Hauptbereich: Links Karte, Rechts Suche & Gipfel-Details -->
+                <div class="dominanz-layout">
+                    <!-- Karte -->
+                    <div>
+                        <div id="dominanzMapContainer"></div>
+                        <div id="dom-status" style="font-size:12px; color:#b45309; margin-top:8px; min-height:16px;"></div>
+                    </div>
+
+                    <!-- Rechte Spalte: Suche + aktiver Gipfel -->
+                    <div style="display:flex; flex-direction:column; gap:14px;">
+                        <!-- Suche: filtert geladene Gipfel + Wikidata-Online-Suche -->
+                        <div style="background:var(--bg-sand-light); border:1px solid var(--border-sand); border-radius:16px; padding:14px;">
+                            <input type="text" id="dom-search-input" class="form-input" placeholder="🔍 Berg suchen (weltweit, z. B. Fuji, Denali …)" autocomplete="off">
+                            <div id="dom-results" class="peak-list" style="margin-top:10px;"></div>
+                        </div>
+                        <!-- Info-Box zum ausgewählten Berg (inkl. anklickbarem Nächsthöherem) -->
+                        <div id="dom-detail" style="background:#fff; border:2px solid var(--emerald-dark); border-radius:16px; padding:16px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Info-Modal: Was ist Dominanz? -->
+            <div class="modal-overlay" id="dom-info-modal" onclick="if(event.target===this) closeDominanzInfo()">
+                <div class="modal-box">
+                    <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">
+                        <h3>⛰️ Was bedeutet „Dominanz“?</h3>
+                        <button class="modal-x" onclick="closeDominanzInfo()" title="Schließen">✕</button>
+                    </div>
+                    <p>
+                        Die <strong>Dominanz</strong> (auch <em>Isolation</em>) eines Berggipfels ist die
+                        Entfernung zum nächstgelegenen Punkt gleicher Höhe – also die Distanz
+                        zum nächsten höheren Gipfel bzw. Höhenzug. Sie beschreibt, wie
+                        „eigenständig“ ein Berg seine Umgebung überragt: Je größer die
+                        Dominanz, desto weiter muss man reisen, bis man etwas Höheres erreicht.
+                    </p>
+                    <p>
+                        Ein Beispiel: Der Mont Blanc hat eine Dominanz von mehreren tausend
+                        Kilometern, weil erst weit entfernt im Kaukasus wieder höhere Gipfel
+                        stehen. Ein kleiner Tafelberg der Sächsischen Schweiz dagegen wird
+                        schon vom Nachbarfelsen übertroffen – seine Dominanz beträgt nur
+                        wenige Kilometer.
+                    </p>
+                    <p style="font-size:13px; color:#475569;">
+                        In dieser Karte reicht der Kreis genau bis zum <strong>Bezugsgipfel</strong>
+                        (dem nächsthöheren Berg) – sein Radius ist der Abstand zwischen den
+                        beiden Gipfeln. Der eigentliche Dominanzwert steht separat in der
+                        Infokarte und kann kleiner sein, weil der gleich hohe Geländepunkt
+                        meist am Hang liegt. Über das rote Feld
+                        „Nächsthöherer Berg“ kannst du dich Schritt für Schritt nach oben
+                        klicken – am Ende landest du beim Mount Everest.
+                    </p>
+                    <p style="margin-bottom:4px;">
+                        🔗 Mehr dazu bei Wikipedia:
+                        <a href="https://de.wikipedia.org/wiki/Dominanz_(Geographie)" target="_blank" rel="noopener" style="color:var(--emerald-dark); font-weight:700;">Dominanz (Geographie)</a>
+                    </p>
+                    <div class="modal-close-row">
+                        <button class="btn btn-emerald" onclick="closeDominanzInfo()">Verstanden</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===============================================================
+             5b. MAP-TOOLS: "LUFTLINIEN-ENTFERNUNG & TRAVLE-PFAD"
+             =============================================================== -->
+        <section id="page-luftlinie" class="page-section">
+            <div class="section-header">
+                <div>
+                    <span class="eyebrow">Map-Tools · Großkreis-Geodäsie, Überflug-Analyse & Ländergrenzen-Graph</span>
+                    <h2 style="font-size:32px; font-weight:800;">✈️ Luftlinien-Entfernung</h2>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    <button class="btn btn-sand" onclick="switchPage('area-maps')">🌍 Maps Math</button>
+                    <button class="btn btn-sand" onclick="switchPage('dominanz')">⛰️ Berg-Dominanz-Atlas</button>
+                    <button class="btn btn-emerald" onclick="switchPage('luftlinie')">✈️ Luftlinie</button>
+                    <button class="btn btn-sand" onclick="switchPage('area-pur')">📏 Pure Math</button>
+                </div>
+            </div>
+
+            <div class="sand-card">
+                <!-- Obere Steuerleiste -->
+                <div class="toolbar-box" style="margin-bottom:14px;">
+                    <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
+                        <label style="display:inline-flex; align-items:center; gap:8px; font-size:12.5px; white-space:nowrap;">
+                            <strong>🗺️ Karte:</strong>
+                            <select id="air-layer-select" class="form-input" style="width:auto; min-width:165px; max-width:220px;" onchange="setAirLayer(this.value)"></select>
+                        </label>
+                        <label style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; cursor:pointer; white-space:nowrap;">
+                            <input type="checkbox" id="air-show-countries" checked onchange="airUpdateLayers()"> <span>Überflogene Länder hervorheben</span>
+                        </label>
+                    </div>
+                    <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
+                        <button class="btn btn-amber" style="padding:8px 12px; font-size:12.5px;" onclick="airSwapPoints()">⇄ Start & Ziel tauschen</button>
+                        <button class="btn btn-emerald" style="padding:8px 12px; font-size:12.5px;" onclick="airSetPreset('pirna-tokyo')">🎌 Bsp: Pirna → Tokio</button>
+                        <button class="btn btn-sand" style="padding:8px 12px; font-size:12.5px;" onclick="airSetPreset('lisbon-vladivostok')">🌍 Bsp: Lissabon → Wladiwostok</button>
+                        <button class="btn btn-dark" style="padding:8px 12px; font-size:12.5px;" onclick="airWorldView()">🌐 Weltansicht</button>
+                    </div>
+                </div>
+
+                <!-- Legende & Klick-Modus -->
+                <div class="dom-legend" style="justify-content:space-between;">
+                    <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px;">
+                        <span class="dom-legend-item"><span class="air-dot-a"></span> <b>Punkt A (Start)</b></span>
+                        <span class="dom-legend-item"><span class="air-dot-b"></span> <b>Punkt B (Ziel)</b></span>
+                        <span class="dom-legend-sep">|</span>
+                        <span class="dom-legend-item"><span style="display:inline-block;width:18px;height:3px;background:#10b981;border-radius:2px;"></span> Kürzeste Luftlinie (Orthodrome)</span>
+                        <span class="dom-legend-item"><span style="display:inline-block;width:18px;height:3px;background:#f59e0b;border-bottom:2px dashed #d97706;"></span> Längengrad-/Breitengrad-Verlauf</span>
+                    </div>
+                    <div id="air-status" style="font-size:11.8px; font-weight:700; color:var(--emerald-dark);">Lade Welt-Geodaten …</div>
+                </div>
+
+                <!-- Hauptbereich: Links Karte, Rechts Suche & Flug-/Travle-Analyse -->
+                <div class="dominanz-layout">
+                    <!-- Karte -->
+                    <div>
+                        <div id="airMapContainer"></div>
+                        <div style="font-size:11.5px; color:#64748b; margin-top:7px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px;">
+                            <span>💡 <b>Tipp:</b> Klicke rechts auf „Punkt A“ oder „Punkt B“ (oder ziehe die Marker direkt mit der Maus), um per Kartenklick neu zu setzen.</span>
+                            <span id="air-cursor-coords" style="font-family:'JetBrains Mono',monospace;"></span>
+                        </div>
+                    </div>
+
+                    <!-- Rechte Spalte: 2 Suchmasken + Analyse-Ergebnis -->
+                    <div style="display:flex; flex-direction:column; gap:12px;">
+                        <div class="air-search-grid">
+                            <!-- Punkt A -->
+                            <div id="air-card-a" class="air-point-card active-slot" onclick="airSelectSlot('A')">
+                                <div class="air-slot-header">
+                                    <span style="color:var(--emerald-dark);"><span class="air-dot-a"></span> Punkt A · Start</span>
+                                    <span id="air-slot-badge-a" class="badge" style="background:var(--emerald-dark);color:#fff;">Klick aktiv</span>
+                                </div>
+                                <input type="text" id="air-input-a" class="form-input" placeholder="🔍 Stadt, Ort oder Adresse …" autocomplete="off"
+                                       onfocus="airSelectSlot('A')" oninput="airSearchInput('A', this.value)">
+                                <div id="air-dd-a" class="air-dropdown"></div>
+                                <div id="air-coord-a" style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#475569; margin-top:5px;">–</div>
+                            </div>
+
+                            <!-- Punkt B -->
+                            <div id="air-card-b" class="air-point-card" onclick="airSelectSlot('B')">
+                                <div class="air-slot-header">
+                                    <span style="color:var(--amber);"><span class="air-dot-b"></span> Punkt B · Ziel</span>
+                                    <span id="air-slot-badge-b" class="badge" style="background:#e2e8f0;color:#475569;">Klicken zum Wählen</span>
+                                </div>
+                                <input type="text" id="air-input-b" class="form-input" placeholder="🔍 Stadt, Ort oder Adresse …" autocomplete="off"
+                                       onfocus="airSelectSlot('B')" oninput="airSearchInput('B', this.value)">
+                                <div id="air-dd-b" class="air-dropdown"></div>
+                                <div id="air-coord-b" style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#475569; margin-top:5px;">–</div>
+                            </div>
+                        </div>
+
+                        <!-- Ausgabefenster: Exakte Entfernung, Koordinaten, Überflug & Travle -->
+                        <div id="air-detail" style="background:#fff; border:2px solid var(--emerald-dark); border-radius:16px; padding:16px; flex:1;"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===============================================================
+             6. MAP-TOOLS (3): "PURE MATH" (130x100 KOORDINATENSYSTEM)
+             =============================================================== -->
+        <section id="page-area-pur" class="page-section">
+            <div class="section-header">
+                <div>
+                    <span class="eyebrow">Map-Tools · Klassisches Koordinatensystem</span>
+                    <h2 style="font-size:32px; font-weight:800;">📏 Pure Math</h2>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    <button class="btn btn-sand" onclick="switchPage('area-maps')">🌍 Maps Math</button>
+                    <button class="btn btn-sand" onclick="switchPage('dominanz')">⛰️ Berg-Dominanz-Atlas</button>
+                    <button class="btn btn-sand" onclick="switchPage('luftlinie')">✈️ Luftlinie</button>
+                    <button class="btn btn-emerald" onclick="switchPage('area-pur')">📏 Pure Math</button>
+                </div>
+            </div>
+
+            <div class="sand-card">
+                <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
+                    <button class="btn-start-matlab" onclick="areaStartCollection()">Start</button>
+                    <button id="area-calc-btn" class="btn btn-emerald hidden" onclick="areaFinishAndCalculate()" style="font-size:15px; padding:12px 20px;">
+                        ✔ Berechnen (ENTER)
+                    </button>
+                </div>
+
+                <div class="toolbar-box" style="justify-content:center; gap:24px; margin-bottom:16px;">
+                    <div>
+                        <strong style="font-size:15px; margin-right:6px;">X:</strong>
+                        <input type="text" id="area-x-val" class="coord-input" value="0.0000" readonly>
+                    </div>
+                    <div>
+                        <strong style="font-size:15px; margin-right:6px;">Y:</strong>
+                        <input type="text" id="area-y-val" class="coord-input" value="0.0000" readonly>
+                    </div>
+                </div>
+
+                <div class="area-layout">
+                    <div><canvas id="areaCanvas" width="1000" height="650"></canvas></div>
+                    <div>
+                        <textarea id="area-output-text" class="output-textarea" readonly>Klicke oben auf „Start“, um mit der Maus Punkte im Koordinatensystem (130 x 100) zu sammeln.
+
+Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</textarea>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===============================================================
+             7. SPIELE-ECKE: MOBILES TETRIS
+             =============================================================== -->
+        <section id="page-tetris" class="page-section">
+            <div class="section-header">
+                <div>
+                    <span class="eyebrow">Spiele-Ecke</span>
+                    <h2 style="font-size:32px; font-weight:800;">🧱 Tetris</h2>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    <button class="btn btn-amber" onclick="tetrisNewGame()">▶ Neues Spiel</button>
+                    <button class="btn btn-emerald" onclick="switchPage('tetris')">🧱 Tetris</button>
+                    <button class="btn btn-sand" onclick="switchPage('minesweeper')">💣 Minesweeper</button>
+                    <button class="btn btn-sand" onclick="switchPage('snake')">🐍 Snake</button>
+                </div>
+            </div>
+            <div class="sand-card tetris-shell">
+                <div class="tetris-options">
+                    <label><input type="checkbox" id="tetris-sound" checked> 🔊 Ton</label>
+                    <label><input type="checkbox" id="tetris-speed" checked> ⚡ Steine werden schneller</label>
+                    <label><input type="checkbox" id="tetris-ghost" checked> 👻 Schattenstein</label>
+                    <label>Schwierigkeit
+                        <select id="tetris-level" onchange="tetrisSetLevel()"><option value="1">Leicht</option><option value="3" selected>Normal</option><option value="6">Schnell</option></select>
+                    </label>
+                </div>
+                <div class="tetris-game-wrap">
+                    <div class="tetris-board-wrap">
+                        <canvas id="tetris-canvas" width="300" height="600" aria-label="Tetris Spielfeld"></canvas>
+                        <div class="tetris-touch-controls">
+                            <button onclick="tetrisMove(-1)">◀</button><button onclick="tetrisRotate()">↻</button><button onclick="tetrisMove(1)">▶</button><button onclick="tetrisHardDrop()">▼</button>
+                        </div>
+                    </div>
+                    <div class="tetris-side">
+                        <div class="tetris-stat"><span>Punkte</span><strong id="tetris-score">0</strong></div>
+                        <div class="tetris-stat"><span>Linien</span><strong id="tetris-lines">0</strong></div>
+                        <div class="tetris-stat"><span>Level</span><strong id="tetris-level-view">1</strong></div>
+                        <h4>Nächster Stein</h4><canvas id="tetris-next" width="120" height="120"></canvas>
+                        <p id="tetris-status" class="tetris-status">Tippe auf „Neues Spiel“ oder drücke eine Taste.</p>
+                        <div class="tetris-keys">← → bewegen · ↑ drehen · ↓ fallen · Leertaste Drop · P pausiert</div>
+                    </div>
+                    <div class="hs-box" id="hs-box-tetris"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===============================================================
+             7b. SPIELE-ECKE: MINESWEEPER
+             =============================================================== -->
+        <section id="page-minesweeper" class="page-section">
+            <div class="section-header">
+                <div>
+                    <span class="eyebrow">Spiele-Ecke</span>
+                    <h2 style="font-size:32px; font-weight:800;">💣 Minesweeper</h2>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    <button class="btn btn-amber" onclick="msNewGame()">▶ Neues Spiel</button>
+                    <button class="btn btn-sand" onclick="switchPage('tetris')">🧱 Tetris</button>
+                    <button class="btn btn-emerald" onclick="switchPage('minesweeper')">💣 Minesweeper</button>
+                    <button class="btn btn-sand" onclick="switchPage('snake')">🐍 Snake</button>
+                </div>
+            </div>
+            <div class="sand-card tetris-shell">
+                <div class="tetris-options">
+                    <label>Größe / Schwierigkeit:
+                        <select id="ms-diff" onchange="msNewGame()">
+                            <option value="easy" selected>Anfänger (9×9 · 10 Minen)</option>
+                            <option value="medium">Fortgeschritten (12×12 · 22 Minen)</option>
+                            <option value="hard">Profi (16×12 · 35 Minen)</option>
+                        </select>
+                    </label>
+                    <button id="ms-flag-toggle" class="btn btn-sand" style="padding:5px 12px; font-size:12px;" onclick="msToggleFlagMode()">
+                        ⛏️ Modus: Aufdecken (Rechtsklick = 🚩)
+                    </button>
+                </div>
+                <div class="tetris-game-wrap">
+                    <div class="tetris-board-wrap">
+                        <div id="ms-board" class="ms-board"></div>
+                    </div>
+                    <div class="tetris-side">
+                        <div class="tetris-stat"><span>Minen übrig</span><strong id="ms-mines-left">10</strong></div>
+                        <div class="tetris-stat"><span>Zeit</span><strong id="ms-time">0.0 s</strong></div>
+                        <div class="tetris-stat"><span>Score</span><strong id="ms-score">0</strong></div>
+                        <p id="ms-status" class="tetris-status">Klicke auf ein Feld, um zu starten!</p>
+                        <div class="tetris-keys">Linksklick: Feld öffnen · Rechtsklick (oder Modus-Schalter): Flagge 🚩 setzen. Score = Schwierigkeits-Bonus minus benötigte Zeit.</div>
+                    </div>
+                    <div class="hs-box" id="hs-box-minesweeper"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===============================================================
+             7c. SPIELE-ECKE: SNAKE
+             =============================================================== -->
+        <section id="page-snake" class="page-section">
+            <div class="section-header">
+                <div>
+                    <span class="eyebrow">Spiele-Ecke</span>
+                    <h2 style="font-size:32px; font-weight:800;">🐍 Snake</h2>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    <button class="btn btn-amber" onclick="snakeNewGame()">▶ Neues Spiel</button>
+                    <button class="btn btn-sand" onclick="switchPage('tetris')">🧱 Tetris</button>
+                    <button class="btn btn-sand" onclick="switchPage('minesweeper')">💣 Minesweeper</button>
+                    <button class="btn btn-emerald" onclick="switchPage('snake')">🐍 Snake</button>
+                </div>
+            </div>
+            <div class="sand-card tetris-shell">
+                <div class="tetris-options">
+                    <label>Tempo:
+                        <select id="snake-speed" onchange="snakeChangeSpeed()">
+                            <option value="260">1 · Sehr gemütlich</option>
+                            <option value="200">2 · Gemütlich</option>
+                            <option value="150" selected>3 · Normal</option>
+                            <option value="100">4  · Schnell</option>
+                            <option value="70">5 · Rasend (Max)</option>
+                        </select>
+                    </label>
+                    <label><input type="checkbox" id="snake-accel" checked> ⚡ Langsame Steigerung mit jedem Apfel</label>
+                    <label><input type="checkbox" id="snake-walls" checked> 🧱 Wände tödlich</label>
+                </div>
+                <div class="tetris-game-wrap">
+                    <div class="tetris-board-wrap">
+                        <canvas id="snake-canvas" width="400" height="400"></canvas>
+                        <div class="tetris-touch-controls">
+                            <button onclick="snakeSetDir(-1,0)">◀</button>
+                            <button onclick="snakeSetDir(0,-1)">▲</button>
+                            <button onclick="snakeSetDir(0,1)">▼</button>
+                            <button onclick="snakeSetDir(1,0)">▶</button>
+                        </div>
+                    </div>
+                    <div class="tetris-side">
+                        <div class="tetris-stat"><span>Punkte</span><strong id="snake-score">0</strong></div>
+                        <div class="tetris-stat"><span>Äpfel 🍎</span><strong id="snake-apples">0</strong></div>
+                        <div class="tetris-stat"><span>Länge</span><strong id="snake-len">3</strong></div>
+                        <p id="snake-status" class="tetris-status">Klicke auf „Neues Spiel“ oder drücke eine Pfeiltaste.</p>
+                        <div class="tetris-keys">Steuerung mit Pfeiltasten, WASD oder den Buttons unter dem Spielfeld. Leertaste pausiert.</div>
+                    </div>
+                    <div class="hs-box" id="hs-box-snake"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Highscore Top-10 Namenseingabe Modal -->
+        <div class="modal-overlay" id="hs-modal">
+            <div class="modal-box" style="max-width:420px; text-align:center;">
+                <div style="font-size:38px; margin-bottom:6px;">🏆</div>
+                <h3 id="hs-modal-title">Neuer Top-10 Highscore!</h3>
+                <p id="hs-modal-text" style="font-size:14px; margin-bottom:14px;"></p>
+                <form onsubmit="submitHighscoreName(event)" style="display:flex; flex-direction:column; gap:10px;">
+                    <input type="text" id="hs-player-name" class="form-input" placeholder="Dein Name (z. B. Pi, David, Alwin...)" maxlength="22" required style="text-align:center; font-weight:700; font-size:15px;">
+                    <div style="display:flex; gap:8px; justify-content:center; margin-top:4px;">
+                        <button type="submit" class="btn btn-emerald" style="flex:1;">🏅 Eintragen</button>
+                        <button type="button" class="btn btn-dark" onclick="closeHighscoreModal()">Überspringen</button>
+                    </div>
+                </form>
+            </div>
+        </div>        
+
+        <!-- ===============================================================
+             8. IMPRESSUM
+             =============================================================== -->
+        <section id="page-impressum" class="page-section">
+            <div class="section-header"><div><span class="eyebrow">Rechtliches</span><h2 style="font-size:32px; font-weight:800;">📄 Impressum</h2></div></div>
+            <div class="sand-card impressum-card">
+                <h3>Angaben gemäß § 5 TMG</h3>
+                <p><strong>Peter Dippe</strong><br>Emil-Gast-Straße 4<br>01796 Pirna<br>Deutschland</p>
+                <h3>Kontakt & Profil</h3>
+                <p>Verantwortlich für den Inhalt dieser Website: Peter Dippe</p>
+                <p style="margin-top:10px;">
+                    <a href="https://www.linkedin.com/in/peter-dippe/" target="_blank" rel="noopener" class="btn btn-emerald" style="font-size:13px; padding:8px 14px;">
+                        🔗 LinkedIn-Profil von Peter Dippe ↗
+                    </a>
+                </p>
+                <p class="created-by">created by Pi 🐙</p>
+                <p class="impressum-note">Hinweis: Bitte prüfe vor der Veröffentlichung, ob für deine konkrete Nutzung weitere Pflichtangaben erforderlich sind.</p>
+            </div>
+        </section>
+
+    </main>
+
+
+    <!-- ===================================================================
+         MODULARE JAVASCRIPT-EINBINDUNG (STUFEN-ARCHITEKTUR)
+         =================================================================== -->
+    <script src="js/core.js"></script>
+    <script src="js/pinnwand.js"></script>
+    <script src="js/dominanz.js"></script>
+    <script src="js/luftlinie.js"></script>
+    <script src="js/math-tools.js"></script>
+    <script src="js/games.js"></script>
+    <script src="js/zaehlboard.js"></script>
+    <script src="js/tischtennis.js"></script>
+    <script src="js/outdoor.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+    <script src="js/turnierplaner.js"></script>
+</body>
+</html>
