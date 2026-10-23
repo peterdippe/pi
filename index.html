@@ -6271,12 +6271,22 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                 selectGraupaTeamTab(activeGraupaTeamId);
             } catch (err) {
                 console.warn('Live-Abruf der Übersicht fehlgeschlagen:', err);
-                setTTLiveSyncBadge('⚠️ Fehler: ' + (err.message || err), '#fee2e2', '#b91c1c');
+                setTTLiveSyncBadge('⚠️ TTLive Bot-Schutz aktiv', '#fee2e2', '#b91c1c');
                 if (cont) {
-                    cont.innerHTML = `<div class="tp-section-card" style="grid-column:1/-1;">
-                        <h4 style="font-size:18px; font-weight:800; color:#b91c1c;">⚠️ Live-Verbindung zu TischtennisLive noch nicht aktiv</h4>
-                        <p style="font-size:13.5px; margin:8px 0;">Damit alle Mannschaften live geladen werden können, stelle sicher, dass du das erweiterte Google Apps Script (mit <code>kind=tt_overview</code> und <code>kind=tt_team</code>) als <b>Neue Version</b> bereitgestellt hast.</p>
-                        <button class="btn btn-emerald" onclick="loadAllGraupaTeamsFromTTLive(true)">🔄 Jetzt erneut versuchen</button>
+                    cont.innerHTML = `<div class="tp-section-card" style="grid-column:1/-1; text-align:center; padding:24px;">
+                        <div style="font-size:28px; margin-bottom:8px;">🛡️</div>
+                        <h4 style="font-size:18px; font-weight:800; color:#b91c1c;">TischtennisLive schützt die Seite aktuell mit einer Bot-Abfrage</h4>
+                        <p style="font-size:13.5px; margin:8px 0 16px; color:#475569;">
+                            Weil TischtennisLive automatisierte Abfragen blockiert, ist einmalig eine kurze Bestätigung direkt auf deren Seite erforderlich.
+                        </p>
+                        <div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap;">
+                            <a href="${TTLIVE_OVERVIEW_URL}" target="_blank" rel="noopener" class="btn btn-amber">
+                                🛡️ 1. Bei TischtennisLive als Mensch verifizieren ↗
+                            </a>
+                            <button class="btn btn-emerald" onclick="loadAllGraupaTeamsFromTTLive(true)">
+                                🔄 2. Danach hier neu laden
+                            </button>
+                        </div>
                     </div>`;
                 }
             }
