@@ -2019,7 +2019,11 @@
                     <h2 style="font-size:32px; font-weight:800;">🏆 Turnierplaner</h2>
                 </div>
                 <div style="display:flex; flex-wrap:wrap; gap:8px;">
-                    <button class="btn btn-sand" onclick="switchPage('tischtennis')">🏓 Zurück zu Tischtennis</button>
+                    <button class="btn btn-sand" onclick="switchPage('tischtennis')">🏓 Tischtennis</button>
+                    <button class="btn btn-sand" onclick="switchPage('zaehlboard')">🔢 Digitales Zählboard</button>
+                    <button class="btn btn-emerald" onclick="switchPage('turnierplaner')">🏆 Turnierplaner</button>
+                    <button class="btn btn-sand" onclick="switchPage('radfahren')">🚴 Fahrradfahren</button>
+                    <button class="btn btn-sand" onclick="switchPage('wandern')">🥾 Wanderungen</button>
                 </div>
             </div>
 
@@ -2110,7 +2114,7 @@
 
                 <div id="tp-empty" class="tp-panel" style="text-align:center;">
                     <h3>Noch kein Turnier</h3>
-                    <p class="tp-help">Lege mit „➕ Lege neues Turnier an" los oder lade ein gespeichertes Turnier.</p>
+                    <p class="tp-help">Lade über „📂 Turnier laden“ ein bestehendes Turnier oder entsperre rechts oben den Admin-Modus, um ein neues Turnier anzulegen.</p>
                 </div>
             </div>
         </section>
@@ -2141,6 +2145,8 @@
                 </div>
                 <div style="display:flex; flex-wrap:wrap; gap:8px;">
                     <button class="btn btn-sand" onclick="switchPage('tischtennis')">🏓 Tischtennis</button>
+                    <button class="btn btn-sand" onclick="switchPage('zaehlboard')">🔢 Digitales Zählboard</button>
+                    <button class="btn btn-sand" onclick="switchPage('turnierplaner')">🏆 Turnierplaner</button>
                     <button class="btn btn-emerald" onclick="switchPage('radfahren')">🚴 Fahrradfahren</button>
                     <button class="btn btn-sand" onclick="switchPage('wandern')">🥾 Wanderungen</button>
                 </div>
@@ -2231,6 +2237,8 @@
                 </div>
                 <div style="display:flex; flex-wrap:wrap; gap:8px;">
                     <button class="btn btn-sand" onclick="switchPage('tischtennis')">🏓 Tischtennis</button>
+                    <button class="btn btn-sand" onclick="switchPage('zaehlboard')">🔢 Digitales Zählboard</button>
+                    <button class="btn btn-sand" onclick="switchPage('turnierplaner')">🏆 Turnierplaner</button>
                     <button class="btn btn-sand" onclick="switchPage('radfahren')">🚴 Fahrradfahren</button>
                     <button class="btn btn-emerald" onclick="switchPage('wandern')">🥾 Wanderungen</button>
                 </div>
@@ -2592,7 +2600,7 @@ Das umschließende Polygon, der kleinste Umkreis nach Welzl sowie die Mittelpunk
                     <button class="btn btn-sand" onclick="switchPage('area-maps')">🌍 Maps Math</button>
                     <button class="btn btn-sand" onclick="switchPage('dominanz')">⛰️ Berg-Dominanz-Atlas</button>
                     <button class="btn btn-sand" onclick="switchPage('luftlinie')">✈️ Luftlinie</button>
-                    <button class="btn btn-amber" onclick="switchPage('area-pur')">📏 Pure Math</button>
+                    <button class="btn btn-emerald" onclick="switchPage('area-pur')">📏 Pure Math</button>
                 </div>
             </div>
 
@@ -2637,7 +2645,9 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                 </div>
                 <div style="display:flex; flex-wrap:wrap; gap:8px;">
                     <button class="btn btn-amber" onclick="tetrisNewGame()">▶ Neues Spiel</button>
-                    <button class="btn btn-sand" onclick="switchPage('home')">🏠 Zur Startseite</button>
+                    <button class="btn btn-emerald" onclick="switchPage('tetris')">🧱 Tetris</button>
+                    <button class="btn btn-sand" onclick="switchPage('minesweeper')">💣 Minesweeper</button>
+                    <button class="btn btn-sand" onclick="switchPage('snake')">🐍 Snake</button>
                 </div>
             </div>
             <div class="sand-card tetris-shell">
@@ -2681,6 +2691,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                 <div style="display:flex; flex-wrap:wrap; gap:8px;">
                     <button class="btn btn-amber" onclick="msNewGame()">▶ Neues Spiel</button>
                     <button class="btn btn-sand" onclick="switchPage('tetris')">🧱 Tetris</button>
+                    <button class="btn btn-emerald" onclick="switchPage('minesweeper')">💣 Minesweeper</button>
                     <button class="btn btn-sand" onclick="switchPage('snake')">🐍 Snake</button>
                 </div>
             </div>
@@ -2726,6 +2737,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                     <button class="btn btn-amber" onclick="snakeNewGame()">▶ Neues Spiel</button>
                     <button class="btn btn-sand" onclick="switchPage('tetris')">🧱 Tetris</button>
                     <button class="btn btn-sand" onclick="switchPage('minesweeper')">💣 Minesweeper</button>
+                    <button class="btn btn-emerald" onclick="switchPage('snake')">🐍 Snake</button>
                 </div>
             </div>
             <div class="sand-card tetris-shell">
