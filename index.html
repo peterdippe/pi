@@ -6592,71 +6592,163 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         }
 
         function extractCleanDataTable(rows, headerIdx, kind) {
-            const extractCellsKeepEmpty = (tr) => {
-                const directEls = Array.from(tr.children).filter(el => el.tagName === 'TD' || el.tagName === 'TH');
-                if (directEls.some(c => c.querySelectorAll('tr').length > 2)) return [];
-                const out = [];
-                directEls.forEach(el => {
-                    const colspan = Math.max(1, parseInt(el.getAttribute('colspan') || '1', 10));
-                    const txt = el.textContent.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
-                    out.push(txt);
-                    for (let c = 1; c < colspan; c++) out.push('');
-                });
-                return out;
+            // Liest eine Zeile inklusive evtl. Bild-Badges (wie das "E"-Icon bei Ersatzspielern)
+            const readCellText = (el) => {
+                let txt = el.textContent.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+                if (!txt) {
+                    const img = el.querySelector('img');
+                    if (img) {
+                        const alt = (img.getAttribute('alt') || img.getAttribute('title') || img.getAttribute('src') || '').trim();
+                        if (/^e$/i.test(alt) || /ersatz/i.test(alt)) txt = 'E';
+                        else if (/jugend|spv|sperr/i.test(alt)) txt = alt.slice(0, 2).toUpperCase();
+                    }
+                }
+                return txt;
             };
 
-            let headers = extractCellsKeepEmpty(rows[headerIdx]).filter(Boolean).map(h => {
-                if (/^Datum/i.test(h)) return 'Datum';
-                if (/^Ergebnis/i.test(h)) return 'Ergebnis';
-                if (/^Kennzeichnung/i.test(h)) return 'Kz.';
-                return h;
-            });
+            // Expandiert eine Zeile exakt nach ihren colspan-Werten in ein festes Spaltenraster
+            const expandRow = (tr) => {
+                const directEls = Array.from(tr.children).filter(el => el.tagName === 'TD' || el.tagName === 'TH');
+                if (directEls.some(c => c.querySelectorAll('tr').length > 2)) return [];
+                const cols = [];
+                directEls.forEach(el => {
+                    const span = Math.max(1, parseInt(el.getAttribute('colspan') || '1', 10));
+                    const txt = readCellText(el);
+                    cols.push(txt);
+                    for (let k = 1; k < span; k++) cols.push('');
+                });
+                return cols;
+            };
 
-            const bodyRows = [];
+            const rawHeaderCols = expandRow(rows[headerIdx]);
+            const rawBodyRows = [];
             for (let i = headerIdx + 1; i < rows.length; i++) {
-                let cells = extractCellsKeepEmpty(rows[i]);
-                if (cells.filter(Boolean).length < 2) continue;
+                const rCols = expandRow(rows[i]);
+                if (rCols.filter(Boolean).length >= 2) {
+                    rawBodyRows.push(rCols);
+                }
+            }
 
-                if (kind === 'schedule') {
-                    // Beim Spielplan leere Layout-Zwischenzellen entfernen und "v" (verlegt) mit Uhrzeit verbinden
-                    const nonEmpty = cells.filter(Boolean);
-                    const mergedSched = [];
+            // SPEZIALFALL 1: SPIELPLAN
+            if (kind === 'schedule') {
+                const bodyRows = rawBodyRows.map(rCols => {
+                    const nonEmpty = rCols.filter(Boolean);
+                    const merged = [];
                     for (let c = 0; c < nonEmpty.length; c++) {
                         if (nonEmpty[c] === 'v' && c + 1 < nonEmpty.length && /^\d{1,2}:\d{2}/.test(nonEmpty[c + 1])) {
-                            mergedSched.push('v ' + nonEmpty[c + 1]);
+                            merged.push('v ' + nonEmpty[c + 1]);
                             c++;
                         } else {
-                            mergedSched.push(nonEmpty[c]);
+                            merged.push(nonEmpty[c]);
                         }
                     }
-                    cells = mergedSched;
-                }
+                    return { cells: merged, isTotal: false };
+                });
+                const headers = (bodyRows[0] && bodyRows[0].cells.length === 7)
+                    ? ['Nr.', 'Tag', 'Datum', 'Zeit', 'Heimmannschaft', 'Gastmannschaft', 'Ergebnis']
+                    : rawHeaderCols.filter(Boolean).map(h => /^Datum/i.test(h) ? 'Datum' : /^Ergebnis/i.test(h) ? 'Ergebnis' : h);
+                return { headers, rows: bodyRows };
+            }
 
-                const isTotal = cells.some(c => /^Gesamt$/i.test(c));
-
-                // In der "Gesamt"-Zeile stehen oft leere Zellen vor dem Wort "Gesamt" -> "Gesamt" ganz nach links setzen
-                if (isTotal) {
-                    const gIdx = cells.findIndex(c => /^Gesamt$/i.test(c));
-                    if (gIdx > 0) {
-                        cells[0] = 'Gesamt';
-                        cells[gIdx] = '';
+            // SPEZIALFALL 2: DOPPEL-BILANZEN (4 feste Zielspalten: Spieler 1, Spieler 2, Bilanz, +/-)
+            if (kind === 'doubles') {
+                const headers = ['Spieler 1', 'Spieler 2', 'Bilanz', '+/-'];
+                const bodyRows = rawBodyRows.map(rCols => {
+                    const nonEmpty = rCols.filter(Boolean);
+                    const isTotal = nonEmpty.some(c => /^Gesamt$/i.test(c));
+                    if (isTotal) {
+                        // In der Gesamt-Zeile stehen ["Gesamt", "2:7", "-5"]
+                        const gIdx = nonEmpty.findIndex(c => /^Gesamt$/i.test(c));
+                        const rest = nonEmpty.slice(gIdx + 1);
+                        return { cells: ['Gesamt', '', rest[0] || '', rest[1] || ''], isTotal: true };
                     }
-                }
-
-                // Falls am Zeilenende Zellen fehlen, auf Header-Länge auffüllen
-                while (cells.length < headers.length) cells.push('');
-                if (headers.length > 0 && cells.length > headers.length) {
-                    cells = cells.slice(0, headers.length);
-                }
-
-                bodyRows.push({ cells, isTotal });
+                    // Reguläre Doppel-Zeile: Entferne evtl. führende Rang-Nummern ("1.", "2.") falls vorhanden
+                    let vals = [...nonEmpty];
+                    if (vals.length > 4 && /^\d+\.?$/.test(vals[0])) vals.shift();
+                    return {
+                        cells: [vals[0] || '', vals[1] || '', vals[2] || '', vals[3] || ''],
+                        isTotal: false
+                    };
+                });
+                return { headers, rows: bodyRows };
             }
 
-            if (kind === 'schedule' && bodyRows.length > 0 && bodyRows[0].cells.length === 7) {
-                headers = ['Nr.', 'Tag', 'Datum', 'Zeit', 'Heimmannschaft', 'Gastmannschaft', 'Ergebnis'];
+            // SPEZIALFALL 3: EINZEL-BILANZEN & SONSTIGE TABELLEN
+            // Wir prüfen für jede physikalische Spalte s, ob sie im Header ODER in irgendeiner Datenzeile Inhalt hat.
+            // Komplett leere Spacer-Spalten (oder eine reine Checkbox-/Icon-Spalte ganz links vor "Position") werfen wir synchron aus Header + allen Zeilen!
+            const maxCols = Math.max(rawHeaderCols.length, ...rawBodyRows.map(r => r.length));
+            const normHeader = Array.from({ length: maxCols }, (_, s) => rawHeaderCols[s] || '');
+            const normBody = rawBodyRows.map(r => Array.from({ length: maxCols }, (_, s) => r[s] || ''));
+
+            // Falls im Header durch ein falsches colspan "Position" in Spalte 0 steht, aber in den Datenzeilen Spalte 0 leer ist und "1." erst in Spalte 1 steht:
+            if (normBody.length > 0 && /^Position$/i.test(normHeader[0]) && normBody.every(r => !r[0]) && normBody.some(r => /^\d+\.?$|^\d+[A-Za-z]+\/\d+$/.test(r[1]))) {
+                normBody.forEach(r => r.shift());
+                normBody.forEach(r => r.push(''));
             }
 
-            return { headers, rows: bodyRows };
+            // Wenn zwischen "Spieler" und "Kennzeichnung" eine unbeschriftete Zusatzspalte existiert, in der der Spielername gelandet ist:
+            // Wir mappen bei Einzel-Bilanzen jede Zeile intelligent auf das exakte 9-Spalten-Schema:
+            // [Position, Spieler, Kz., ST, PK1, PK2, PK3, Gesamt, LivePZ]
+            if (kind === 'singles') {
+                const hasPk3 = normHeader.some(h => /PK\s*3/i.test(h));
+                const hasLpz = normHeader.some(h => /LivePZ|LPZ/i.test(h));
+                const headers = ['Position', 'Spieler', 'Kz.', 'ST', 'PK1', 'PK2', ...(hasPk3 ? ['PK3'] : []), 'Gesamt', ...(hasLpz ? ['LivePZ'] : [])];
+                const pkCount = hasPk3 ? 3 : 2;
+
+                const bodyRows = rawBodyRows.map(rCols => {
+                    const isTotal = rCols.some(c => /^Gesamt$/i.test(c));
+                    if (isTotal) {
+                        const nonEmpty = rCols.filter(Boolean);
+                        const gIdx = nonEmpty.findIndex(c => /^Gesamt$/i.test(c));
+                        const ratios = nonEmpty.slice(gIdx + 1); // z.B. ["3:9", "7:5", "3:9", "13:23"]
+                        const cells = ['Gesamt', '', '', ''];
+                        for (let p = 0; p < pkCount; p++) cells.push(ratios[p] || '');
+                        cells.push(ratios[pkCount] || ''); // Gesamt-Bilanz
+                        if (hasLpz) cells.push('');
+                        return { cells, isTotal: true };
+                    }
+
+                    // Für jeden Spieler suchen wir in rCols die Anker-Positionen:
+                    // 1. Position (z.B. "1.", "2.", "2Er/1")
+                    let idxPos = rCols.findIndex(c => /^\d+\.?$|^\d+[A-Za-z]+\/\d+$/.test(c));
+                    if (idxPos === -1) idxPos = 0;
+                    const posVal = rCols[idxPos] || '';
+
+                    // 2. Spielername (erste nicht-leere Textzelle nach Position, die kein einzelnes Kürzel ist)
+                    let idxName = -1;
+                    for (let k = idxPos + 1; k < rCols.length; k++) {
+                        if (rCols[k] && !/^\d+$/.test(rCols[k])) { idxName = k; break; }
+                    }
+                    const nameVal = idxName !== -1 ? rCols[idxName] : '';
+
+                    // 3. ST (Teilnahmen: erste reine 1-2 stellige Zahl nach dem Namen)
+                    let idxSt = -1;
+                    for (let k = (idxName !== -1 ? idxName + 1 : idxPos + 1); k < rCols.length; k++) {
+                        if (/^\d{1,2}$/.test(rCols[k])) { idxSt = k; break; }
+                    }
+                    const stVal = idxSt !== -1 ? rCols[idxSt] : '';
+
+                    // 4. Kennzeichnung (falls zwischen Name und ST z.B. "E", "S", "J", "SPV" steht)
+                    let kzVal = '';
+                    if (idxName !== -1 && idxSt !== -1 && idxSt > idxName + 1) {
+                        kzVal = rCols.slice(idxName + 1, idxSt).filter(Boolean).join(' ');
+                    }
+
+                    // 5. Nach ST folgen exakt die festen Spalten für PK1, PK2, (PK3), Gesamt, (LivePZ)
+                    const afterSt = idxSt !== -1 ? rCols.slice(idxSt + 1) : [];
+                    const pkVals = [];
+                    for (let p = 0; p < pkCount; p++) pkVals.push(afterSt[p] || '');
+                    const totalVal = afterSt[pkCount] || '';
+                    const lpzVal = hasLpz ? (afterSt[pkCount + 1] || '') : '';
+
+                    const cells = [posVal, nameVal, kzVal, stVal, ...pkVals, totalVal, ...(hasLpz ? [lpzVal] : [])];
+                    return { cells, isTotal: false };
+                });
+
+                return { headers, rows: bodyRows };
+            }
+
+            return { headers: normHeader, rows: normBody.map(cells => ({ cells, isTotal: false })) };
         }
 
         // -----------------------------------------------------------------
