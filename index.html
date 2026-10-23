@@ -6515,7 +6515,8 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
 
             // 2. Ballmarke auslesen
             let ballInfo = '';
-            const ballMatch = fullText.match(/Die\s+Mannschaft\s+verwendet\s+Bälle\s+der\s+Marke\s+([^\n\r.!]+(\*{1,3})?)/i);
+            const ballMatch = fullText.match(/Die\s+Mannschaft\s+verwendet\s+Bälle\s+der\s+Marke\s+([^\n\r.!]+?)(?=Einzel|Doppel|Spielplan|$)/i);
+            if (ballMatch) ballInfo = ('Die Mannschaft verwendet Bälle der Marke ' + ballMatch[1]).replace(/\s+/g, ' ').trim();
             if (ballMatch) ballInfo = ballMatch[0].replace(/\s+/g, ' ').trim();
 
             // 3. Alle Tabellen prüfen, die keine großen Unter-Tabellen enthalten
@@ -6591,83 +6592,68 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         }
 
         function extractCleanDataTable(rows, headerIdx, kind) {
-            let headers = getCleanRowCells(rows[headerIdx]).map(h => {
+            const extractCellsKeepEmpty = (tr) => {
+                const directEls = Array.from(tr.children).filter(el => el.tagName === 'TD' || el.tagName === 'TH');
+                if (directEls.some(c => c.querySelectorAll('tr').length > 2)) return [];
+                const out = [];
+                directEls.forEach(el => {
+                    const colspan = Math.max(1, parseInt(el.getAttribute('colspan') || '1', 10));
+                    const txt = el.textContent.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+                    out.push(txt);
+                    for (let c = 1; c < colspan; c++) out.push('');
+                });
+                return out;
+            };
+
+            let headers = extractCellsKeepEmpty(rows[headerIdx]).filter(Boolean).map(h => {
                 if (/^Datum/i.test(h)) return 'Datum';
-                if /^Ergebnis/i.test(h)) return 'Ergebnis';
+                if (/^Ergebnis/i.test(h)) return 'Ergebnis';
                 if (/^Kennzeichnung/i.test(h)) return 'Kz.';
                 return h;
             });
 
             const bodyRows = [];
             for (let i = headerIdx + 1; i < rows.length; i++) {
-                const tr = rows[i];
-                // Wichtig: Wir holen hier die Zellen direkt über die DOM-Knoten ab, 
-                // um festzustellen, ob Zellen leer sind oder durch colspan verschoben wurden!
-                const directEls = Array.from(tr.children).filter(el => el.tagName === 'TD' || el.tagName === 'TH');
-                if (directEls.some(c => c.querySelectorAll('table').length > 2)) continue;
-
-                let cells = [];
-                directEls.forEach(el => {
-                    const colspan = parseInt(el.getAttribute('colspan') || '1', 10);
-                    const txt = el.textContent.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
-                    cells.push(txt);
-                    // Falls eine Zelle colspan > 1 hat (z.B. verbundene leere Zellen), entsprechende Leerzellen einfügen
-                    for (let c = 1; c < colspan; c++) cells.push('');
-                });
-
-                const rawJoined = cells.join(' | ').trim();
-                if (!rawJoined) continue;
-
-                const isTotal = /^Gesamt/i.test(cells[0]) || /^Gesamt/i.test(cells[1] || '') || /^Gesamt/i.test(rawJoined);
-
-                // Wenn es die Einzel-Bilanz-Tabelle ist, mappen wir die Spalten anhand typischer Muster,
-                // damit Werte bei fehlenden PK-Spalten niemals verrutschen:
-                if (kind === 'singles' && !isTotal && headers.length >= 8) {
-                    // Erwartete Spalten im Header: Position, Spieler, Kennzeichnung, ST, PK1, PK2, PK3, Gesamt, LivePZ
-                    // Manchmal fehlt die Kennzeichnung-Spalte im HTML. Wir fangen das sauber ab:
-                    const cleanedCells = cells.filter(Boolean);
-                    if (cleanedCells.length >= 7 && cleanedCells.length < headers.length) {
-                        // Prüfen ob Kennzeichnung (z.B. 'E') fehlt
-                        const hasFlag = cleanedCells.some(c => c === 'E' || c === 'FS' || c === 'S');
-                        if (!hasFlag && headers.includes('Kz.')) {
-                            // Füge an Position 2 (Kennzeichnung) einen Leerstring ein
-                            cells = [cells[0], cells[1], '', ...cells.slice(2)];
-                        }
-                    }
-                }
+                let cells = extractCellsKeepEmpty(rows[i]);
+                if (cells.filter(Boolean).length < 2) continue;
 
                 if (kind === 'schedule') {
+                    // Beim Spielplan leere Layout-Zwischenzellen entfernen und "v" (verlegt) mit Uhrzeit verbinden
+                    const nonEmpty = cells.filter(Boolean);
                     const mergedSched = [];
-                    for (let c = 0; c < cells.length; c++) {
-                        if (cells[c] === 'v' && c + 1 < cells.length && /^\d{1,2}:\d{2}/.test(cells[c + 1])) {
-                            mergedSched.push('v ' + cells[c + 1]);
+                    for (let c = 0; c < nonEmpty.length; c++) {
+                        if (nonEmpty[c] === 'v' && c + 1 < nonEmpty.length && /^\d{1,2}:\d{2}/.test(nonEmpty[c + 1])) {
+                            mergedSched.push('v ' + nonEmpty[c + 1]);
                             c++;
                         } else {
-                            mergedSched.push(cells[c]);
+                            mergedSched.push(nonEmpty[c]);
                         }
                     }
                     cells = mergedSched;
                 }
 
-                // Spaltenanzahl exakt an Header anpassen (Fehlende auffüllen)
-                if (cells.length < headers.length && !isTotal) {
-                    // Wenn z.B. PK2/PK3 leer sind, schieben wir sie vor 'Gesamt' und 'LivePZ'
-                    if (kind === 'singles' && headers.length === 9 && cells.length === 8) {
-                        // Erkennen ob Kennzeichnung fehlt oder PK-Spalte
-                        cells = [cells[0], cells[1], '', cells[2], cells[3], cells[4], cells[5], cells[6], cells[7]];
-                    } else {
-                        while (cells.length < headers.length) cells.push('');
+                const isTotal = cells.some(c => /^Gesamt$/i.test(c));
+
+                // In der "Gesamt"-Zeile stehen oft leere Zellen vor dem Wort "Gesamt" -> "Gesamt" ganz nach links setzen
+                if (isTotal) {
+                    const gIdx = cells.findIndex(c => /^Gesamt$/i.test(c));
+                    if (gIdx > 0) {
+                        cells[0] = 'Gesamt';
+                        cells[gIdx] = '';
                     }
                 }
 
-                bodyRows.forEach(r => {
-                    if (r.isTotal && r.cells.length < headers.length) {
-                        const diff = headers.length - r.cells.length;
-                        r.cells = [r.cells[0], ...Array(diff).fill(''), ...r.cells.slice(1)];
-                    }
-                });
+                // Falls am Zeilenende Zellen fehlen, auf Header-Länge auffüllen
+                while (cells.length < headers.length) cells.push('');
+                if (headers.length > 0 && cells.length > headers.length) {
+                    cells = cells.slice(0, headers.length);
+                }
 
                 bodyRows.push({ cells, isTotal });
+            }
+
+            if (kind === 'schedule' && bodyRows.length > 0 && bodyRows[0].cells.length === 7) {
+                headers = ['Nr.', 'Tag', 'Datum', 'Zeit', 'Heimmannschaft', 'Gastmannschaft', 'Ergebnis'];
             }
 
             return { headers, rows: bodyRows };
