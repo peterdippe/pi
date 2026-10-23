@@ -6440,6 +6440,63 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             return teams;
         }
 
+        function renderGraupaTeamTabs() {
+            const bar = document.getElementById('tt-team-tabs');
+            if (!bar) return;
+            bar.innerHTML = ttTeamsList.map((t, idx) => `
+                <button class="tt-team-tab ${t.id === activeGraupaTeamId ? 'active' : ''}"
+                        onclick="selectGraupaTeamTab('${t.id}')">
+                    🏓 ${domEsc(t.tabName || ((idx + 1) + '. Mannschaft'))}
+                </button>
+            `).join('') + `
+                <button class="btn btn-sand" style="margin-left:auto; padding:6px 11px; font-size:11.5px;" onclick="loadAllGraupaTeamsFromTTLive(true)" title="Alle Tabellen & Bilanzen frisch von TischtennisLive abrufen">
+                    🔄 Alle live aktualisieren
+                </button>
+            `;
+        }
+
+        async function selectGraupaTeamTab(teamId) {
+            activeGraupaTeamId = teamId;
+            renderGraupaTeamTabs();
+
+            const team = ttTeamsList.find(t => t.id === teamId);
+            if (!team) return;
+
+            const directLink = document.getElementById('tt-team-direct-link');
+            if (directLink && team.teamUrl) directLink.href = team.teamUrl;
+
+            renderGraupaTeamLayout(team, ttTeamDetailsCache[teamId] || null, !ttTeamDetailsCache[teamId]);
+
+            if (ttTeamDetailsCache[teamId]) return;
+
+            const cloudUrl = (CONFIG.pinnwandCloudUrl || '').trim();
+            try {
+                const res = await fetch(`${cloudUrl}?kind=tt_team&url=${encodeURIComponent(team.teamUrl)}&t=${Date.now()}`, { redirect: 'follow' });
+                const data = await res.json();
+                if (data && data.ok && data.html) {
+                    const details = parseTTLiveTeamDetailHtml(data.html, data.lpzHtml || '');
+                    ttTeamDetailsCache[teamId] = details;
+                    if (details.headerTitle) {
+                        const cleanSub = details.headerTitle.replace(/^TSV\s+Graupa\s*[,·-]?\s*/i, '').trim();
+                        if (cleanSub) {
+                            team.tabName = cleanSub;
+                            renderGraupaTeamTabs();
+                        }
+                    }
+                    if (activeGraupaTeamId === teamId) {
+                        renderGraupaTeamLayout(team, details, false);
+                    }
+                } else {
+                    throw new Error(data?.error || 'Detailseite konnte nicht geladen werden');
+                }
+            } catch (err) {
+                console.warn('Fehler beim Laden der Mannschaftsdetails:', err);
+                if (activeGraupaTeamId === teamId) {
+                    renderGraupaTeamLayout(team, { error: String(err) }, false);
+                }
+            }
+        }
+
         function parseTTLiveTeamDetailHtml(htmlString, lpzHtmlString) {
             const doc = sanitizeTTLiveDom(htmlString);
             const fullText = doc.body ? doc.body.textContent : '';
