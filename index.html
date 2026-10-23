@@ -6239,12 +6239,103 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         // -----------------------------------------------------------------
         // SCHRITT A: ÜBERSICHTSSEITE (L2P=870) LADEN & ALLE MANNSCHAFTEN EXTRAHIEREN
         // -----------------------------------------------------------------
-        async function loadAllGraupaTeamsFromTTLive(forceRefresh) {
+        async function fetchTTLiveHtmlCascade(kind, targetUrl, cacheKey, forceRefresh) {
             const cloudUrl = (CONFIG.pinnwandCloudUrl || '').trim();
+
+            // STUFE 1: Google Apps Script (inkl. Auto-Token-POST & Google Drive Cache)
+            if (cloudUrl && cloudUrl.startsWith('https://script.google.com/')) {
+                try {
+                    const gasUrl = kind === 'overview'
+                        ? `${cloudUrl}?kind=tt_overview&saison=2026${forceRefresh ? '&force=1' : ''}&t=${Date.now()}`
+                        : `${cloudUrl}?kind=tt_team&url=${encodeURIComponent(targetUrl)}&t=${Date.now()}`;
+                    const res = await fetch(gasUrl, { redirect: 'follow' });
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data && data.ok && data.html && /TSV\s+Graupa/i.test(data.html) && !/Ich bin ein Mensch/i.test(data.html)) {
+                            return { html: data.html, source: data.cached === 'drive' ? 'Drive-Cache' : 'TTLive (Cloud)' };
+                        }
+                    }
+                } catch (e) {}
+            }
+
+            // STUFE 2: Multi-CORS-Proxy-Kaskade direkt aus dem Browser
+            const proxies = [
+                {
+                    name: 'CodeTabs',
+                    buildUrl: u => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u),
+                    extract: async r => await r.text()
+                },
+                {
+                    name: 'AllOrigins-JSON',
+                    buildUrl: u => 'https://api.allorigins.win/get?url=' + encodeURIComponent(u) + '&t=' + Date.now(),
+                    extract: async r => { const j = await r.json(); return (j && j.contents) ? j.contents : ''; }
+                },
+                {
+                    name: 'CorsProxy',
+                    buildUrl: u => 'https://corsproxy.io/?url=' + encodeURIComponent(u),
+                    extract: async r => await r.text()
+                }
+            ];
+
+            for (const p of proxies) {
+                try {
+                    const res = await fetch(p.buildUrl(targetUrl));
+                    if (!res.ok) continue;
+                    const html = await p.extract(res);
+                    if (html && /TSV\s+Graupa/i.test(html) && !/Ich bin ein Mensch/i.test(html)) {
+                        // Erfolg! Im Hintergrund gleich im Google-Drive-Cache sichern
+                        if (cloudUrl && cacheKey) {
+                            fetch(cloudUrl, {
+                                method: 'POST', redirect: 'follow',
+                                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                                body: JSON.stringify({ kind: 'tt_save_cache', key: cacheKey, html: html })
+                            }).catch(() => {});
+                        }
+                        return { html, source: 'TTLive (' + p.name + ')' };
+                    }
+                } catch (e) {}
+            }
+
+            throw new Error('TTLive verlangt aktuell eine kurze Browser-Bestätigung');
+        }
+
+        function openManualTTImportModal() {
+            const pasted = prompt(
+                'So schaltest du alle 11 Mannschaften in 5 Sekunden frei (und speicherst sie für alle Geräte in Google Drive):\n\n' +
+                '1. Öffne die TTLive-Seite über den gelben Button (und klicke ggf. auf "Ich bin ein Mensch").\n' +
+                '2. Drücke dort Strg+U (Seitenquelltext), dann Strg+A (Alles markieren) und Strg+C (Kopieren).\n' +
+                '3. Füge den kopierten Quelltext hier mit Strg+V ein:'
+            );
+            if (!pasted || !/TSV\s+Graupa/i.test(pasted)) {
+                if (pasted) alert('Im eingefügten Text wurden keine Tabellen des TSV Graupa gefunden. Bitte mit Strg+U den Seitenquelltext kopieren.');
+                return;
+            }
+            const parsedTeams = parseTTLiveOverviewHtml(pasted);
+            if (!parsedTeams.length) {
+                alert('Keine Liga-Tabellen im Quelltext erkannt.');
+                return;
+            }
+            ttTeamsList = parsedTeams;
+            try { localStorage.setItem('dippe_tt_overview_v1', JSON.stringify(ttTeamsList)); } catch (e) {}
+            const cloudUrl = (CONFIG.pinnwandCloudUrl || '').trim();
+            if (cloudUrl) {
+                fetch(cloudUrl, {
+                    method: 'POST', redirect: 'follow',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({ kind: 'tt_save_cache', key: 'overview_2026', html: pasted })
+                }).catch(() => {});
+            }
+            activeGraupaTeamId = ttTeamsList[0].id;
+            setTTLiveSyncBadge(`☁️ Live synchronisiert (${ttTeamsList.length} Mannschaften)`, '#d1fae5', '#065f46');
+            renderGraupaTeamTabs();
+            selectGraupaTeamTab(activeGraupaTeamId);
+        }
+
+        async function loadAllGraupaTeamsFromTTLive(forceRefresh) {
             const cont = document.getElementById('tt-team-content');
             if (forceRefresh) ttTeamDetailsCache = {};
 
-            // 1. Sofort-Anzeige aus lokalem Browser-Cache (0 ms Wartezeit beim Seitenaufruf)
+            // Lokalen Browser-Cache sofort (0 ms) anzeigen, falls vorhanden
             if (!ttTeamsList.length && !forceRefresh) {
                 try {
                     const cachedOverview = localStorage.getItem('dippe_tt_overview_v1');
@@ -6272,12 +6363,8 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             }
 
             try {
-                const res = await fetch(`${cloudUrl}?kind=tt_overview&saison=2026${forceRefresh ? '&force=1' : ''}&t=${Date.now()}`, { redirect: 'follow' });
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                const data = await res.json();
-                if (!data || !data.ok || !data.html) throw new Error(data?.error || 'Keine HTML-Daten erhalten');
-
-                const parsedTeams = parseTTLiveOverviewHtml(data.html);
+                const result = await fetchTTLiveHtmlCascade('overview', TTLIVE_OVERVIEW_URL, 'overview_2026', forceRefresh);
+                const parsedTeams = parseTTLiveOverviewHtml(result.html);
                 if (!parsedTeams.length) throw new Error('Keine Graupa-Tabellen im HTML gefunden');
 
                 ttTeamsList = parsedTeams;
@@ -6287,7 +6374,8 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                     activeGraupaTeamId = ttTeamsList[0].id;
                 }
 
-                setTTLiveSyncBadge(`☁️ Live aus TTLive (${ttTeamsList.length} Mannschaften · ${new Date().toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'})})`, '#d1fae5', '#065f46');
+                const timeStr = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+                setTTLiveSyncBadge(`☁️ ${result.source} (${ttTeamsList.length} Mannschaften · ${timeStr})`, '#d1fae5', '#065f46');
                 renderGraupaTeamTabs();
                 selectGraupaTeamTab(activeGraupaTeamId);
             } catch (err) {
@@ -6295,7 +6383,27 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                 if (ttTeamsList.length) {
                     setTTLiveSyncBadge(`⚡ Gespeicherter Live-Stand (${ttTeamsList.length} Mannschaften)`, '#e0f2fe', '#0369a1');
                 } else {
-                    setTTLiveSyncBadge('⚠️ ' + (err.message || err), '#fee2e2', '#b91c1c');
+                    setTTLiveSyncBadge('⚠️ TTLive Bot-Weiche aktiv', '#fee2e2', '#b91c1c');
+                    if (cont) {
+                        cont.innerHTML = `<div class="tp-section-card" style="grid-column:1/-1; text-align:center; padding:24px;">
+                            <div style="font-size:28px; margin-bottom:8px;">🛡️</div>
+                            <h4 style="font-size:18px; font-weight:800; color:#b91c1c;">TischtennisLive Bot-Weiche („Ich bin ein Mensch“) aktiv</h4>
+                            <p style="font-size:13.5px; margin:8px 0 16px; color:#475569;">
+                                Stelle sicher, dass das aktualisierte Google Apps Script als <b>Neue Version</b> bereitgestellt ist, oder übernimm die Tabellen per 1-Klick-Sync direkt in dein Google Drive:
+                            </p>
+                            <div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap;">
+                                <a href="${TTLIVE_OVERVIEW_URL}" target="_blank" rel="noopener" class="btn btn-amber">
+                                    🏓 1. TTLive-Tabellen öffnen ↗
+                                </a>
+                                <button class="btn btn-emerald" onclick="loadAllGraupaTeamsFromTTLive(true)">
+                                    🔄 2. Erneut automatisch abrufen
+                                </button>
+                                <button class="btn btn-dark" onclick="openManualTTImportModal()">
+                                    📋 3. Quelltext einfügen (Cloud-Sync)
+                                </button>
+                            </div>
+                        </div>`;
+                    }
                 }
             }
         }
@@ -6499,31 +6607,28 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
 
             if (ttTeamDetailsCache[teamId]) return;
 
-            const cloudUrl = (CONFIG.pinnwandCloudUrl || '').trim();
             try {
-                const res = await fetch(`${cloudUrl}?kind=tt_team&url=${encodeURIComponent(team.teamUrl)}&t=${Date.now()}`, { redirect: 'follow' });
-                const data = await res.json();
-                if (data && data.ok && data.html) {
-                    const details = parseTTLiveTeamDetailHtml(data.html, data.lpzHtml || '');
-                    ttTeamDetailsCache[teamId] = details;
-                    try { localStorage.setItem('dippe_tt_details_v1', JSON.stringify(ttTeamDetailsCache)); } catch(e) {}
-                    if (details.headerTitle) {
-                        const cleanSub = details.headerTitle.replace(/^TSV\s+Graupa\s*[,·-]?\s*/i, '').trim();
-                        if (cleanSub) {
-                            team.tabName = cleanSub;
-                            renderGraupaTeamTabs();
-                        }
+                const l3p = (team.teamUrl.match(/L3P=(\d+)/i) || [])[1] || teamId;
+                const result = await fetchTTLiveHtmlCascade('team', team.teamUrl, 'team_' + l3p, false);
+                const details = parseTTLiveTeamDetailHtml(result.html, '');
+                ttTeamDetailsCache[teamId] = details;
+                try { localStorage.setItem('dippe_tt_details_v1', JSON.stringify(ttTeamDetailsCache)); } catch (e) {}
+
+                if (details.headerTitle) {
+                    const cleanSub = details.headerTitle.replace(/^TSV\s+Graupa\s*[,·-]?\s*/i, '').trim();
+                    if (cleanSub) {
+                        team.tabName = cleanSub;
+                        try { localStorage.setItem('dippe_tt_overview_v1', JSON.stringify(ttTeamsList)); } catch (e) {}
+                        renderGraupaTeamTabs();
                     }
-                    if (activeGraupaTeamId === teamId) {
-                        renderGraupaTeamLayout(team, details, false);
-                    }
-                } else {
-                    throw new Error(data?.error || 'Detailseite konnte nicht geladen werden');
+                }
+                if (activeGraupaTeamId === teamId) {
+                    renderGraupaTeamLayout(team, details, false);
                 }
             } catch (err) {
                 console.warn('Fehler beim Laden der Mannschaftsdetails:', err);
                 if (activeGraupaTeamId === teamId) {
-                    renderGraupaTeamLayout(team, { error: String(err) }, false);
+                    renderGraupaTeamLayout(team, { error: String(err.message || err) }, false);
                 }
             }
         }
