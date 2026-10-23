@@ -6240,10 +6240,29 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
         // SCHRITT A: ÜBERSICHTSSEITE (L2P=870) LADEN & ALLE MANNSCHAFTEN EXTRAHIEREN
         // -----------------------------------------------------------------
         async function loadAllGraupaTeamsFromTTLive(forceRefresh) {
+            const cloudUrl = (CONFIG.pinnwandCloudUrl || '').trim();
             const cont = document.getElementById('tt-team-content');
             if (forceRefresh) ttTeamDetailsCache = {};
 
-            setTTLiveSyncBadge('⏳ Lade aktuelle Tabellen live aus TischtennisLive …', '#fef3c7', '#92400e');
+            // 1. Sofort-Anzeige aus lokalem Browser-Cache (0 ms Wartezeit beim Seitenaufruf)
+            if (!ttTeamsList.length && !forceRefresh) {
+                try {
+                    const cachedOverview = localStorage.getItem('dippe_tt_overview_v1');
+                    const cachedDetails = localStorage.getItem('dippe_tt_details_v1');
+                    if (cachedOverview) {
+                        const parsedCache = JSON.parse(cachedOverview);
+                        if (Array.isArray(parsedCache) && parsedCache.length) {
+                            ttTeamsList = parsedCache;
+                            if (cachedDetails) ttTeamDetailsCache = JSON.parse(cachedDetails) || {};
+                            activeGraupaTeamId = ttTeamsList[0].id;
+                            renderGraupaTeamTabs();
+                            selectGraupaTeamTab(activeGraupaTeamId);
+                        }
+                    }
+                } catch (e) {}
+            }
+
+            setTTLiveSyncBadge('⏳ Synchronisiere live mit TischtennisLive …', '#fef3c7', '#92400e');
             if (cont && !ttTeamsList.length) {
                 cont.innerHTML = `<div class="tp-section-card" style="grid-column:1/-1; text-align:center; padding:28px;">
                     <div style="font-size:28px; margin-bottom:8px;">🏓</div>
@@ -6253,22 +6272,17 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
             }
 
             try {
-                // Nutzung eines stabilen CORS-Proxies, um die Cloudflare-Sperre für Server-IPs zu umgehen
-                const targetUrl = 'https://dresden.tischtennislive.de/?L1=Public&L2=Verein&L2P=870&Page=Spielbetrieb&Sportart=96&Page2=Tabellen&Saison=2026';
-                const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(targetUrl);
-
-                const res = await fetch(proxyUrl);
+                const res = await fetch(`${cloudUrl}?kind=tt_overview&saison=2026${forceRefresh ? '&force=1' : ''}&t=${Date.now()}`, { redirect: 'follow' });
                 if (!res.ok) throw new Error('HTTP ' + res.status);
-                const htmlText = await res.text();
+                const data = await res.json();
+                if (!data || !data.ok || !data.html) throw new Error(data?.error || 'Keine HTML-Daten erhalten');
 
-                if (/Bitte bestätigen Sie/i.test(htmlText) || /cf-chl-widget/i.test(htmlText)) {
-                    throw new Error('Cloudflare-Sperre aktiv. Bitte einmal kurz den Original-Link oben rechts anklicken und verifizieren.');
-                }
-
-                const parsedTeams = parseTTLiveOverviewHtml(htmlText);
+                const parsedTeams = parseTTLiveOverviewHtml(data.html);
                 if (!parsedTeams.length) throw new Error('Keine Graupa-Tabellen im HTML gefunden');
 
                 ttTeamsList = parsedTeams;
+                try { localStorage.setItem('dippe_tt_overview_v1', JSON.stringify(ttTeamsList)); } catch (e) {}
+
                 if (!activeGraupaTeamId || !ttTeamsList.some(t => t.id === activeGraupaTeamId)) {
                     activeGraupaTeamId = ttTeamsList[0].id;
                 }
@@ -6277,24 +6291,11 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                 renderGraupaTeamTabs();
                 selectGraupaTeamTab(activeGraupaTeamId);
             } catch (err) {
-                console.warn('Live-Abruf fehlgeschlagen:', err);
-                setTTLiveSyncBadge('⚠️ ' + (err.message || err), '#fee2e2', '#b91c1c');
-                if (cont) {
-                    cont.innerHTML = `<div class="tp-section-card" style="grid-column:1/-1; text-align:center; padding:24px;">
-                        <div style="font-size:28px; margin-bottom:8px;">🛡️</div>
-                        <h4 style="font-size:18px; font-weight:800; color:#b91c1c;">TischtennisLive Bot-Schutz aktiv</h4>
-                        <p style="font-size:13.5px; margin:8px 0 16px; color:#475569;">
-                            TischtennisLive verlangt eine einmalige Browser-Bestätigung. Klicke auf den Button, um die Seite freizuschalten:
-                        </p>
-                        <div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap;">
-                            <a href="${TTLIVE_OVERVIEW_URL}" target="_blank" rel="noopener" class="btn btn-amber">
-                                🛡️ 1. Bei TischtennisLive öffnen & verifizieren ↗
-                            </a>
-                            <button class="btn btn-emerald" onclick="loadAllGraupaTeamsFromTTLive(true)">
-                                🔄 2. Danach hier neu laden
-                            </button>
-                        </div>
-                    </div>`;
+                console.warn('Live-Abruf Hinweis:', err);
+                if (ttTeamsList.length) {
+                    setTTLiveSyncBadge(`⚡ Gespeicherter Live-Stand (${ttTeamsList.length} Mannschaften)`, '#e0f2fe', '#0369a1');
+                } else {
+                    setTTLiveSyncBadge('⚠️ ' + (err.message || err), '#fee2e2', '#b91c1c');
                 }
             }
         }
@@ -6505,6 +6506,7 @@ Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</te
                 if (data && data.ok && data.html) {
                     const details = parseTTLiveTeamDetailHtml(data.html, data.lpzHtml || '');
                     ttTeamDetailsCache[teamId] = details;
+                    try { localStorage.setItem('dippe_tt_details_v1', JSON.stringify(ttTeamDetailsCache)); } catch(e) {}
                     if (details.headerTitle) {
                         const cleanSub = details.headerTitle.replace(/^TSV\s+Graupa\s*[,·-]?\s*/i, '').trim();
                         if (cleanSub) {
