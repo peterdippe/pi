@@ -1,0 +1,299 @@
+<!-- ===============================================================
+     SPORT-ECKE: KICKERABEND (2v2 MONSTER-DYP · FAIR-CHECKPOINTS · KELLER-TELEMETRIE)
+     =============================================================== -->
+<section id="page-kicker" class="page-section">
+    <div class="section-header">
+        <div>
+            <span class="eyebrow">Sport-Ecke · Keller-Turnier · 2 gegen 2 mit rotierenden Partnern & Einzel-Wertung</span>
+            <h2 style="font-size:32px; font-weight:800;">⚽ Kickerabend</h2>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            <button class="btn btn-sand" onclick="switchPage('tischtennis')">🏓 Tischtennis</button>
+            <button class="btn btn-sand" onclick="switchPage('tt-ranking')">📈 TT-Ranking</button>
+            <button class="btn btn-sand" onclick="switchPage('turnierplaner')">🏆 Turnierplaner</button>
+            <button class="btn btn-sand" onclick="switchPage('zaehlboard')">🔢 Digitales Zählboard</button>
+            <button class="btn btn-sand" onclick="switchPage('radfahren')">🚴 Fahrradfahren</button>
+            <button class="btn btn-sand" onclick="switchPage('wandern')">🥾 Wanderungen</button>
+            <button class="btn btn-emerald" onclick="switchPage('kicker')">⚽ Kickerabend</button>
+        </div>
+    </div>
+
+    <!-- ===============================================================
+         OBERE STEUERLEISTE (ARCHIV-AUSWAHL, ADMIN-MODUS & QUICK-ACTIONS)
+         =============================================================== -->
+    <div class="hero-card" style="padding:16px 22px; margin-bottom:18px; border:1.5px solid rgba(52, 211, 153, 0.4);">
+        <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px;">
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                <span class="badge" id="kk-status-badge" style="background:#10b981; color:#06281e; font-weight:800; font-size:11.5px; padding:5px 10px;">
+                    ⚽ Bereit
+                </span>
+                <h3 style="font-size:19px; font-weight:800; color:#fff; margin:0;" id="kk-header-title">
+                    Graupaer Keller-Kicker-Cup
+                </h3>
+                <select id="kk-archive-select" class="form-input" style="width:auto; padding:5px 10px; font-size:12px; font-weight:700;" onchange="kkSelectTournamentView(this.value)">
+                    <option value="active">Aktuelles Turnier</option>
+                </select>
+            </div>
+
+            <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+                <div id="kk-admin-controls" class="hidden" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+                    <button class="btn btn-emerald" style="padding:7px 12px; font-size:12px;" onclick="kkOpenSetupPanel()">
+                        ➕ Neues Turnier / Setup
+                    </button>
+                    <button id="kk-btn-add-block" class="btn btn-sand" style="padding:7px 12px; font-size:12px;" onclick="kkAppendFairBlock()" title="Weiteren fairen Spielblock anhängen, sodass alle wieder gleich viele Spiele haben">
+                        ➕ Fair-Block anhängen
+                    </button>
+                    <button id="kk-btn-finish" class="btn btn-amber" style="padding:7px 12px; font-size:12px;" onclick="kkFinishTournament()">
+                        🏁 Turnier beenden & Champion küren
+                    </button>
+                    <button id="kk-btn-delete" class="btn btn-dark" style="padding:7px 10px; font-size:12px; background:#b91c1c; color:#fff;" onclick="kkDeleteCurrentTournament()" title="Ausgewähltes Kicker-Turnier löschen">
+                        🗑️ Löschen
+                    </button>
+                </div>
+                <button id="kk-admin-btn" class="btn btn-amber" style="padding:7px 13px; font-size:12px;" onclick="kkToggleAdmin()">
+                    🔒 Admin-Modus entsperren
+                </button>
+            </div>
+        </div>
+
+        <!-- Aktives Regel-Banner (wird im laufenden Turnier eingeblendet) -->
+        <div id="kk-rules-banner" class="hidden" style="margin-top:12px; padding-top:10px; border-top:1px solid rgba(52,211,153,0.22); display:flex; flex-wrap:wrap; gap:8px; align-items:center; font-size:12px; color:#a7f3d0;"></div>
+    </div>
+
+    <!-- ===============================================================
+         1. SETUP-KONFIGURATOR (SPIELER & KELLER-REGELN VOR TURNIERSTART)
+         =============================================================== -->
+    <div id="kk-setup-panel" class="sand-card hidden" style="margin-bottom:20px;">
+        <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px; margin-bottom:14px;">
+            <div>
+                <span class="eyebrow-dark">Neuen Kickerabend konfigurieren · 2 gegen 2 (Monster-DYP)</span>
+                <h3 style="font-size:22px; font-weight:800;">⚙️ Turnier-Setup, Teilnehmer & Keller-Regeln</h3>
+            </div>
+            <button class="btn btn-dark" style="padding:6px 12px; font-size:12px;" onclick="kkCloseSetupPanel()">Schließen ✕</button>
+        </div>
+
+        <div class="grid-2" style="gap:18px; align-items:start;">
+            <!-- LINKE BOX: SPIELER EINGEBEN -->
+            <div style="background:var(--bg-sand-light); border:1px solid var(--border-sand); border-radius:16px; padding:16px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <h4 style="font-size:16px; font-weight:800; color:var(--emerald-dark);">👥 1. Teilnehmer am Kickertisch (<span id="kk-player-count-badge">0</span>)</h4>
+                    <span style="font-size:11.5px; color:#64748b;">Mindestens 4 Spieler</span>
+                </div>
+
+                <!-- Schnelleingabe per Textfeld + Enter -->
+                <div style="display:flex; gap:8px; margin-bottom:10px;">
+                    <input type="text" id="kk-new-player-input" class="form-input" placeholder="Spielername eingeben (Enter zum Hinzufügen)…"
+                           onkeydown="if(event.key==='Enter'){event.preventDefault();kkAddPlayerFromInput();}">
+                    <button type="button" class="btn btn-emerald" onclick="kkAddPlayerFromInput()">➕ Hinzufügen</button>
+                </div>
+
+                <!-- 1-Klick Schnell-Auswahl für Stammgäste -->
+                <div style="margin-bottom:12px;">
+                    <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; margin-bottom:5px;">⚡ Schnell-Auswahl (Antippen zum Ein-/Auswählen):</div>
+                    <div id="kk-quick-chips" style="display:flex; flex-wrap:wrap; gap:5px;"></div>
+                </div>
+
+                <!-- Aktuelle Teilnehmer-Liste -->
+                <div id="kk-setup-player-list" style="display:flex; flex-wrap:wrap; gap:6px; min-height:42px; padding:10px; background:#fff; border:1px solid var(--border-sand); border-radius:12px;"></div>
+
+                <!-- Mathematische Fair-Block-Vorschau -->
+                <div id="kk-math-info-box" style="margin-top:12px; background:#ecfdf5; border:1px solid #a7f3d0; color:#065f46; border-radius:11px; padding:10px 12px; font-size:12.5px; line-height:1.5;"></div>
+            </div>
+
+            <!-- RECHTE BOX: KELLER-REGELWERK & TURNIER-UMFANG -->
+            <div style="background:var(--bg-sand-light); border:1px solid var(--border-sand); border-radius:16px; padding:16px;">
+                <h4 style="font-size:16px; font-weight:800; color:var(--emerald-dark); margin-bottom:10px;">📜 2. Offizielle Keller-Regeln & Spielmodus</h4>
+
+                <div class="grid-2" style="gap:10px; margin-bottom:10px;">
+                    <div>
+                        <label style="font-size:11.5px; font-weight:700; color:#475569; display:block; margin-bottom:3px;">Name des Kickerabends</label>
+                        <input type="text" id="kk-cfg-name" class="form-input" value="Graupaer Keller-Kicker-Cup">
+                    </div>
+                    <div>
+                        <label style="font-size:11.5px; font-weight:700; color:#475569; display:block; margin-bottom:3px;">Tore zum Sieg (pro Spiel)</label>
+                        <select id="kk-cfg-wingoals" class="form-input" style="font-weight:700;">
+                            <option value="5">Bis 5 Tore (Schnelle Runden)</option>
+                            <option value="6" selected>Bis 6 Tore (Klassischer Kneipen-Standard)</option>
+                            <option value="7">Bis 7 Tore</option>
+                            <option value="8">Bis 8 Tore</option>
+                            <option value="10">Bis 10 Tore (Marathon)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid-2" style="gap:10px; margin-bottom:10px;">
+                    <div>
+                        <label style="font-size:11.5px; font-weight:700; color:#475569; display:block; margin-bottom:3px;">Mittelfeldtore (5er-Reihe)</label>
+                        <select id="kk-cfg-midfield" class="form-input">
+                            <option value="Zählen voll (Erlaubt)" selected>✅ Zählen voll (Erlaubt)</option>
+                            <option value="Verboten (Kein Tor)">🚫 Verboten (Zählen nicht)</option>
+                            <option value="Nur abgefälscht gültig">⚡ Nur abgefälscht gültig</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:11.5px; font-weight:700; color:#475569; display:block; margin-bottom:3px;">Kurbeln (360°-Drehung)</label>
+                        <select id="kk-cfg-spin" class="form-input">
+                            <option value="Streng verboten (Foul!)" selected>🚫 Streng verboten (Ehrenkodex)</option>
+                            <option value="Erlaubt (Keller-Anarchie)">🌪️ Erlaubt (Keller-Anarchie)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid-2" style="gap:10px; margin-bottom:10px;">
+                    <div>
+                        <label style="font-size:11.5px; font-weight:700; color:#475569; display:block; margin-bottom:3px;">2-Tore-Vorsprung (Deuce)</label>
+                        <select id="kk-cfg-deuce" class="form-input">
+                            <option value="Nein (Entscheidungstor zählt sofort)" selected>⚡ Nein (Nächstes Tor entscheidet)</option>
+                            <option value="Ja (2 Tore Vorsprung nötig)">🔥 Ja (2 Tore Vorsprung nötig)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:11.5px; font-weight:700; color:#475569; display:block; margin-bottom:3px;">Zu-Null-Niederlage (0:x)</label>
+                        <select id="kk-cfg-zero" class="form-input">
+                            <option value="Tisch-Krabbel-Pflicht! 🐛" selected>🐛 Unter den Tisch krabbeln!</option>
+                            <option value="Eintrag in die Krabbel-Statistik">📸 Nur Schandfleck in der Statistik</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="margin-bottom:14px;">
+                    <label style="font-size:11.5px; font-weight:700; color:#475569; display:block; margin-bottom:3px;">
+                        Geplante Start-Distanz (Jederzeit im Turnier per 1-Klick verlängerbar oder am Checkpoint beendbar!)
+                    </label>
+                    <select id="kk-cfg-blocks" class="form-input" style="font-weight:700;"></select>
+                </div>
+
+                <button type="button" class="btn btn-emerald" style="width:100%; font-size:15px; padding:12px;" onclick="kkStartNewTournament()">
+                    🚀 Kicker-Turnier & Spielplan jetzt starten!
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===============================================================
+         2. LIVE-ARENA: AKTUELLES SPIEL AM TISCH (SMARTPHONE 1-TAP SCORE)
+         =============================================================== -->
+    <div id="kk-live-arena" class="hero-card" style="padding:20px 24px; margin-bottom:20px; background:radial-gradient(circle at 50% 0%, #16382e 0%, #071310 80%); border:2px solid #34d399;">
+        <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px; margin-bottom:12px;">
+            <div>
+                <span class="eyebrow" id="kk-active-match-eyebrow" style="margin-bottom:2px;">Aktuelles Spiel am Kickertisch</span>
+                <h3 style="font-size:20px; font-weight:800; color:#fff;" id="kk-active-match-title">⚽ Tisch frei</h3>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <span id="kk-checkpoint-pill" class="badge" style="background:rgba(251,191,36,0.18); color:#fbbf24; border:1px solid rgba(251,191,36,0.4); font-size:11.5px; padding:5px 10px;">
+                    ⚖️ Checkpoint-Status
+                </span>
+            </div>
+        </div>
+
+        <!-- Fortschrittsbalken mit markierten Fair-Stopp-Checkpoints -->
+        <div style="margin-bottom:16px;">
+            <div style="display:flex; justify-content:space-between; font-size:11.5px; color:var(--text-muted); font-weight:700; margin-bottom:4px;">
+                <span id="kk-progress-text">0 von 0 Spielen absolviert</span>
+                <span id="kk-checkpoint-hint" style="color:#34d399;"></span>
+            </div>
+            <div class="tp-progress-bar" style="height:14px; background:rgba(255,255,255,0.1);">
+                <div id="kk-progress-fill" class="tp-progress-fill" style="width:0%;"></div>
+            </div>
+        </div>
+
+        <!-- Das aktive 2v2 Duell + 1-Tap Smartphone-Toreingabe -->
+        <div id="kk-active-match-box"></div>
+    </div>
+
+    <!-- Champion-Siegerpodest (erscheint bei beendetem Turnier) -->
+    <div id="kk-podium-box" class="hidden" style="margin-bottom:20px;"></div>
+
+    <!-- ===============================================================
+         3. ZWEISPALTIGES HAUPTBOARD: LINKS EINZEL-RANGLISTE | RECHTS SPIELPLAN
+         =============================================================== -->
+    <div class="tt-hub-layout" style="grid-template-columns: 1.15fr 0.85fr; gap:18px; margin-bottom:20px; align-items:stretch;">
+
+        <!-- LINKE SPALTE: EINZEL-SPIELER-RANGLISTE -->
+        <div class="sand-card" style="display:flex; flex-direction:column; justify-content:space-between;">
+            <div>
+                <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px; margin-bottom:12px;">
+                    <div>
+                        <span class="eyebrow-dark">Einzelwertung · Jeder sammelt Punkte mit wechselnden Partnern</span>
+                        <h3 style="font-size:21px; font-weight:800;">🏆 Einzel-Rangliste (Wer ist der Beste?)</h3>
+                    </div>
+                    <select id="kk-rank-sort" class="form-input" style="width:auto; padding:5px 10px; font-size:12px; font-weight:700;" onchange="kkRenderAll()">
+                        <option value="pts-total" selected>Sortierung: Punkte + Tordiff. (Standard)</option>
+                        <option value="pts-avg">Sortierung: Punkte / Spiel (Fair bei Zwischenstopp)</option>
+                        <option value="elo">Sortierung: Kicker-Elo (Stärke-Rating)</option>
+                        <option value="diff">Sortierung: Tordifferenz</option>
+                    </select>
+                </div>
+
+                <div style="overflow-x:auto;">
+                    <table class="tt-data-table">
+                        <thead>
+                            <tr>
+                                <th style="width:42px;">#</th>
+                                <th>Spieler</th>
+                                <th style="text-align:center;">Sp.</th>
+                                <th style="text-align:center;">S : N</th>
+                                <th style="text-align:center;">Tore</th>
+                                <th style="text-align:center;">Diff</th>
+                                <th style="text-align:center;">Ø Pkt</th>
+                                <th style="text-align:right;">Pkt</th>
+                                <th style="text-align:right;">Elo</th>
+                            </tr>
+                        </thead>
+                        <tbody id="kk-leaderboard-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div style="font-size:11.5px; color:#64748b; margin-top:10px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px;">
+                <span>⚡ <b>Wertung:</b> Sieg = 3 Pkt. (Zu-Null-Sieg = 3 Pkt. + 🐛 Krabbel-Orden) · Kicker-Elo startet bei 1000.</span>
+                <span>🟢 = Gewonnen · 🔴 = Verloren</span>
+            </div>
+        </div>
+
+        <!-- RECHTE SPALTE: ROTATIONS-SPIELPLAN MIT FAIR-STOPP-CHECKPOINTS -->
+        <div class="sand-card" style="display:flex; flex-direction:column; justify-content:space-between;">
+            <div>
+                <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px;">
+                    <div>
+                        <span class="eyebrow-dark">Optimierte 2v2 DYP-Rotation · Minimaler Pausen-Stress</span>
+                        <h3 style="font-size:21px; font-weight:800;">📋 Spielplan & Checkpoints</h3>
+                    </div>
+                    <button class="btn btn-emerald" style="padding:6px 11px; font-size:11.5px;" onclick="kkAppendFairBlock()" title="Nächsten fairen Spielblock unten anhängen">
+                        ➕ +1 Fair-Block
+                    </button>
+                </div>
+
+                <div id="kk-schedule-list" style="max-height:460px; overflow-y:auto; display:flex; flex-direction:column; gap:7px; padding-right:4px;"></div>
+            </div>
+            <div style="font-size:11.5px; color:#64748b; margin-top:10px;">
+                💡 <b>Tipp:</b> An jedem goldenen <b>⚖️ Fair-Stopp-Checkpoint</b> haben alle Teilnehmer exakt gleich viele Spiele absolviert – dort kann das Turnier jederzeit perfekt fair beendet werden!
+            </div>
+        </div>
+    </div>
+
+    <!-- ===============================================================
+         4. KELLER-TELEMETRIE & ABSURDE RUHMESHALLE (8 SPEZIAL-AWARDS & MATRIX)
+         =============================================================== -->
+    <div class="hero-card" style="padding:22px 26px; margin-bottom:10px;">
+        <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px; margin-bottom:16px;">
+            <div>
+                <span class="eyebrow">Keller-Telemetrie · Synergien, Angstgegner & Kuriositäten</span>
+                <h3 style="font-size:22px; font-weight:800; color:#fff;">🏅 Die Keller-Ruhmeshalle & Spezial-Statistiken</h3>
+            </div>
+            <span class="badge" style="background:rgba(251,191,36,0.18); color:#fbbf24; font-size:11.5px; padding:5px 10px;">
+                Live berechnet aus allen gespielten Bällen
+            </span>
+        </div>
+
+        <!-- 8 Spezial-Awards im Grid -->
+        <div id="kk-awards-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(235px, 1fr)); gap:12px; margin-bottom:18px;"></div>
+
+        <!-- Ausklappbare Partner- & Gegner-Harmonie-Tabellen -->
+        <details style="border-top:1px solid rgba(255,255,255,0.12); padding-top:12px;">
+            <summary style="cursor:pointer; font-size:13px; font-weight:800; color:#34d399;">
+                🔍 Alle gespielten Doppel-Paarungen & Partner-Harmonien im Detail anzeigen
+            </summary>
+            <div id="kk-pairings-detail-box" style="margin-top:12px; overflow-x:auto;"></div>
+        </details>
+    </div>
+</section>
