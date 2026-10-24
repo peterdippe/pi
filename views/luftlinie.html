@@ -1,0 +1,83 @@
+<section id="page-luftlinie" class="page-section">
+    <div class="section-header">
+        <div>
+            <span class="eyebrow">Map-Tools · Großkreis-Geodäsie, Überflug-Analyse & Ländergrenzen-Graph</span>
+            <h2 style="font-size:32px; font-weight:800;">✈️ Luftlinien-Entfernung</h2>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            <button class="btn btn-sand" onclick="switchPage('area-maps')">🌍 Maps Math</button>
+            <button class="btn btn-sand" onclick="switchPage('dominanz')">⛰️ Berg-Dominanz-Atlas</button>
+            <button class="btn btn-emerald" onclick="switchPage('luftlinie')">✈️ Luftlinie</button>
+            <button class="btn btn-sand" onclick="switchPage('area-pur')">📏 Pure Math</button>
+        </div>
+    </div>
+
+    <div class="sand-card">
+        <div class="toolbar-box" style="margin-bottom:14px;">
+            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
+                <label style="display:inline-flex; align-items:center; gap:8px; font-size:12.5px; white-space:nowrap;">
+                    <strong>🗺️ Karte:</strong>
+                    <select id="air-layer-select" class="form-input" style="width:auto; min-width:165px; max-width:220px;" onchange="setAirLayer(this.value)"></select>
+                </label>
+                <label style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; cursor:pointer; white-space:nowrap;">
+                    <input type="checkbox" id="air-show-countries" checked onchange="airUpdateLayers()"> <span>Überflogene Länder hervorheben</span>
+                </label>
+            </div>
+            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
+                <button class="btn btn-amber" style="padding:8px 12px; font-size:12.5px;" onclick="airSwapPoints()">⇄ Start & Ziel tauschen</button>
+                <button class="btn btn-emerald" style="padding:8px 12px; font-size:12.5px;" onclick="airSetPreset('pirna-tokyo')">🎌 Bsp: Pirna → Tokio</button>
+                <button class="btn btn-sand" style="padding:8px 12px; font-size:12.5px;" onclick="airSetPreset('lisbon-vladivostok')">🌍 Bsp: Lissabon → Wladiwostok</button>
+                <button class="btn btn-dark" style="padding:8px 12px; font-size:12.5px;" onclick="airWorldView()">🌐 Weltansicht</button>
+            </div>
+        </div>
+
+        <div class="dom-legend" style="justify-content:space-between;">
+            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px;">
+                <span class="dom-legend-item"><span class="air-dot-a"></span> <b>Punkt A (Start)</b></span>
+                <span class="dom-legend-item"><span class="air-dot-b"></span> <b>Punkt B (Ziel)</b></span>
+                <span class="dom-legend-sep">|</span>
+                <span class="dom-legend-item"><span style="display:inline-block;width:18px;height:3px;background:#10b981;border-radius:2px;"></span> Kürzeste Luftlinie (Orthodrome)</span>
+                <span class="dom-legend-item"><span style="display:inline-block;width:18px;height:3px;background:#f59e0b;border-bottom:2px dashed #d97706;"></span> Längengrad-/Breitengrad-Verlauf</span>
+            </div>
+            <div id="air-status" style="font-size:11.8px; font-weight:700; color:var(--emerald-dark);">Lade Welt-Geodaten …</div>
+        </div>
+
+        <div class="dominanz-layout">
+            <div>
+                <div id="airMapContainer"></div>
+                <div style="font-size:11.5px; color:#64748b; margin-top:7px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px;">
+                    <span>💡 <b>Tipp:</b> Klicke rechts auf „Punkt A“ oder „Punkt B“ (oder ziehe die Marker direkt mit der Maus), um per Kartenklick neu zu setzen.</span>
+                    <span id="air-cursor-coords" style="font-family:'JetBrains Mono',monospace;"></span>
+                </div>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:12px;">
+                <div class="air-search-grid">
+                    <div id="air-card-a" class="air-point-card active-slot" onclick="airSelectSlot('A')">
+                        <div class="air-slot-header">
+                            <span style="color:var(--emerald-dark);"><span class="air-dot-a"></span> Punkt A · Start</span>
+                            <span id="air-slot-badge-a" class="badge" style="background:var(--emerald-dark);color:#fff;">Klick aktiv</span>
+                        </div>
+                        <input type="text" id="air-input-a" class="form-input" placeholder="🔍 Stadt, Ort oder Adresse …" autocomplete="off"
+                               onfocus="airSelectSlot('A')" oninput="airSearchInput('A', this.value)">
+                        <div id="air-dd-a" class="air-dropdown"></div>
+                        <div id="air-coord-a" style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#475569; margin-top:5px;">–</div>
+                    </div>
+
+                    <div id="air-card-b" class="air-point-card" onclick="airSelectSlot('B')">
+                        <div class="air-slot-header">
+                            <span style="color:var(--amber);"><span class="air-dot-b"></span> Punkt B · Ziel</span>
+                            <span id="air-slot-badge-b" class="badge" style="background:#e2e8f0;color:#475569;">Klicken zum Wählen</span>
+                        </div>
+                        <input type="text" id="air-input-b" class="form-input" placeholder="🔍 Stadt, Ort oder Adresse …" autocomplete="off"
+                               onfocus="airSelectSlot('B')" oninput="airSearchInput('B', this.value)">
+                        <div id="air-dd-b" class="air-dropdown"></div>
+                        <div id="air-coord-b" style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#475569; margin-top:5px;">–</div>
+                    </div>
+                </div>
+
+                <div id="air-detail" style="background:#fff; border:2px solid var(--emerald-dark); border-radius:16px; padding:16px; flex:1;"></div>
+            </div>
+        </div>
+    </div>
+</section>

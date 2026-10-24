@@ -1,0 +1,41 @@
+<section id="page-tetris" class="page-section">
+    <div class="section-header">
+        <div>
+            <span class="eyebrow">Spiele-Ecke</span>
+            <h2 style="font-size:32px; font-weight:800;">🧱 Tetris</h2>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            <button class="btn btn-amber" onclick="tetrisNewGame()">▶ Neues Spiel</button>
+            <button class="btn btn-emerald" onclick="switchPage('tetris')">🧱 Tetris</button>
+            <button class="btn btn-sand" onclick="switchPage('minesweeper')">💣 Minesweeper</button>
+            <button class="btn btn-sand" onclick="switchPage('snake')">🐍 Snake</button>
+        </div>
+    </div>
+    <div class="sand-card tetris-shell">
+        <div class="tetris-options">
+            <label><input type="checkbox" id="tetris-sound" checked> 🔊 Ton</label>
+            <label><input type="checkbox" id="tetris-speed" checked> ⚡ Steine werden schneller</label>
+            <label><input type="checkbox" id="tetris-ghost" checked> 👻 Schattenstein</label>
+            <label>Schwierigkeit
+                <select id="tetris-level" onchange="tetrisSetLevel()"><option value="1">Leicht</option><option value="3" selected>Normal</option><option value="6">Schnell</option></select>
+            </label>
+        </div>
+        <div class="tetris-game-wrap">
+            <div class="tetris-board-wrap">
+                <canvas id="tetris-canvas" width="300" height="600" aria-label="Tetris Spielfeld"></canvas>
+                <div class="tetris-touch-controls">
+                    <button onclick="tetrisMove(-1)">◀</button><button onclick="tetrisRotate()">↻</button><button onclick="tetrisMove(1)">▶</button><button onclick="tetrisHardDrop()">▼</button>
+                </div>
+            </div>
+            <div class="tetris-side">
+                <div class="tetris-stat"><span>Punkte</span><strong id="tetris-score">0</strong></div>
+                <div class="tetris-stat"><span>Linien</span><strong id="tetris-lines">0</strong></div>
+                <div class="tetris-stat"><span>Level</span><strong id="tetris-level-view">1</strong></div>
+                <h4>Nächster Stein</h4><canvas id="tetris-next" width="120" height="120"></canvas>
+                <p id="tetris-status" class="tetris-status">Tippe auf „Neues Spiel“ oder drücke eine Taste.</p>
+                <div class="tetris-keys">← → bewegen · ↑ drehen · ↓ fallen · Leertaste Drop · P pausiert</div>
+            </div>
+            <div class="hs-box" id="hs-box-tetris"></div>
+        </div>
+    </div>
+</section>

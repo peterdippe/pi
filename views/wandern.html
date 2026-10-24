@@ -1,0 +1,81 @@
+<section id="page-wandern" class="page-section">
+    <div class="section-header">
+        <div>
+            <span class="eyebrow">Sport-Ecke · Elbsandstein, Tafelberge & Gipfelziele</span>
+            <h2 style="font-size:32px; font-weight:800;">🥾 Wanderungen</h2>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            <button class="btn btn-sand" onclick="switchPage('tischtennis')">🏓 Tischtennis</button>
+            <button class="btn btn-sand" onclick="switchPage('zaehlboard')">🔢 Digitales Zählboard</button>
+            <button class="btn btn-sand" onclick="switchPage('turnierplaner')">🏆 Turnierplaner</button>
+            <button class="btn btn-sand" onclick="switchPage('radfahren')">🚴 Fahrradfahren</button>
+            <button class="btn btn-emerald" onclick="switchPage('wandern')">🥾 Wanderungen</button>
+        </div>
+    </div>
+
+    <div class="hero-card">
+        <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:18px;">
+            <div style="flex:1; min-width:260px;">
+                <span class="eyebrow">Direkt vor der Haustür ins Felsrevier</span>
+                <h3 style="font-size:24px; font-weight:800; color:#fff; margin-bottom:6px;">Felsriffe, Stiegen & weite Blicke über die Sächsische Schweiz</h3>
+                <p style="color:var(--text-muted); font-size:14.5px; line-height:1.6;">
+                    Wenn das Tor zur Sächsischen Schweiz die eigene Heimat ist, liegen Schrammsteine, Rathen, die Festung Königstein und unzählige verwunschene Gründe nur einen Katzensprung entfernt. Und für die topografische Analyse jedes Gipfels gibt es direkt nebenan den eigenen Berg-Dominanz-Atlas!
+                </p>
+            </div>
+            <button class="btn btn-amber" style="padding:12px 18px; font-size:14px;" onclick="switchPage('dominanz')">
+                ⛰️ Zum Berg-Dominanz-Atlas ↗
+            </button>
+        </div>
+    </div>
+
+    <div class="grid-3" style="margin-bottom:20px;">
+        <div class="sand-card">
+            <span class="eyebrow-dark">Klassiker im Fels</span>
+            <h3 style="font-size:19px; font-weight:800; margin:4px 0 8px;">🧗 Schrammsteine & Gratwege</h3>
+            <p style="font-size:13.5px; line-height:1.55;">
+                Über Leitern, Stiegen und schmale Sandsteinpfade hinauf zur Schrammsteinaussicht – mit einem der eindrucksvollsten 360°-Panoramen des Elbsandsteingebirges.
+            </p>
+        </div>
+        <div class="sand-card">
+            <span class="eyebrow-dark">Felsenbühne & Klammen</span>
+            <h3 style="font-size:19px; font-weight:800; margin:4px 0 8px;">🌲 Kurort Rathen, Bastei & Schwedenlöcher</h3>
+            <p style="font-size:13.5px; line-height:1.55;">
+                Abwechslungsreiche Rundtouren zwischen Elbfähre, Amselsee, kühlen Felsschluchten und den berühmten Aussichten hoch über dem Elbbogen.
+            </p>
+        </div>
+        <div class="sand-card">
+            <span class="eyebrow-dark">Tafelberge & Ferne</span>
+            <h3 style="font-size:19px; font-weight:800; margin:4px 0 8px;">🏰 Festung Königstein, Lilienstein & Vogtland</h3>
+            <p style="font-size:13.5px; line-height:1.55;">
+                Markante Tafelberge links und rechts der Elbe sowie ausgedehnte Familien- und Herbstwanderungen durch das grüne Vogtland rund um das Mühlental.
+            </p>
+        </div>
+    </div>
+
+    <div class="sand-card">
+        <div class="grid-2" style="align-items:center;">
+            <div>
+                <span class="eyebrow-dark">Tourenplanung nach DIN 33466</span>
+                <h3 style="font-size:21px; font-weight:800; margin-bottom:6px;">⏱️ Wander-Gehzeit-Rechner</h3>
+                <p style="font-size:13.5px; line-height:1.55; margin-bottom:12px;">
+                    Berechnet die realistische reine Gehzeit aus Horizontaldistanz, Aufstieg und Abstieg nach der offiziellen Bergwander-Formel (4 km/h horizontal, 300 Hm/h im Aufstieg, 500 Hm/h im Abstieg – wobei der kleinere Zeitwert zur Hälfte auf den größeren addiert wird).
+                </p>
+                <div class="grid-3" style="gap:10px;">
+                    <div>
+                        <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Strecke (km):</label>
+                        <input type="number" id="hike-km" class="form-input" value="14" min="0.5" step="0.5" oninput="calcHikeTime()">
+                    </div>
+                    <div>
+                        <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Aufstieg (Hm):</label>
+                        <input type="number" id="hike-up" class="form-input" value="520" min="0" step="20" oninput="calcHikeTime()">
+                    </div>
+                    <div>
+                        <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Abstieg (Hm):</label>
+                        <input type="number" id="hike-down" class="form-input" value="520" min="0" step="20" oninput="calcHikeTime()">
+                    </div>
+                </div>
+            </div>
+            <div id="hike-calc-result" class="person-box" style="background:#ecfdf5; border-color:#a7f3d0; padding:18px; text-align:center;"></div>
+        </div>
+    </div>
+</section>

@@ -1,0 +1,43 @@
+<section id="page-area-pur" class="page-section">
+    <div class="section-header">
+        <div>
+            <span class="eyebrow">Map-Tools · Klassisches Koordinatensystem</span>
+            <h2 style="font-size:32px; font-weight:800;">📏 Pure Math</h2>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            <button class="btn btn-sand" onclick="switchPage('area-maps')">🌍 Maps Math</button>
+            <button class="btn btn-sand" onclick="switchPage('dominanz')">⛰️ Berg-Dominanz-Atlas</button>
+            <button class="btn btn-sand" onclick="switchPage('luftlinie')">✈️ Luftlinie</button>
+            <button class="btn btn-emerald" onclick="switchPage('area-pur')">📏 Pure Math</button>
+        </div>
+    </div>
+
+    <div class="sand-card">
+        <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
+            <button class="btn-start-matlab" onclick="areaStartCollection()">Start</button>
+            <button id="area-calc-btn" class="btn btn-emerald hidden" onclick="areaFinishAndCalculate()" style="font-size:15px; padding:12px 20px;">
+                ✔ Berechnen (ENTER)
+            </button>
+        </div>
+
+        <div class="toolbar-box" style="justify-content:center; gap:24px; margin-bottom:16px;">
+            <div>
+                <strong style="font-size:15px; margin-right:6px;">X:</strong>
+                <input type="text" id="area-x-val" class="coord-input" value="0.0000" readonly>
+            </div>
+            <div>
+                <strong style="font-size:15px; margin-right:6px;">Y:</strong>
+                <input type="text" id="area-y-val" class="coord-input" value="0.0000" readonly>
+            </div>
+        </div>
+
+        <div class="area-layout">
+            <div><canvas id="areaCanvas" width="1000" height="650"></canvas></div>
+            <div>
+                <textarea id="area-output-text" class="output-textarea" readonly>Klicke oben auf „Start“, um mit der Maus Punkte im Koordinatensystem (130 x 100) zu sammeln.
+
+Beende die Eingabe mit ENTER, Rechtsklick oder dem grünen Berechnen-Button.</textarea>
+            </div>
+        </div>
+    </div>
+</section>

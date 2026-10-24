@@ -1,0 +1,41 @@
+<section id="page-minesweeper" class="page-section">
+    <div class="section-header">
+        <div>
+            <span class="eyebrow">Spiele-Ecke</span>
+            <h2 style="font-size:32px; font-weight:800;">💣 Minesweeper</h2>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            <button class="btn btn-amber" onclick="msNewGame()">▶ Neues Spiel</button>
+            <button class="btn btn-sand" onclick="switchPage('tetris')">🧱 Tetris</button>
+            <button class="btn btn-emerald" onclick="switchPage('minesweeper')">💣 Minesweeper</button>
+            <button class="btn btn-sand" onclick="switchPage('snake')">🐍 Snake</button>
+        </div>
+    </div>
+    <div class="sand-card tetris-shell">
+        <div class="tetris-options">
+            <label>Größe / Schwierigkeit:
+                <select id="ms-diff" onchange="msNewGame()">
+                    <option value="easy" selected>Anfänger (9×9 · 10 Minen)</option>
+                    <option value="medium">Fortgeschritten (12×12 · 22 Minen)</option>
+                    <option value="hard">Profi (16×12 · 35 Minen)</option>
+                </select>
+            </label>
+            <button id="ms-flag-toggle" class="btn btn-sand" style="padding:5px 12px; font-size:12px;" onclick="msToggleFlagMode()">
+                ⛏️ Modus: Aufdecken (Rechtsklick = 🚩)
+            </button>
+        </div>
+        <div class="tetris-game-wrap">
+            <div class="tetris-board-wrap">
+                <div id="ms-board" class="ms-board"></div>
+            </div>
+            <div class="tetris-side">
+                <div class="tetris-stat"><span>Minen übrig</span><strong id="ms-mines-left">10</strong></div>
+                <div class="tetris-stat"><span>Zeit</span><strong id="ms-time">0.0 s</strong></div>
+                <div class="tetris-stat"><span>Score</span><strong id="ms-score">0</strong></div>
+                <p id="ms-status" class="tetris-status">Klicke auf ein Feld, um zu starten!</p>
+                <div class="tetris-keys">Linksklick: Feld öffnen · Rechtsklick (oder Modus-Schalter): Flagge 🚩 setzen. Score = Schwierigkeits-Bonus minus benötigte Zeit.</div>
+            </div>
+            <div class="hs-box" id="hs-box-minesweeper"></div>
+        </div>
+    </div>
+</section>

@@ -1,0 +1,56 @@
+<section id="page-area-maps" class="page-section">
+    <div class="section-header">
+        <div>
+            <span class="eyebrow">Map-Tools · Interaktive Kartengeometrie</span>
+            <h2 style="font-size:32px; font-weight:800;">🌍 Maps Math</h2>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            <button class="btn btn-emerald" onclick="switchPage('area-maps')">🌍 Maps Math</button>
+            <button class="btn btn-sand" onclick="switchPage('dominanz')">⛰️ Berg-Dominanz-Atlas</button>
+            <button class="btn btn-sand" onclick="switchPage('luftlinie')">✈️ Luftlinie</button>
+            <button class="btn btn-sand" onclick="switchPage('area-pur')">📏 Pure Math</button>
+        </div>
+    </div>
+
+    <div class="sand-card">
+        <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
+            <button class="btn-start-matlab" onclick="mapsMathStart()">Start (Punkte neu setzen)</button>
+            <button class="btn btn-emerald" onclick="mapsMathFinishAndCalculate()" style="font-size:15px; padding:12px 20px;">
+                ✔ Berechnen (ENTER)
+            </button>
+            <button class="btn btn-dark" onclick="mapsMathResetToPirna()">🏠 Pirna</button>
+        </div>
+
+        <div class="toolbar-box" style="margin-bottom:16px;">
+            <div style="display:inline-flex; align-items:center; gap:8px; white-space:nowrap;">
+                <strong style="font-size:12.5px;">🗺️ Karte:</strong>
+                <select id="maps-layer-select" class="form-input" style="width:auto; min-width:165px; max-width:220px;" onchange="setMapsMathLayer(this.value)"></select>
+            </div>
+
+            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
+                <div>
+                    <strong style="font-size:12px;">Lat:</strong>
+                    <input type="text" id="maps-lat-val" class="coord-input" value="50.95850" readonly>
+                </div>
+                <div>
+                    <strong style="font-size:12px;">Lng:</strong>
+                    <input type="text" id="maps-lng-val" class="coord-input" value="13.93720" readonly>
+                </div>
+                <span id="maps-zoom-badge" class="badge" style="font-size:12px; padding:6px 10px; background:#059669; color:#fff;">Zoom: 16</span>
+            </div>
+        </div>
+
+        <div class="area-layout">
+            <div><div id="mapsMathContainer"></div></div>
+            <div>
+                <textarea id="maps-output-text" class="output-textarea" readonly>Willkommen bei Maps Math!
+
+1. Scrolle und zoome frei in der Karte.
+2. Klicke mindestens 3 Punkte auf die Karte.
+3. Klicke auf „Berechnen (ENTER)“ oder drücke ENTER.
+
+Das umschließende Polygon, der kleinste Umkreis nach Welzl sowie die Mittelpunkte (nach Breiten- und Längengrad) werden sofort berechnet und mit einer zum Zoom-Faktor passenden Flächeneinheit (m², ha oder km²) ausgegeben.</textarea>
+            </div>
+        </div>
+    </div>
+</section>

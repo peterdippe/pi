@@ -1,0 +1,77 @@
+<section id="page-pinnwand" class="page-section">
+    <div class="section-header">
+        <div>
+            <span class="eyebrow">Projekte, Notizen, Links, Bilder & Ideen</span>
+            <h2 style="font-size:32px; font-weight:800;">📌 π's Pinnwand</h2>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
+            <span id="pinnwand-sync-status" class="pin-sync-pill">💾 Lokal gespeichert</span>
+            <button class="btn btn-sand" style="padding:7px 12px; font-size:12px;" onclick="loadPinnwandFromCloud(true)" title="Aktuellsten Stand aus Google Drive abrufen">🔄 Aktualisieren</button>
+            <button class="btn btn-emerald" onclick="openNewPinnwandPostForm()">➕ Neuer Beitrag / Bild</button>
+            <button class="btn btn-amber" onclick="togglePinnwandForm('cat')">📁 Neue Kategorie</button>
+        </div>
+    </div>
+
+    <div id="pinnwand-cat-form" class="sand-card hidden" style="margin-bottom:20px;">
+        <h3 style="font-size:19px; font-weight:800; margin-bottom:12px;">📁 Neue Pinnwand-Kategorie anlegen</h3>
+        <div style="display:flex; flex-wrap:wrap; gap:10px;">
+            <input type="text" id="new-cat-icon" class="form-input" style="width:90px;" placeholder="Emoji 🎿" value="🌟">
+            <input type="text" id="new-cat-name" class="form-input" style="flex:1; min-width:200px;" placeholder="Name der Kategorie (z.B. Garten & Projekte, Urlaubsplanung...)">
+            <button class="btn btn-emerald" onclick="addPinnwandCategory()">Kategorie speichern</button>
+            <button class="btn btn-dark" onclick="togglePinnwandForm(null)">Abbrechen</button>
+        </div>
+    </div>
+
+    <div id="pinnwand-post-form" class="sand-card hidden" style="margin-bottom:20px;">
+        <h3 id="pin-form-heading" style="font-size:20px; font-weight:800; margin-bottom:14px;">➕ Neuen Pinnwand-Eintrag hinzufügen</h3>
+        <div class="grid-2" style="gap:14px; margin-bottom:14px;">
+            <div>
+                <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Kategorie wählen:</label>
+                <select id="pin-cat-select" class="form-input"></select>
+            </div>
+            <div>
+                <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Titel des Eintrags:</label>
+                <input type="text" id="pin-title" class="form-input" placeholder="z.B. Großes Sippen-Treffen / Omas Eierschecke">
+            </div>
+        </div>
+        <div style="margin-bottom:14px;">
+            <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Beschreibung / Notiz (Tipp: Du kannst hier auch direkt per Strg+V ein Bild aus der Zwischenablage einfügen!):</label>
+            <textarea id="pin-desc" class="form-input" rows="4" placeholder="Text, Termin-Details, Anleitung, Zutaten oder Infos..."></textarea>
+        </div>
+        <div class="grid-2" style="gap:14px; margin-bottom:14px;">
+            <div>
+                <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">🖼️ Bild hochladen (von Festplatte/Handy) oder Bild-URL / Dateiname:</label>
+                <input type="file" id="pin-img-input" accept="image/*" class="form-input" onchange="previewPinnwandImage(event)" style="margin-bottom:8px;">
+                <input type="text" id="pin-img-url" class="form-input" placeholder="Oder Bild-Link / Dateiname im Repo (z.B. foto.jpg)..." oninput="previewPinnwandImageUrl(this.value)">
+            </div>
+            <div>
+                <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">📎 Weiterführender Datei- oder Cloud-Link (optional, z.B. PDF, GPX, Drive):</label>
+                <input type="text" id="pin-file-link" class="form-input" placeholder="https://... oder Dateiname im GitHub-Ordner" style="margin-bottom:8px;">
+                <div id="pin-img-preview-box" class="hidden" style="background:var(--bg-sand-light); border:1px solid var(--border-sand); border-radius:10px; padding:8px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                    <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+                        <img id="pin-img-preview" src="" alt="Vorschau" style="height:48px; width:64px; object-fit:cover; border-radius:6px; border:1px solid var(--border-sand);">
+                        <span style="font-size:12px; font-weight:600; color:var(--emerald-dark);">Bild eingebettet ✓</span>
+                    </div>
+                    <button type="button" class="btn btn-dark" style="padding:5px 10px; font-size:11.5px;" onclick="clearPinnwandImage()">Bild entfernen ✕</button>
+                </div>
+            </div>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:10px;">
+            <button id="pin-submit-btn" class="btn btn-emerald" onclick="savePinnwandPost()">💾 Speichern</button>
+            <button class="btn btn-dark" onclick="togglePinnwandForm(null)">Abbrechen</button>
+        </div>
+    </div>
+
+    <div id="pinnwand-categories-bar" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:22px;"></div>
+    <div id="pinnwand-grid" class="grid-3"></div>
+
+    <div class="modal-overlay" id="pin-lightbox-modal" onclick="closePinLightbox()">
+        <div style="max-width:92vw; max-height:90vh; position:relative; text-align:center;" onclick="event.stopPropagation()">
+            <img id="pin-lightbox-img" src="" alt="Vollbild" style="max-width:92vw; max-height:82vh; border-radius:16px; border:3px solid var(--bg-sand); box-shadow:0 24px 60px rgba(0,0,0,0.65); object-fit:contain; background:#091512;">
+            <div style="margin-top:10px; display:flex; justify-content:center; gap:12px; align-items:center;">
+                <span id="pin-lightbox-caption" style="color:#fff; font-weight:700; font-size:15px;"></span>
+                <button class="btn btn-amber" style="padding:6px 14px; font-size:12.5px;" onclick="closePinLightbox()">Schließen ✕</button>
+            </div>
+        </div>
+    </div>
+</section>

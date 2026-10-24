@@ -1,0 +1,29 @@
+<section id="page-fotos" class="page-section">
+    <div class="section-header">
+        <div>
+            <span class="eyebrow">Privatbereich</span>
+            <h2 style="font-size:32px; font-weight:800;">Familienfotos & Cloud-Alben</h2>
+        </div>
+        <button id="logout-btn" class="btn btn-amber hidden" onclick="lockPhotos()">🔒 Bereich wieder sperren</button>
+    </div>
+
+    <div id="foto-login-gate" class="sand-card" style="max-width:460px; margin:40px auto; text-align:center;">
+        <div style="font-size:42px; margin-bottom:10px;">🔐</div>
+        <h3 style="font-size:24px; font-weight:800;">Passwortgeschützter Bereich</h3>
+        <p style="font-size:14px; margin:8px 0 20px; opacity:0.85;">
+            Bitte gib das Familien-Passwort ein, um unsere Ordner auf Google Drive und OneDrive freizuschalten.
+        </p>
+        <form onsubmit="unlockPhotos(event)" style="display:flex; flex-direction:column; gap:12px;">
+            <input type="password" id="foto-password-input" placeholder="Passwort eingeben..."
+                   style="padding:12px; border-radius:12px; border:1px solid var(--border-sand); font-size:15px; text-align:center;">
+            <div id="foto-error-msg" class="hidden" style="color:#dc2626; font-size:13px; font-weight:700;">
+                Falsches Passwort! Bitte versuche es erneut.
+            </div>
+            <button type="submit" class="btn btn-emerald" style="width:100%;">Alben freischalten</button>
+        </form>
+    </div>
+
+    <div id="foto-content" class="hidden">
+        <div id="alben-grid" class="grid-3"></div>
+    </div>
+</section>

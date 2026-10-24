@@ -1,0 +1,48 @@
+<section id="page-snake" class="page-section">
+    <div class="section-header">
+        <div>
+            <span class="eyebrow">Spiele-Ecke</span>
+            <h2 style="font-size:32px; font-weight:800;">🐍 Snake</h2>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            <button class="btn btn-amber" onclick="snakeNewGame()">▶ Neues Spiel</button>
+            <button class="btn btn-sand" onclick="switchPage('tetris')">🧱 Tetris</button>
+            <button class="btn btn-sand" onclick="switchPage('minesweeper')">💣 Minesweeper</button>
+            <button class="btn btn-emerald" onclick="switchPage('snake')">🐍 Snake</button>
+        </div>
+    </div>
+    <div class="sand-card tetris-shell">
+        <div class="tetris-options">
+            <label>Tempo:
+                <select id="snake-speed" onchange="snakeChangeSpeed()">
+                    <option value="260">1 · Sehr gemütlich</option>
+                    <option value="200">2 · Gemütlich</option>
+                    <option value="150" selected>3 · Normal</option>
+                    <option value="100">4 · Schnell</option>
+                    <option value="70">5 · Rasend (Max)</option>
+                </select>
+            </label>
+            <label><input type="checkbox" id="snake-accel" checked> ⚡ Langsame Steigerung mit jedem Apfel</label>
+            <label><input type="checkbox" id="snake-walls" checked> 🧱 Wände tödlich</label>
+        </div>
+        <div class="tetris-game-wrap">
+            <div class="tetris-board-wrap">
+                <canvas id="snake-canvas" width="400" height="400"></canvas>
+                <div class="tetris-touch-controls">
+                    <button onclick="snakeSetDir(-1,0)">◀</button>
+                    <button onclick="snakeSetDir(0,-1)">▲</button>
+                    <button onclick="snakeSetDir(0,1)">▼</button>
+                    <button onclick="snakeSetDir(1,0)">▶</button>
+                </div>
+            </div>
+            <div class="tetris-side">
+                <div class="tetris-stat"><span>Punkte</span><strong id="snake-score">0</strong></div>
+                <div class="tetris-stat"><span>Äpfel 🍎</span><strong id="snake-apples">0</strong></div>
+                <div class="tetris-stat"><span>Länge</span><strong id="snake-len">3</strong></div>
+                <p id="snake-status" class="tetris-status">Klicke auf „Neues Spiel“ oder drücke eine Pfeiltaste.</p>
+                <div class="tetris-keys">Steuerung mit Pfeiltasten, WASD oder den Buttons unter dem Spielfeld. Leertaste pausiert.</div>
+            </div>
+            <div class="hs-box" id="hs-box-snake"></div>
+        </div>
+    </div>
+</section>

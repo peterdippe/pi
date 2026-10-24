@@ -1,0 +1,85 @@
+<section id="page-radfahren" class="page-section">
+    <div class="section-header">
+        <div>
+            <span class="eyebrow">Sport-Ecke · Gravel, Asphalt & Höhenmeter</span>
+            <h2 style="font-size:32px; font-weight:800;">🚴 Fahrradfahren</h2>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            <button class="btn btn-sand" onclick="switchPage('tischtennis')">🏓 Tischtennis</button>
+            <button class="btn btn-sand" onclick="switchPage('zaehlboard')">🔢 Digitales Zählboard</button>
+            <button class="btn btn-sand" onclick="switchPage('turnierplaner')">🏆 Turnierplaner</button>
+            <button class="btn btn-emerald" onclick="switchPage('radfahren')">🚴 Fahrradfahren</button>
+            <button class="btn btn-sand" onclick="switchPage('wandern')">🥾 Wanderungen</button>
+        </div>
+    </div>
+
+    <div class="hero-card">
+        <span class="eyebrow">Titan-Ästhetik, Heißwachs & GPS-Tracks</span>
+        <h3 style="font-size:24px; font-weight:800; color:#fff; margin-bottom:6px;">Zwischen Elbradweg, Borsberg-Anstiegen & Schotterpisten</h3>
+        <p style="color:var(--text-muted); font-size:14.5px; line-height:1.6;">
+            Ob schnelle Feierabendrunde aus Graupa heraus, ausgedehnte Gravel-Abenteuer über Wald- und Schotterwege oder knackige Anstiege aus dem Elbtal hinauf ins Osterzgebirge und die Sächsische Schweiz – wenn der Antrieb frisch gewachst schnurrt und die Route auf dem Radcomputer steht, beginnt die beste Zeit des Tages.
+        </p>
+        <div class="grid-3" style="margin-top:18px;">
+            <div class="sport-stat-box">
+                <div class="telemetry-label">Bike & Rahmenbau</div>
+                <div class="sport-stat-val">Titan Gravel GT</div>
+                <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">Zeitloses Titan-Design kombiniert mit drahtloser 2×12 AXS-Schaltpräzision.</div>
+            </div>
+            <div class="sport-stat-box">
+                <div class="telemetry-label">Antriebs-Philosophie</div>
+                <div class="sport-stat-val">100 % Heißwachs</div>
+                <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">Minimaler Reibungsverlust, kein schwarzes Kettenöl und maximale Laufleistung.</div>
+            </div>
+            <div class="sport-stat-box">
+                <div class="telemetry-label">Cockpit & Metriken</div>
+                <div class="sport-stat-val">Karoo · GPX · HF</div>
+                <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">Präzise Track-Planung via Locus Map & Strava mit Live-Steigungsprofilen.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid-2">
+        <div class="sand-card">
+            <span class="eyebrow-dark">Mathe fürs Cockpit</span>
+            <h3 style="font-size:21px; font-weight:800; margin-bottom:12px;">⚙️ Touren-Zeit & VAM-Steigungsrechner</h3>
+            <div class="grid-2" style="gap:12px; margin-bottom:12px;">
+                <div>
+                    <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Distanz (km):</label>
+                    <input type="number" id="bike-dist" class="form-input" value="65" min="1" step="1" oninput="calcBikeMetrics()">
+                </div>
+                <div>
+                    <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Höhenmeter (Hm):</label>
+                    <input type="number" id="bike-hm" class="form-input" value="850" min="0" step="10" oninput="calcBikeMetrics()">
+                </div>
+                <div>
+                    <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Flach-Tempo (km/h):</label>
+                    <input type="number" id="bike-speed" class="form-input" value="26" min="10" max="50" step="0.5" oninput="calcBikeMetrics()">
+                </div>
+                <div>
+                    <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Steigleistung VAM (Hm/h):</label>
+                    <input type="number" id="bike-vam" class="form-input" value="650" min="200" max="1800" step="25" oninput="calcBikeMetrics()">
+                </div>
+            </div>
+            <div id="bike-calc-result" class="person-box" style="background:#ecfdf5; border-color:#a7f3d0; padding:14px;"></div>
+        </div>
+
+        <div class="sand-card">
+            <span class="eyebrow-dark">Heimat-Sektoren ab Graupa / Pirna</span>
+            <h3 style="font-size:21px; font-weight:800; margin-bottom:10px;">🗺️ Lieblings-Runden & Segmente</h3>
+            <div style="display:flex; flex-direction:column; gap:10px; font-size:13.8px; line-height:1.55;">
+                <div class="person-box">
+                    <span class="person-role">🌲 Borsberg & Schönfelder Hochland (Gravel)</span>
+                    Direkt vor der Haustür: Über abwechslungsreiche Wald- und Schotterpfade hinauf Richtung Borsberg, Jagdwege und Panoramablicke über das Elbtal.
+                </div>
+                <div class="person-box">
+                    <span class="person-role">⛰️ Hohnstein, Polenztal & Kirnitzschtal</span>
+                    Klassische Wellenprofile durch die Vordere und Hintere Sächsische Schweiz – ruhige Nebenstraßen, feiner Schotter und knackige Rampen aus den Tälern.
+                </div>
+                <div class="person-box">
+                    <span class="person-role">🌊 Elbradweg-Tempofahrt (Dresden ↔ Bad Schandau)</span>
+                    Flaches Rollen entlang der Elbe für Grundlagenausdauer, Aero-Abschnitte oder als entspannter Ausklang nach einer Höhenmeter-Etappe.
+                </div>
+            </div>
+        </div>
+    </div>
+</section>

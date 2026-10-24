@@ -1,0 +1,105 @@
+<section id="page-dominanz" class="page-section">
+    <div class="section-header">
+        <div>
+            <span class="eyebrow">Map-Tools · Topografie, Isolation & Prominenz</span>
+            <h2 style="font-size:32px; font-weight:800;">⛰️ Berg-Dominanz-Atlas</h2>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            <button class="btn btn-sand" onclick="switchPage('area-maps')">🌍 Maps Math</button>
+            <button class="btn btn-emerald" onclick="switchPage('dominanz')">⛰️ Berg-Dominanz-Atlas</button>
+            <button class="btn btn-sand" onclick="switchPage('luftlinie')">✈️ Luftlinie</button>
+            <button class="btn btn-sand" onclick="switchPage('area-pur')">📏 Pure Math</button>
+        </div>
+    </div>
+
+    <div class="sand-card">
+        <div class="toolbar-box" style="margin-bottom:16px;">
+            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
+                <label style="display:inline-flex; align-items:center; gap:8px; font-size:12.5px; white-space:nowrap;">
+                    <strong>🗺️ Karte:</strong>
+                    <select id="dom-layer-select" class="form-input" style="width:auto; min-width:165px; max-width:220px;" onchange="setDominanzLayer(this.value)"></select>
+                </label>
+                <label style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; cursor:pointer; white-space:nowrap;">
+                    <input type="checkbox" id="dom-show-circle" checked> <span id="dom-circle-label">Dominanzradius</span>
+                </label>
+            </div>
+            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
+                <button id="dom-pick-btn" class="btn btn-amber" style="padding:8px 12px; font-size:12.5px;" onclick="toggleDomPickMode()">📍 Eigenen Punkt setzen: AUS</button>
+                <button class="btn btn-emerald" style="padding:8px 14px; font-size:12.5px;" onclick="openDominanzInfo()">❓ Was ist Dominanz?</button>
+                <button class="btn btn-dark" style="padding:8px 12px; font-size:12.5px;" onclick="dominanzWorldView()">🌍 Weltansicht</button>
+            </div>
+        </div>
+
+        <div class="dom-legend" id="dom-legend">
+            <strong style="font-size:12px; margin-right:2px;">Höhe ü. NN:</strong>
+            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#1a6b2e;"></span> &lt; 1000 m</span>
+            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#5bd16a;"></span> 1000–2000 m</span>
+            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#f2d307;"></span> 2000–3000 m</span>
+            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#d9a406;"></span> 3000–4000 m</span>
+            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#f27405;"></span> 4000–5000 m</span>
+            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#f2766e;"></span> 5000–6000 m</span>
+            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#e01b1b;"></span> 6000–7000 m</span>
+            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#8b2fc9;"></span> &gt; 7000 m</span>
+            <span class="dom-legend-sep">|</span>
+            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#111;"></span> gewählter Berg</span>
+            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#fff; border-color:#111;"></span> Bezugsberg</span>
+        </div>
+
+        <div style="font-size:11.5px; color:#64748b; margin-bottom:12px;">
+            <span id="dom-count">lade Gipfel …</span> · <span id="dom-visible"></span> Daten aus Wikidata/Wikipedia · Start: Zugspitze
+        </div>
+
+        <div class="dominanz-layout">
+            <div>
+                <div id="dominanzMapContainer"></div>
+                <div id="dom-status" style="font-size:12px; color:#b45309; margin-top:8px; min-height:16px;"></div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:14px;">
+                <div style="background:var(--bg-sand-light); border:1px solid var(--border-sand); border-radius:16px; padding:14px;">
+                    <input type="text" id="dom-search-input" class="form-input" placeholder="🔍 Berg suchen (weltweit, z. B. Fuji, Denali …)" autocomplete="off">
+                    <div id="dom-results" class="peak-list" style="margin-top:10px;"></div>
+                </div>
+                <div id="dom-detail" style="background:#fff; border:2px solid var(--emerald-dark); border-radius:16px; padding:16px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="dom-info-modal" onclick="if(event.target===this) closeDominanzInfo()">
+        <div class="modal-box">
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">
+                <h3>⛰️ Was bedeutet „Dominanz“?</h3>
+                <button class="modal-x" onclick="closeDominanzInfo()" title="Schließen">✕</button>
+            </div>
+            <p>
+                Die <strong>Dominanz</strong> (auch <em>Isolation</em>) eines Berggipfels ist die
+                Entfernung zum nächstgelegenen Punkt gleicher Höhe – also die Distanz
+                zum nächsten höheren Gipfel bzw. Höhenzug. Sie beschreibt, wie
+                „eigenständig“ ein Berg seine Umgebung überragt: Je größer die
+                Dominanz, desto weiter muss man reisen, bis man etwas Höheres erreicht.
+            </p>
+            <p>
+                Ein Beispiel: Der Mont Blanc hat eine Dominanz von mehreren tausend
+                Kilometern, weil erst weit entfernt im Kaukasus wieder höhere Gipfel
+                stehen. Ein kleiner Tafelberg der Sächsischen Schweiz dagegen wird
+                schon vom Nachbarfelsen übertroffen – seine Dominanz beträgt nur
+                wenige Kilometer.
+            </p>
+            <p style="font-size:13px; color:#475569;">
+                In dieser Karte reicht der Kreis genau bis zum <strong>Bezugsgipfel</strong>
+                (dem nächsthöheren Berg) – sein Radius ist der Abstand zwischen den
+                beiden Gipfeln. Der eigentliche Dominanzwert steht separat in der
+                Infokarte und kann kleiner sein, weil der gleich hohe Geländepunkt
+                meist am Hang liegt. Über das rote Feld
+                „Nächsthöherer Berg“ kannst du dich Schritt für Schritt nach oben
+                klicken – am Ende landest du beim Mount Everest.
+            </p>
+            <p style="margin-bottom:4px;">
+                🔗 Mehr dazu bei Wikipedia:
+                <a href="https://de.wikipedia.org/wiki/Dominanz_(Geographie)" target="_blank" rel="noopener" style="color:var(--emerald-dark); font-weight:700;">Dominanz (Geographie)</a>
+            </p>
+            <div class="modal-close-row">
+                <button class="btn btn-emerald" onclick="closeDominanzInfo()">Verstanden</button>
+            </div>
+        </div>
+    </div>
+</section>

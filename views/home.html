@@ -1,0 +1,104 @@
+<section id="page-home" class="page-section active">
+    <div class="hero-card">
+        <div class="hero-grid">
+            <div>
+                <span class="eyebrow">π = 3.14159265… · Peters digitales Labor & Basecamp</span>
+                <h2 class="hero-title">
+                    Sport, Geographie, Mathe & <span class="highlight-grad">Vibe-Coding</span>.
+                </h2>
+                <p style="color:var(--text-muted); font-size:15.2px; line-height:1.65; margin-bottom:0;">
+                    Willkommen auf meiner persönlichen Spielwiese! Hier treffen meine Leidenschaften aufeinander: Tischtennis mit 8 Ecken, Gravel- und Rennradtouren, Wanderungen durch die Sächsische Schweiz, topografische Karten-Experimente, angewandte Mathematik und handgemachtes Vibe-Coding.
+                </p>
+                <div class="vibe-pills">
+                    <button class="vibe-pill" onclick="switchPage('tischtennis')">🏓 Tischtennis</button>
+                    <button class="vibe-pill" onclick="switchPage('radfahren')">🚴 Fahrradfahren</button>
+                    <button class="vibe-pill" onclick="switchPage('wandern')">🥾 Wanderungen</button>
+                    <button class="vibe-pill" onclick="switchPage('dominanz')">⛰️ Geographie & Gipfel</button>
+                    <button class="vibe-pill" onclick="switchPage('area-maps')">📐 Mathe-Spielereien</button>
+                    <button class="vibe-pill" onclick="switchPage('pinnwand')">📌 π's Pinnwand</button>
+                    <button class="vibe-pill" onclick="switchPage('tetris')">🕹️ Arcade & Highscores</button>
+                </div>
+            </div>
+
+            <div class="pi-telemetry-card">
+                <div class="pi-watermark">π</div>
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; position:relative; z-index:1;">
+                    <div>
+                        <span class="eyebrow" style="margin-bottom:2px;">Live-Status · System π</span>
+                        <h3 style="font-size:20px; font-weight:800; color:#fff;">Peters Themen-Radar</h3>
+                    </div>
+                    <span class="badge" style="background:rgba(16,185,129,0.2); color:#34d399; border:1px solid rgba(52,211,153,0.4); font-size:11px; padding:4px 9px;">v3.14 aktiv</span>
+                </div>
+                <div class="telemetry-grid">
+                    <div class="telemetry-item">
+                        <div class="telemetry-label">🏓 Tischtennis</div>
+                        <div class="telemetry-val">Spin, Tempo & Punktspiel</div>
+                    </div>
+                    <div class="telemetry-item">
+                        <div class="telemetry-label">🚴 Gravel & Road</div>
+                        <div class="telemetry-val">Titan, Wachs & Höhenmeter</div>
+                    </div>
+                    <div class="telemetry-item">
+                        <div class="telemetry-label">🥾 Outdoor-Revier</div>
+                        <div class="telemetry-val">Elbsandstein & Gipfel</div>
+                    </div>
+                    <div class="telemetry-item">
+                        <div class="telemetry-label">💻 Vibe-Coding</div>
+                        <div class="telemetry-val">Welzl, Geodäsie & Games</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="home-bottom-grid">
+        <div class="sand-card">
+            <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px;">
+                <div>
+                    <span class="eyebrow-dark">Basecamp & Startpunkt für Touren</span>
+                    <h3 style="font-size:21px; font-weight:800;" id="home-loc-title">📍 Emil-Gast-Straße 4, 01796 Pirna</h3>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
+                    <label style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; white-space:nowrap;">
+                        🗺️ <select id="home-layer-select" class="form-input" style="width:auto; min-width:155px; max-width:210px; padding:6px 10px;" onchange="setHomeLayer(this.value)"></select>
+                    </label>
+                    <a id="home-route-link" href="#" target="_blank" rel="noopener" class="btn btn-dark" style="padding:8px 14px; font-size:12px;">
+                        Größere Karte & Route ↗
+                    </a>
+                </div>
+            </div>
+            <div id="osm-map"></div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:20px;">
+            <div class="hero-card" style="margin-bottom:0; padding:22px; flex:1; display:flex; flex-direction:column; justify-content:space-between;">
+                <div>
+                    <span class="eyebrow">🏅 Action & Bewegung</span>
+                    <h3 style="font-size:21px; font-weight:800; margin-bottom:8px;">Die neue Sport-Ecke</h3>
+                    <p style="color:var(--text-muted); font-size:13.8px; line-height:1.55;">
+                        Vom Tischtennis-Zählgerät für die Halle über den Gravel-Steigungsrechner bis zur Tourenplanung in der Sächsischen Schweiz.
+                    </p>
+                </div>
+                <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-top:14px;">
+                    <button class="btn btn-amber" style="padding:9px 8px; font-size:12.5px;" onclick="switchPage('tischtennis')">🏓 TT</button>
+                    <button class="btn btn-emerald" style="padding:9px 8px; font-size:12.5px;" onclick="switchPage('radfahren')">🚴 Rad</button>
+                    <button class="btn btn-sand" style="padding:9px 8px; font-size:12.5px;" onclick="switchPage('wandern')">🥾 Wandern</button>
+                </div>
+            </div>
+
+            <div class="sand-card" style="flex:1; display:flex; flex-direction:column; justify-content:space-between;">
+                <div>
+                    <span class="eyebrow-dark">Geographie, Mathe & Ideen</span>
+                    <h3 style="font-size:21px; font-weight:800; margin-bottom:6px;">🗺️ Map-Tools & π's Pinnwand</h3>
+                    <p style="font-size:13.5px; line-height:1.55; opacity:0.9;">
+                        Berechne Polygone und kleinste Umkreise nach Welzl, klicke dich über den <b>Berg-Dominanz-Atlas</b> bis zum Mount Everest oder halte Projekte auf <b>π's Pinnwand</b> fest.
+                    </p>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:14px;">
+                    <button class="btn btn-dark" onclick="switchPage('dominanz')">⛰️ Berg-Atlas</button>
+                    <button class="btn btn-emerald" onclick="switchPage('pinnwand')">📌 π's Pinnwand</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
