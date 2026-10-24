@@ -8,7 +8,7 @@ const domNorm = s => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\
 
 const NAV_GROUPS = {
     familie:     ['fotos', 'pinnwand'],
-    sport:       ['tischtennis', 'zaehlboard', 'turnierplaner', 'radfahren', 'wandern'],
+    sport:       ['tischtennis', 'zaehlboard', 'tt-ranking', 'turnierplaner', 'radfahren', 'wandern'],
     maptools:    ['area-maps', 'dominanz', 'luftlinie', 'area-pur'],
     spiele:      ['tetris', 'minesweeper', 'snake'],
     rechtliches: ['impressum']
@@ -195,6 +195,9 @@ async function switchPage(pageId) {
     }
     if (pageId === 'tischtennis' && typeof initTTHubIfNeeded === 'function') {
         setTimeout(() => initTTHubIfNeeded(), 80);
+    }
+    if (pageId === 'tt-ranking' && typeof initTTRankingIfNeeded === 'function') {
+        setTimeout(() => initTTRankingIfNeeded(), 80);
     }
 }
 
