@@ -16,7 +16,7 @@ const NAV_GROUPS = {
 
 const ALL_VIEWS = [
     'home', 'pinnwand', 'fotos',
-    'tischtennis', 'zaehlboard', 'turnierplaner', 'radfahren', 'wandern',
+    'tischtennis', 'zaehlboard', 'tt-ranking', 'turnierplaner', 'radfahren', 'wandern',
     'area-maps', 'dominanz', 'luftlinie', 'area-pur',
     'tetris', 'minesweeper', 'snake',
     'impressum'
@@ -92,6 +92,22 @@ function openNavGroup(group) {
     if (btn) btn.classList.add('group-open');
 }
 
+// Ergänzt automatisch den "📈 TT-Ranking"-Button in den Kopfzeilen der Sport-Ecke-Unterseiten
+function injectTTRankingHeaderButtons() {
+    ['tischtennis', 'zaehlboard', 'turnierplaner', 'radfahren', 'wandern'].forEach(pid => {
+        const sec = document.getElementById('page-' + pid);
+        if (!sec) return;
+        const tpBtn = sec.querySelector('.section-header button[onclick*="turnierplaner"]');
+        if (tpBtn && !sec.querySelector('.section-header button[onclick*="tt-ranking"]')) {
+            const btn = document.createElement('button');
+            btn.className = 'btn btn-sand';
+            btn.setAttribute('onclick', "switchPage('tt-ranking')");
+            btn.textContent = '📈 TT-Ranking';
+            tpBtn.parentNode.insertBefore(btn, tpBtn);
+        }
+    });
+}
+
 // Lädt alle HTML-Views aus dem Ordner views/ in den <main>-Container
 let viewsLoadedPromise = null;
 
@@ -107,10 +123,11 @@ async function ensureAllViewsLoaded() {
                 return await res.text();
             } catch (err) {
                 console.error(`View views/${viewName}.html konnte nicht geladen werden:`, err);
-                return `<section id="page-${viewName}" class="page-section"><div class="sand-card"><h3>Ansicht "${viewName}" konnte nicht geladen werden.</h3></div></section>`;
+                return `<section id="page-${viewName}" class="page-section"><div class="sand-card"><h3>Ansicht "${viewName}" konnte nicht geladen werden (bitte prüfen, ob views/${viewName}.html existiert).</h3></div></section>`;
             }
         }));
         main.innerHTML = snippets.join('\n');
+        injectTTRankingHeaderButtons();
 
         // Sobald die Views im DOM liegen, alle Basis-Module sauber initialisieren
         if (typeof initHomeMap === 'function') initHomeMap();
