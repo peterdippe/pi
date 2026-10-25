@@ -1,7 +1,7 @@
 <section id="page-tetris" class="page-section">
     <div class="section-header">
         <div>
-            <span class="eyebrow">Spiele-Ecke</span>
+            <span class="eyebrow">Spiele-Ecke · NES A-Type Edition & GameBoy-Controller</span>
             <h2 style="font-size:32px; font-weight:800;">🧱 Tetris</h2>
         </div>
         <div style="display:flex; flex-wrap:wrap; gap:8px;">
@@ -11,31 +11,116 @@
             <button class="btn btn-sand" onclick="switchPage('snake')">🐍 Snake</button>
         </div>
     </div>
+
     <div class="sand-card tetris-shell">
-        <div class="tetris-options">
-            <label><input type="checkbox" id="tetris-sound" checked> 🔊 Ton</label>
-            <label><input type="checkbox" id="tetris-speed" checked> ⚡ Steine werden schneller</label>
+        <div class="tetris-options" style="margin-bottom:14px;">
+            <button class="btn btn-emerald" style="padding:7px 14px; font-size:13px;" onclick="tetrisNewGame()">▶ Start / Neustart</button>
+            <button class="btn btn-dark" style="padding:7px 12px; font-size:12.5px;" onclick="tetrisTogglePause()" id="tetris-pause-btn">⏸️ Pause</button>
+            <label><input type="checkbox" id="tetris-sound" checked> 🔊 8-Bit Ton</label>
+            <label><input type="checkbox" id="tetris-speed" checked> ⚡ Auto-Level-Up</label>
             <label><input type="checkbox" id="tetris-ghost" checked> 👻 Schattenstein</label>
-            <label>Schwierigkeit
-                <select id="tetris-level" onchange="tetrisSetLevel()"><option value="1">Leicht</option><option value="3" selected>Normal</option><option value="6">Schnell</option></select>
+            <label>Start-Level:
+                <select id="tetris-level" onchange="tetrisSetLevel()">
+                    <option value="1">Level 01 (Gemütlich)</option>
+                    <option value="3" selected>Level 03 (Normal)</option>
+                    <option value="6">Level 06 (Flott)</option>
+                    <option value="9">Level 09 (Profi)</option>
+                    <option value="12">Level 12 (Meister)</option>
+                    <option value="15">Level 15 (NES-Speed)</option>
+                </select>
             </label>
         </div>
-        <div class="tetris-game-wrap">
-            <div class="tetris-board-wrap">
-                <canvas id="tetris-canvas" width="300" height="600" aria-label="Tetris Spielfeld"></canvas>
-                <div class="tetris-touch-controls">
-                    <button onclick="tetrisMove(-1)">◀</button><button onclick="tetrisRotate()">↻</button><button onclick="tetrisMove(1)">▶</button><button onclick="tetrisHardDrop()">▼</button>
+
+        <!-- NES ARCADE GEHÄUSE -->
+        <div class="nes-tetris-cabinet">
+            <!-- Kompakt-HUD für Smartphones (damit Spielfeld + GameBoy-Pad auf 1 Seite passen) -->
+            <div class="nes-mobile-hud">
+                <div><span>Lines</span><strong id="tetris-lines-mob">000</strong></div>
+                <div><span>Score</span><strong id="tetris-score-mob">000000</strong></div>
+                <div><span>Top</span><strong id="tetris-top-mob">002400</strong></div>
+                <div><span>Level</span><strong id="tetris-level-mob">03</strong></div>
+            </div>
+
+            <div class="nes-grid">
+                <!-- LINKE SPALTE: A-TYPE & NES TETROMINO-STATISTICS -->
+                <div style="display:flex; flex-direction:column; gap:12px;">
+                    <div class="nes-box nes-desktop-only">
+                        <div class="nes-box-title" style="margin:0; color:#34d399;">A - TYPE</div>
+                    </div>
+
+                    <div class="nes-box">
+                        <div class="nes-box-title">STATISTICS</div>
+                        <div id="tetris-stats-list"></div>
+                    </div>
+                </div>
+
+                <!-- MITTLERE SPALTE: LINES-HEADER, SPIELFELD & GAMEBOY-CONTROLLER -->
+                <div>
+                    <div class="nes-lines-banner">
+                        LINES - <span id="tetris-lines">000</span>
+                    </div>
+                    <div class="nes-board-frame" style="position:relative;">
+                        <canvas id="tetris-canvas" width="300" height="600" aria-label="Tetris Spielfeld"></canvas>
+                    </div>
+
+                    <!-- GAMEBOY 2-DAUMEN-CONTROLLER (Links + Kreuz, Rechts großer Rotations-Button) -->
+                    <div class="gb-controller-deck" aria-label="GameBoy Steuerung">
+                        <div class="gb-dpad">
+                            <button type="button" class="gb-dpad-btn gb-dpad-up" onclick="tetrisHardDrop()" title="Sofort absetzen (Hard Drop)">
+                                <span>▲</span><span class="gb-dpad-sub">Drop</span>
+                            </button>
+                            <button type="button" class="gb-dpad-btn gb-dpad-left" onclick="tetrisMove(-1)" title="Nach links">
+                                <span>◀</span>
+                            </button>
+                            <div class="gb-dpad-center"></div>
+                            <button type="button" class="gb-dpad-btn gb-dpad-right" onclick="tetrisMove(1)" title="Nach rechts">
+                                <span>▶</span>
+                            </button>
+                            <button type="button" class="gb-dpad-btn gb-dpad-down"
+                                    onpointerdown="tetrisStartSoftDrop(event)"
+                                    onpointerup="tetrisStopSoftDrop()"
+                                    onpointerleave="tetrisStopSoftDrop()"
+                                    onpointercancel="tetrisStopSoftDrop()"
+                                    title="Schneller nach unten">
+                                <span>▼</span><span class="gb-dpad-sub">Runter</span>
+                            </button>
+                        </div>
+
+                        <div class="gb-action-zone">
+                            <button type="button" class="gb-rotate-btn" onclick="tetrisRotate()" title="Stein drehen">
+                                ↻
+                            </button>
+                            <span class="gb-rotate-label">Drehen (A)</span>
+                        </div>
+                    </div>
+
+                    <p id="tetris-status" style="text-align:center; font-size:12.5px; color:#a7c4bc; margin:10px 0 0; font-weight:700;">
+                        Tippe auf „▶ Start“ oder drücke eine Pfeiltaste!
+                    </p>
+                </div>
+
+                <!-- RECHTE SPALTE: TOP, SCORE, NEXT & LEVEL -->
+                <div style="display:flex; flex-direction:column; gap:12px;">
+                    <div class="nes-box nes-desktop-only">
+                        <div class="nes-box-title" style="text-align:left; margin-bottom:2px;">TOP</div>
+                        <div id="tetris-top" class="nes-score-val" style="color:#fbbf24;">002400</div>
+                        <div class="nes-box-title" style="text-align:left; margin-bottom:2px;">SCORE</div>
+                        <div id="tetris-score" class="nes-score-val" style="margin-bottom:0;">000000</div>
+                    </div>
+
+                    <div class="nes-box" style="text-align:center;">
+                        <div class="nes-box-title">NEXT</div>
+                        <canvas id="tetris-next" width="120" height="90" style="background:#030806; border-radius:6px; margin:0 auto; display:block;"></canvas>
+                    </div>
+
+                    <div class="nes-box nes-desktop-only" style="text-align:center;">
+                        <div class="nes-box-title">LEVEL</div>
+                        <div id="tetris-level-view" style="font-size:28px; font-weight:800; color:#38bdf8;">03</div>
+                    </div>
+
+                    <div class="hs-box" id="hs-box-tetris" style="margin-top:4px;"></div>
                 </div>
             </div>
-            <div class="tetris-side">
-                <div class="tetris-stat"><span>Punkte</span><strong id="tetris-score">0</strong></div>
-                <div class="tetris-stat"><span>Linien</span><strong id="tetris-lines">0</strong></div>
-                <div class="tetris-stat"><span>Level</span><strong id="tetris-level-view">1</strong></div>
-                <h4>Nächster Stein</h4><canvas id="tetris-next" width="120" height="120"></canvas>
-                <p id="tetris-status" class="tetris-status">Tippe auf „Neues Spiel“ oder drücke eine Taste.</p>
-                <div class="tetris-keys">← → bewegen · ↑ drehen · ↓ fallen · Leertaste Drop · P pausiert</div>
-            </div>
-            <div class="hs-box" id="hs-box-tetris"></div>
         </div>
     </div>
 </section>
