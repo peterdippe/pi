@@ -1,47 +1,74 @@
 <section id="page-snake" class="page-section">
     <div class="section-header">
         <div>
-            <span class="eyebrow">Spiele-Ecke</span>
+            <span class="eyebrow">Spiele-Ecke · Live-Speed-Vorschau & 2-Daumen-Split-Steuerung</span>
             <h2 style="font-size:32px; font-weight:800;">🐍 Snake</h2>
         </div>
         <div style="display:flex; flex-wrap:wrap; gap:8px;">
-            <button class="btn btn-amber" onclick="snakeNewGame()">▶ Neues Spiel</button>
+            <button class="btn btn-amber" onclick="snakeNewGame()">▶ Spiel starten</button>
             <button class="btn btn-sand" onclick="switchPage('tetris')">🧱 Tetris</button>
             <button class="btn btn-sand" onclick="switchPage('minesweeper')">💣 Minesweeper</button>
             <button class="btn btn-emerald" onclick="switchPage('snake')">🐍 Snake</button>
         </div>
     </div>
+
     <div class="sand-card tetris-shell">
-        <div class="tetris-options">
-            <label>Tempo:
-                <select id="snake-speed" onchange="snakeChangeSpeed()">
-                    <option value="260">1 · Sehr gemütlich</option>
-                    <option value="200">2 · Gemütlich</option>
-                    <option value="150" selected>3 · Normal</option>
-                    <option value="100">4 · Schnell</option>
-                    <option value="70">5 · Rasend (Max)</option>
-                </select>
-            </label>
-            <label><input type="checkbox" id="snake-accel" checked> ⚡ Langsame Steigerung mit jedem Apfel</label>
+        <div class="tetris-options" style="gap:14px; align-items:center;">
+            <!-- Geschwindigkeits-Schieberegler mit Live-Vorschau -->
+            <div class="arcade-slider-box">
+                <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:800;">
+                    <span>🚀 Grundtempo (Live-Vorschau im Feld):</span>
+                    <span id="snake-speed-label" style="color:#34d399;">Stufe 5 · Normal (135 ms)</span>
+                </div>
+                <input type="range" id="snake-speed-slider" min="1" max="10" step="1" value="5" oninput="snakeUpdateSpeedSlider(this.value)">
+            </div>
+
+            <label><input type="checkbox" id="snake-accel" checked> ⚡ Mit jedem Apfel schneller</label>
             <label><input type="checkbox" id="snake-walls" checked> 🧱 Wände tödlich</label>
+            <button class="btn btn-emerald" style="padding:9px 16px;" onclick="snakeNewGame()">▶ Jetzt selbst spielen</button>
         </div>
+
         <div class="tetris-game-wrap">
-            <div class="tetris-board-wrap">
-                <canvas id="snake-canvas" width="400" height="400"></canvas>
-                <div class="tetris-touch-controls">
-                    <button onclick="snakeSetDir(-1,0)">◀</button>
-                    <button onclick="snakeSetDir(0,-1)">▲</button>
-                    <button onclick="snakeSetDir(0,1)">▼</button>
-                    <button onclick="snakeSetDir(1,0)">▶</button>
+            <div class="tetris-board-wrap" style="width:100%; max-width:420px; margin:0 auto;">
+                <canvas id="snake-canvas" width="440" height="440" style="width:100%; height:auto; aspect-ratio:1/1; border-radius:16px; border:2.5px solid #34d399; display:block;"></canvas>
+
+                <!-- 2-DAUMEN-SPLIT-PAD (Links: Links/Rechts · Rechts: Hoch/Runter) -->
+                <div class="snake-thumb-pad" aria-label="2-Daumen Snake Steuerung">
+                    <div>
+                        <div style="font-size:10px; font-weight:800; color:#a7c4bc; text-transform:uppercase; text-align:center; margin-bottom:4px;">Linker Daumen (L / R)</div>
+                        <div class="snake-thumb-group">
+                            <button type="button" class="snake-thumb-btn" onclick="snakeSetDir(-1, 0)">◀</button>
+                            <button type="button" class="snake-thumb-btn" onclick="snakeSetDir(1, 0)">▶</button>
+                        </div>
+                    </div>
+
+                    <div style="text-align:center;">
+                        <button type="button" class="btn btn-amber" style="padding:8px 12px; font-size:12px;" onclick="snakeNewGame()">▶ Start</button>
+                    </div>
+
+                    <div>
+                        <div style="font-size:10px; font-weight:800; color:#fbbf24; text-transform:uppercase; text-align:center; margin-bottom:4px;">Rechter Daumen (H / R)</div>
+                        <div class="snake-thumb-group">
+                            <button type="button" class="snake-thumb-btn" style="border-color:#fbbf24;" onclick="snakeSetDir(0, -1)">▲</button>
+                            <button type="button" class="snake-thumb-btn" style="border-color:#fbbf24;" onclick="snakeSetDir(0, 1)">▼</button>
+                        </div>
+                    </div>
                 </div>
             </div>
+
             <div class="tetris-side">
                 <div class="tetris-stat"><span>Punkte</span><strong id="snake-score">0</strong></div>
                 <div class="tetris-stat"><span>Äpfel 🍎</span><strong id="snake-apples">0</strong></div>
-                <div class="tetris-stat"><span>Länge</span><strong id="snake-len">3</strong></div>
-                <p id="snake-status" class="tetris-status">Klicke auf „Neues Spiel“ oder drücke eine Pfeiltaste.</p>
-                <div class="tetris-keys">Steuerung mit Pfeiltasten, WASD oder den Buttons unter dem Spielfeld. Leertaste pausiert.</div>
+                <div class="tetris-stat"><span>Schlangenlänge</span><strong id="snake-len">4</strong></div>
+                <p id="snake-status" class="tetris-status" style="color:#34d399; font-weight:700;">
+                    👀 Live-Demo läuft! Bewege oben den Schieberegler, um das Tempo live zu testen.
+                </p>
+                <div class="tetris-keys">
+                    📱 <b>2-Daumen-Modus:</b> Linker Daumen steuert Links/Rechts, rechter Daumen Hoch/Runter.<br>
+                    ⌨️ <b>Tastatur:</b> Pfeiltasten oder WASD · Leertaste pausiert.
+                </div>
             </div>
+
             <div class="hs-box" id="hs-box-snake"></div>
         </div>
     </div>

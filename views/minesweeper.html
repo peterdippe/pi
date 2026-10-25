@@ -1,7 +1,7 @@
 <section id="page-minesweeper" class="page-section">
     <div class="section-header">
         <div>
-            <span class="eyebrow">Spiele-Ecke</span>
+            <span class="eyebrow">Spiele-Ecke · 10 Feldgrößen bis XXL & 5%-Bomben-Regler</span>
             <h2 style="font-size:32px; font-weight:800;">💣 Minesweeper</h2>
         </div>
         <div style="display:flex; flex-wrap:wrap; gap:8px;">
@@ -11,29 +11,56 @@
             <button class="btn btn-sand" onclick="switchPage('snake')">🐍 Snake</button>
         </div>
     </div>
+
     <div class="sand-card tetris-shell">
-        <div class="tetris-options">
-            <label>Größe / Schwierigkeit:
-                <select id="ms-diff" onchange="msNewGame()">
-                    <option value="easy" selected>Anfänger (9×9 · 10 Minen)</option>
-                    <option value="medium">Fortgeschritten (12×12 · 22 Minen)</option>
-                    <option value="hard">Profi (16×12 · 35 Minen)</option>
-                </select>
-            </label>
-            <button id="ms-flag-toggle" class="btn btn-sand" style="padding:5px 12px; font-size:12px;" onclick="msToggleFlagMode()">
-                ⛏️ Modus: Aufdecken (Rechtsklick = 🚩)
+        <div class="tetris-options" style="gap:14px; align-items:center;">
+            <!-- Regler 1: Feldgröße in 10 festen Stufen (von 8x8 bis 36x22 XXL) -->
+            <div class="arcade-slider-box">
+                <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:800;">
+                    <span>📐 Spielfeld-Größe (10 Stufen):</span>
+                    <span id="ms-size-label" style="color:#34d399;">Stufe 3 · 12×12 (144 Felder)</span>
+                </div>
+                <input type="range" id="ms-size-slider" min="1" max="10" step="1" value="3" oninput="msUpdateSliders()">
+            </div>
+
+            <!-- Regler 2: Bombenanteil in 5%-Schritten -->
+            <div class="arcade-slider-box">
+                <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:800;">
+                    <span>💣 Bombenanteil (5%-Schritte):</span>
+                    <span id="ms-bomb-label" style="color:#fbbf24;">15% (22 Bomben)</span>
+                </div>
+                <input type="range" id="ms-bomb-slider" min="10" max="35" step="5" value="15" oninput="msUpdateSliders()">
+            </div>
+
+            <button id="ms-flag-toggle" class="btn btn-sand" style="padding:10px 14px; font-size:13px;" onclick="msToggleFlagMode()">
+                ⛏️ Modus: Aufdecken (Tippen zum Wechseln auf 🚩)
             </button>
         </div>
-        <div class="tetris-game-wrap">
-            <div class="tetris-board-wrap">
-                <div id="ms-board" class="ms-board"></div>
+
+        <!-- Kompakte Live-Statistik-Leiste über dem Feld -->
+        <div style="display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; align-items:center; margin-bottom:12px; background:rgba(9,21,18,0.9); padding:10px 16px; border-radius:14px; color:#fff;">
+            <div style="display:flex; gap:18px; flex-wrap:wrap; font-family:'JetBrains Mono',monospace; font-size:14px;">
+                <span>💣 Übrig: <strong id="ms-mines-left" style="color:#fbbf24;">22</strong></span>
+                <span>⏱️ Zeit: <strong id="ms-time" style="color:#34d399;">0.0 s</strong></span>
+                <span>🏆 Score: <strong id="ms-score" style="color:#38bdf8;">0</strong></span>
             </div>
-            <div class="tetris-side">
-                <div class="tetris-stat"><span>Minen übrig</span><strong id="ms-mines-left">10</strong></div>
-                <div class="tetris-stat"><span>Zeit</span><strong id="ms-time">0.0 s</strong></div>
-                <div class="tetris-stat"><span>Score</span><strong id="ms-score">0</strong></div>
-                <p id="ms-status" class="tetris-status">Klicke auf ein Feld, um zu starten!</p>
-                <div class="tetris-keys">Linksklick: Feld öffnen · Rechtsklick (oder Modus-Schalter): Flagge 🚩 setzen. Score = Schwierigkeits-Bonus minus benötigte Zeit.</div>
+            <div id="ms-status" style="font-size:12.5px; color:#a7c4bc; font-weight:700;">
+                Erstes Feld ist garantiert minenfrei!
+            </div>
+        </div>
+
+        <!-- Scrollbarer Spielbrett-Container (ideal für XXL auf Desktop & Touch-Wischen auf Smartphone) -->
+        <div class="ms-board-scroll">
+            <div id="ms-board" class="ms-board" style="margin:0 auto;"></div>
+        </div>
+
+        <div style="margin-top:16px; display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:16px; align-items:start;">
+            <div class="person-box" style="margin:0;">
+                <span class="person-role">💡 Profi-Steuerung (Desktop & Smartphone)</span>
+                <p style="font-size:12.8px; line-height:1.55; margin-top:4px;">
+                    <b>Smartphone:</b> Nutze oben den großen Schalter <b>⛏️ Aufdecken / 🚩 Flagge</b> oder halte ein Feld kurz gedrückt (Long-Press), um direkt eine Flagge zu setzen.<br>
+                    <b>Schnell-Aufdecken (Chording):</b> Tippst du auf eine bereits aufgedeckte Zahl, um die herum schon alle Flaggen gesetzt sind, werden alle übrigen Nachbarfelder sofort automatisch geöffnet!
+                </p>
             </div>
             <div class="hs-box" id="hs-box-minesweeper"></div>
         </div>
