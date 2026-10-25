@@ -1,5 +1,5 @@
 // ===================================================================
-// CORE: VIEW-LOADER, ROUTER, PASSWORT-MODAL & GLOBALE HELFER (js/core.js)
+// CORE: VIEW-LOADER, DEEP-LINK ROUTER, PASSWORT-MODAL & HELFER (js/core.js)
 // ===================================================================
 
 const domEsc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -8,7 +8,7 @@ const domNorm = s => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\
 
 const NAV_GROUPS = {
     familie:     ['fotos', 'pinnwand'],
-    sport:       ['tischtennis', 'tt-ranking', 'turnierplaner', 'zaehlboard', 'radfahren', 'wandern', 'kicker'],
+    sport:       ['tischtennis', 'tt-news', 'tt-ranking', 'turnierplaner', 'zaehlboard', 'radfahren', 'wandern', 'kicker'],
     maptools:    ['area-maps', 'dominanz', 'luftlinie', 'area-pur'],
     spiele:      ['tetris', 'minesweeper', 'snake'],
     rechtliches: ['impressum']
@@ -16,14 +16,37 @@ const NAV_GROUPS = {
 
 const ALL_VIEWS = [
     'home', 'pinnwand', 'fotos',
-    'tischtennis', 'tt-ranking', 'turnierplaner', 'zaehlboard', 'radfahren', 'wandern', 'kicker',
+    'tischtennis', 'tt-news', 'tt-ranking', 'turnierplaner', 'zaehlboard', 'radfahren', 'wandern', 'kicker',
     'area-maps', 'dominanz', 'luftlinie', 'area-pur',
     'tetris', 'minesweeper', 'snake',
     'impressum'
 ];
 
+const PAGE_TITLES = {
+    'home':          'π | Peters Page',
+    'pinnwand':      "📌 π's Pinnwand | Peters Page",
+    'fotos':         '📸 Fotos & Cloud | Peters Page',
+    'tischtennis':   '🏓 Tischtennis · TSV Graupa | Peters Page',
+    'tt-news':       '📰 TT-News & Videos | Peters Page',
+    'tt-ranking':    '📈 TT-Ranking & Challenge | Peters Page',
+    'turnierplaner': '🏆 Turnierplaner | Peters Page',
+    'zaehlboard':    '🔢 Digitales Zählboard | Peters Page',
+    'radfahren':     '🚴 Fahrradfahren | Peters Page',
+    'wandern':       '🥾 Wanderungen | Peters Page',
+    'kicker':        '⚽ Kickerabend | Peters Page',
+    'area-maps':     '🌍 Maps Math | Peters Page',
+    'dominanz':      '⛰️ Berg-Dominanz-Atlas | Peters Page',
+    'luftlinie':     '✈️ Luftlinien-Entfernung | Peters Page',
+    'area-pur':      '📏 Pure Math | Peters Page',
+    'tetris':        '🧱 Tetris | Peters Page',
+    'minesweeper':   '💣 Minesweeper | Peters Page',
+    'snake':         '🐍 Snake | Peters Page',
+    'impressum':     '📄 Impressum | Peters Page'
+};
+
 const SPORT_HEADER_ITEMS = [
     { id: 'tischtennis',   label: '🏓 Tischtennis' },
+    { id: 'tt-news',       label: '📰 TT-News' },
     { id: 'tt-ranking',    label: '📈 TT-Ranking' },
     { id: 'turnierplaner', label: '🏆 Turnierplaner' },
     { id: 'zaehlboard',    label: '🔢 Digitales Zählboard' },
@@ -32,8 +55,10 @@ const SPORT_HEADER_ITEMS = [
     { id: 'kicker',        label: '⚽ Kickerabend' }
 ];
 
+let currentActivePageId = 'home';
+
 // ===================================================================
-// GLOBALER MASKIERTER PASSWORT-DIALOG (KEIN KLARTEXT-PROMPT MEHR!)
+// GLOBALER MASKIERTER PASSWORT-DIALOG
 // ===================================================================
 let _pwdModalResolver = null;
 
@@ -82,7 +107,74 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ===================================================================
-// GEMEINSAME KARTEN-HELFER FÜR HOME, MAPS MATH, DOMINANZ & LUFTLINIE
+// DEEP-LINK ROUTING & TEILEN-FUNKTION (FÜR ALLE UNTERSEITEN)
+// ===================================================================
+function resolvePageIdFromUrl() {
+    // 1. Aus 404.html SPA-Redirect (wenn jemand /tischtennis direkt aufgerufen hat)
+    const redirected = sessionStorage.getItem('dippe_spa_redirect');
+    if (redirected) {
+        sessionStorage.removeItem('dippe_spa_redirect');
+        const cleanRedir = redirected.toLowerCase().trim();
+        if (ALL_VIEWS.includes(cleanRedir)) return cleanRedir;
+    }
+
+    // 2. Aus URL-Hash (#tischtennis oder #/tischtennis)
+    const rawHash = window.location.hash.replace(/^#\/?/, '').split('?')[0].toLowerCase().trim();
+    if (rawHash && ALL_VIEWS.includes(rawHash)) return rawHash;
+
+    // 3. Aus Query-Parameter (?p=tischtennis oder ?page=tischtennis)
+    const params = new URLSearchParams(window.location.search);
+    const qp = (params.get('p') || params.get('page') || '').toLowerCase().trim();
+    if (qp && ALL_VIEWS.includes(qp)) return qp;
+
+    // 4. Aus Pfadnamen (/tischtennis)
+    const pathSeg = window.location.pathname.replace(/^\/+|\/+$/g, '').split('/').pop().toLowerCase();
+    if (pathSeg && ALL_VIEWS.includes(pathSeg)) return pathSeg;
+
+    return 'home';
+}
+
+function getShareableUrlForPage(pageId) {
+    const base = window.location.origin + window.location.pathname.replace(/index\.html$/i, '');
+    if (!pageId || pageId === 'home') return base;
+    return `${base}#${pageId}`;
+}
+
+async function shareCurrentPage(customPageId) {
+    const pid = customPageId || currentActivePageId || 'home';
+    const url = getShareableUrlForPage(pid);
+    const title = PAGE_TITLES[pid] || 'π | Peters Page';
+
+    if (navigator.share) {
+        try {
+            await navigator.share({ title, url });
+            return;
+        } catch (e) {}
+    }
+    try {
+        await navigator.clipboard.writeText(url);
+        showQuickToast(`🔗 Direktlink kopiert: ${url}`);
+    } catch (e) {
+        prompt('Direktlink zu dieser Seite kopieren:', url);
+    }
+}
+
+function showQuickToast(msg) {
+    let t = document.getElementById('pi-quick-toast');
+    if (!t) {
+        t = document.createElement('div');
+        t.id = 'pi-quick-toast';
+        t.style.cssText = 'position:fixed; bottom:22px; right:22px; background:#06281e; color:#34d399; border:1.5px solid #34d399; padding:10px 16px; border-radius:12px; font-weight:800; font-size:13px; box-shadow:0 12px 30px rgba(0,0,0,0.5); z-index:9999; transition:opacity 0.25s;';
+        document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.style.opacity = '1';
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => { t.style.opacity = '0'; }, 2600);
+}
+
+// ===================================================================
+// GEMEINSAME KARTEN-HELFER
 // ===================================================================
 let pirnaCoords = [50.9939978, 13.9076698];
 const HOME_LOCATIONS = [
@@ -126,7 +218,6 @@ function fillLayerSelect(selId, current) {
     sel.innerHTML = LAYER_ORDER.map(k => `<option value="${k}"${k===current?' selected':''}>${LAYER_LABELS[k]}</option>`).join('');
 }
 
-// Navigation & Sidebar
 function toggleSidebar() {
     document.getElementById('sidebar')?.classList.toggle('open');
 }
@@ -153,7 +244,6 @@ function openNavGroup(group) {
     if (btn) btn.classList.add('group-open');
 }
 
-// Synchronisiert die obere Button-Leiste auf allen Seiten der Sport-Ecke automatisch in exakt derselben Reihenfolge!
 function syncSportHeaderButtons() {
     SPORT_HEADER_ITEMS.forEach(activeItem => {
         const sec = document.getElementById('page-' + activeItem.id);
@@ -172,7 +262,6 @@ function syncSportHeaderButtons() {
     });
 }
 
-// Lädt alle HTML-Views aus dem Ordner views/ in den <main>-Container
 let viewsLoadedPromise = null;
 
 async function ensureAllViewsLoaded() {
@@ -187,13 +276,12 @@ async function ensureAllViewsLoaded() {
                 return await res.text();
             } catch (err) {
                 console.error(`View views/${viewName}.html konnte nicht geladen werden:`, err);
-                return `<section id="page-${viewName}" class="page-section"><div class="sand-card"><h3>Ansicht "${viewName}" konnte nicht geladen werden (bitte prüfen, ob views/${viewName}.html existiert).</h3></div></section>`;
+                return `<section id="page-${viewName}" class="page-section"><div class="sand-card"><h3>Ansicht "${viewName}" konnte nicht geladen werden.</h3></div></section>`;
             }
         }));
         main.innerHTML = snippets.join('\n');
         syncSportHeaderButtons();
 
-        // Sobald die Views im DOM liegen, alle Basis-Module sauber initialisieren
         if (typeof initHomeMap === 'function') initHomeMap();
         if (typeof initPinnwand === 'function') initPinnwand();
         if (typeof calcBikeMetrics === 'function') calcBikeMetrics();
@@ -205,6 +293,9 @@ async function ensureAllViewsLoaded() {
             ttHubInitialized = false;
             initTTHubIfNeeded();
         }
+        if (typeof initTTNewsIfNeeded === 'function') {
+            initTTNewsIfNeeded();
+        }
         if (typeof initKickerIfNeeded === 'function') {
             initKickerIfNeeded();
         }
@@ -212,8 +303,19 @@ async function ensureAllViewsLoaded() {
     return viewsLoadedPromise;
 }
 
-async function switchPage(pageId) {
+async function switchPage(pageId, skipHistoryPush = false) {
     await ensureAllViewsLoaded();
+    if (!ALL_VIEWS.includes(pageId)) pageId = 'home';
+    currentActivePageId = pageId;
+
+    // URL in der Adresszeile aktualisieren (sodass man die URL jederzeit kopieren/teilen kann)
+    if (!skipHistoryPush) {
+        const targetHash = pageId === 'home' ? window.location.pathname : `#${pageId}`;
+        if (window.location.hash !== `#${pageId}` && !(pageId === 'home' && !window.location.hash)) {
+            history.pushState({ pageId }, PAGE_TITLES[pageId] || 'π', targetHash);
+        }
+    }
+    document.title = PAGE_TITLES[pageId] || 'π | Peters Page';
 
     document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
@@ -239,6 +341,7 @@ async function switchPage(pageId) {
     }
 
     document.getElementById('sidebar')?.classList.remove('open');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 
     if (pageId === 'home' && typeof homeMap !== 'undefined' && homeMap) {
         setTimeout(() => homeMap.invalidateSize(), 150);
@@ -280,6 +383,9 @@ async function switchPage(pageId) {
     if (pageId === 'tischtennis' && typeof initTTHubIfNeeded === 'function') {
         setTimeout(() => initTTHubIfNeeded(), 80);
     }
+    if (pageId === 'tt-news' && typeof initTTNewsIfNeeded === 'function') {
+        setTimeout(() => initTTNewsIfNeeded(), 80);
+    }
     if (pageId === 'tt-ranking' && typeof initTTRankingIfNeeded === 'function') {
         setTimeout(() => initTTRankingIfNeeded(), 80);
     }
@@ -287,6 +393,16 @@ async function switchPage(pageId) {
         setTimeout(() => initKickerIfNeeded(), 80);
     }
 }
+
+// Reagiert auf Browser-Zurück/Vorwärts-Buttons und direkte Hash-Änderungen
+window.addEventListener('popstate', () => {
+    const pid = resolvePageIdFromUrl();
+    switchPage(pid, true);
+});
+window.addEventListener('hashchange', () => {
+    const pid = resolvePageIdFromUrl();
+    if (pid !== currentActivePageId) switchPage(pid, true);
+});
 
 let _mapResizeTimer = null;
 window.addEventListener('resize', () => {
@@ -299,6 +415,10 @@ window.addEventListener('resize', () => {
     }, 180);
 });
 
-window.addEventListener('DOMContentLoaded', () => {
-    ensureAllViewsLoaded();
+window.addEventListener('DOMContentLoaded', async () => {
+    await ensureAllViewsLoaded();
+    const initialPage = resolvePageIdFromUrl();
+    if (initialPage && initialPage !== 'home') {
+        switchPage(initialPage, true);
+    }
 });
