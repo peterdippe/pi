@@ -453,9 +453,9 @@ function parseClickTTOverviewTeam(ctObj) {
     };
 }
 
-function parseClickTTTeamDetailHtml(bilanzenHtml, infosHtml, spieleHtml, baseTeam) {
-    if (baseTeam === undefined && typeof spieleHtml === 'object') {
-        baseTeam = spieleHtml;
+function parseClickTTTeamDetailHtml(bilanzenHtml, infosHtml, spieleHtml, targetTeam) {
+    if (targetTeam === undefined && typeof spieleHtml === 'object') {
+        targetTeam = spieleHtml;
         spieleHtml = '';
     }
 
@@ -474,7 +474,7 @@ function parseClickTTTeamDetailHtml(bilanzenHtml, infosHtml, spieleHtml, baseTea
         if (rows.length < 2) return;
         const headText = rows.slice(0, 2).map(r => r.textContent.replace(/\s+/g, ' ').trim()).join(' | ');
 
-        // 1. KOMBINIERTE ODER GETRENNTE EINZEL- & DOPPEL-BILANZ-TABELLE IN CLICK-TT
+        // 1. EINZEL- & DOPPEL-BILANZEN TRENNEN
         if (!singlesTable && (/Rang|Pos|Einsätze/i.test(headText) && /Name|Spieler|Gesamt|PK1/i.test(headText))) {
             const hCells = getCleanRowCells(rows[0]);
             const singleRows = [];
@@ -558,13 +558,13 @@ function parseClickTTTeamDetailHtml(bilanzenHtml, infosHtml, spieleHtml, baseTea
             return;
         }
 
-        // 2. Spielplan-Tabelle auf der Seite (click-TT hat eine extra Spalte "Halle" z.B. "1" oder "2" nach der Uhrzeit!)
+        // 2. Spielplan-Tabelle direkt auf der Seite
         if (!scheduleTable && (/Heim/i.test(headText) || /Gast/i.test(headText) || /Begegnung/i.test(headText)) && /\d{2}\.\d{2}\.\d{2,4}/.test(tbl.textContent)) {
             scheduleTable = extractClickTTScheduleFromTable(rows);
         }
     });
 
-    // 3. SPIELPLAN AUS spieleHtml (click-TT /spiele oder TTLive-Fallback team_136234) EXTRAHIEREN
+    // 3. SPIELPLAN AUS spieleHtml EXTRAHIEREN
     if (!scheduleTable && spieleHtml) {
         if (/TischtennisLive/i.test(spieleHtml) && !/mytischtennis/i.test(spieleHtml)) {
             const parsedFallback = parseTTLiveTeamDetailHtml(spieleHtml);
@@ -590,76 +590,102 @@ function parseClickTTTeamDetailHtml(bilanzenHtml, infosHtml, spieleHtml, baseTea
         }
     }
 
-    // 4. INFOS-SEITE PARSEN: "Mannschaftskontakt" & "Spiellokal 1" (trennt Name, Straße, PLZ/Ort, E-Mail & Telefon sauber!)
+    // 4. INFOS-SEITE PARSEN (100% frei von <script>-JSON-Fragmenten!)
     if (infosHtml) {
-        const parseContactLines = (rawStr) => {
-            let s = String(rawStr || '')
-                .replace(/<br\s*\/?>/gi, '\n')
-                .replace(/<\/(div|p|li|tr|h[1-6]|dt|dd|span|a)>/gi, '\n')
-                .replace(/<[^>]+>/g, ' ')
-                .replace(/&nbsp;/gi, ' ');
-            // Falls im DOM alles ohne Zeilenumbruch zusammenhing (z.B. "Peter KraetschKrietzschwitz 25b01796 Pirnakraetschipe@web.de0172/9 34 37 67"),
-            // künstliche Trenner an den Übergängen (Kleinbuchstabe->Großbuchstabe, vor 5-stelliger PLZ, vor E-Mail, vor Telefonnummer) einfügen:
-            s = s.replace(/([a-zäöüß])([A-ZÄÖÜ])/g, '$1\n$2')
-                 .replace(/(\d[a-zA-Z]?)(\d{5}\s+[A-ZÄÖÜ])/g, '$1\n$2')
-                 .replace(/([A-Za-zäöüß])(\d{5}\s+[A-ZÄÖÜ])/g, '$1\n$2')
-                 .replace(/([A-Za-zäöüß])([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/g, '$1\n$2')
-                 .replace(/(\.[a-zA-Z]{2,})(0\d{2,4}[\s\/\-]*\d)/g, '$1\n$2');
-            return s.split(/\r?\n/).map(x => x.replace(/\s+/g, ' ').trim()).filter(Boolean);
-        };
+        // A) Zuerst prüfen, ob Next.js JSON-Felder ("team_contact" / "playing_locations" / "gyms") im HTML stecken:
+        const tcBlock = infosHtml.match(/"team_contact"\s*:\s*\{([\s\S]{1,800}?)\}/i);
+        if (tcBlock) {
+            const tc = tcBlock[1];
+            const fn = (tc.match(/"first_?name"\s*:\s*"([^"]+)"/i) || [])[1] || '';
+            const ln = (tc.match(/"last_?name"\s*:\s*"([^"]+)"/i) || [])[1] || '';
+            const fullN = (tc.match(/"name"\s*:\s*"([^"]+)"/i) || [])[1] || '';
+            if (fn || ln) captainInfo.name = `${fn} ${ln}`.trim();
+            else if (fullN) captainInfo.name = fullN.trim();
 
-        // Gezielter Ausschnitt ab "Mannschaftskontakt" bis "Spiellokal"
-        const mkBlockMatch = infosHtml.match(/Mannschaftskontakt([\s\S]{1,1200}?)(?=Spiellokal|<footer|$)/i);
-        if (mkBlockMatch) {
-            const lines = parseContactLines(mkBlockMatch[1]).filter(l => !/^Mannschaftskontakt$/i.test(l));
-            const mailLine = lines.find(l => /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/.test(l));
-            if (mailLine) {
-                const em = mailLine.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
-                if (em) captainInfo.email = em[0];
-            }
-            const phoneLine = lines.find(l => /(?:0\d{2,4}|\+49)[\s\/\-]*\d[\d\s\/\-]{4,}/.test(l));
-            if (phoneLine) {
-                const ph = phoneLine.match(/(?:0\d{2,4}|\+49)[\s\/\-]*\d[\d\s\/\-]{4,}/);
-                if (ph) captainInfo.phone = ph[0].trim();
-            }
-            const nameCandidates = lines.filter(l =>
-                !l.includes('@') &&
-                !/^\d{5}\b/.test(l) &&
-                !/\d{2,4}[\s\/\-]\d{2,}/.test(l) &&
-                !/\d+\s*[a-zA-Z]?$/.test(l) &&
-                l.length >= 4 && l.length <= 45
-            );
-            if (nameCandidates[0]) captainInfo.name = nameCandidates[0];
+            const em = (tc.match(/"email[^"]*"\s*:\s*"([^"]+@[^"]+)"/i) || [])[1];
+            if (em) captainInfo.email = em.trim();
+
+            const ph = (tc.match(/"(?:phone|mobile|tel)[^"]*"\s*:\s*"([^"]+)"/i) || [])[1];
+            if (ph) captainInfo.phone = ph.trim();
         }
 
-        // Gezielter Ausschnitt ab "Spiellokal 1"
-        const slBlockMatch = infosHtml.match(/Spiellokal\s*1?([\s\S]{1,1200}?)(?=Spiellokal\s*2|Mannschaftskontakt|<footer|$)/i);
-        if (slBlockMatch) {
-            const lines = parseContactLines(slBlockMatch[1]).filter(l => !/^Spiellokal/i.test(l) && !/^www\.|^http/i.test(l));
-            const plzIdx = lines.findIndex(l => /^\d{5}\s+/.test(l));
-            if (plzIdx !== -1) {
-                venueInfo.city = lines[plzIdx];
-                if (plzIdx >= 2) {
-                    venueInfo.name = lines[0];
-                    venueInfo.street = lines[plzIdx - 1];
-                } else if (plzIdx === 1) {
-                    venueInfo.name = lines[0];
-                }
-            } else if (lines.length >= 2) {
-                venueInfo.name = lines[0];
-                venueInfo.street = lines[1];
+        // B) Jetzt im völlig skriptfreien DOM nach "Mannschaftskontakt" und "Spiellokal 1" suchen:
+        const iDoc = sanitizeTTLiveDom(infosHtml); // sanitizeTTLiveDom entfernt alle <script>-Tags!
+        iDoc.querySelectorAll('footer, nav, header, [class*="footer"], [id*="footer"]').forEach(el => el.remove());
+
+        // Hilfsfunktion: fügt vor jedem Block/Zeilen-Tag einen echten Zeilenumbruch ein, bevor Tags entfernt werden
+        const htmlToCleanLines = (el) => {
+            if (!el) return [];
+            const clone = el.cloneNode(true);
+            clone.querySelectorAll('br, p, div, li, tr, h1, h2, h3, h4, h5, h6, dt, dd').forEach(node => {
+                node.insertAdjacentText('beforebegin', '\n');
+                node.insertAdjacentText('afterend', '\n');
+            });
+            return (clone.textContent || '')
+                .split(/\r?\n/)
+                .map(s => s.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim())
+                .filter(s => s.length >= 2 && !/^\{"|^","|":null|"\$undefined"/i.test(s));
+        };
+
+        const allLines = htmlToCleanLines(iDoc.body);
+
+        // Mannschaftskontakt im sichtbaren Text finden
+        const mkIdx = allLines.findIndex(l => /^Mannschaftskontakt$/i.test(l));
+        if (mkIdx !== -1) {
+            const mkSlice = [];
+            for (let k = mkIdx + 1; k < Math.min(allLines.length, mkIdx + 12); k++) {
+                if (/^Spiellokal|^Mannschafts|^Verein|^Ligen/i.test(allLines[k])) break;
+                mkSlice.push(allLines[k]);
             }
-            const phoneLine = lines.find(l => /(?:0\d{2,4}|\+49)[\s\/\-]*\d[\d\s\/\-]{4,}/.test(l));
-            if (phoneLine) {
-                const ph = phoneLine.match(/(?:0\d{2,4}|\+49)[\s\/\-]*\d[\d\s\/\-]{4,}/);
-                if (ph) venueInfo.phone = ph[0].trim();
+            if (!captainInfo.name && mkSlice[0]) {
+                captainInfo.name = mkSlice[0];
+            }
+            const mailLine = mkSlice.find(l => /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/.test(l));
+            if (mailLine && !captainInfo.email) {
+                captainInfo.email = (mailLine.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/) || [mailLine])[0];
+            }
+            const phoneLine = mkSlice.find(l => /(?:0\d{2,4}|\+49)[\s\/\-]*\d[\d\s\/\-]{4,}/.test(l));
+            if (phoneLine && !captainInfo.phone) {
+                captainInfo.phone = (phoneLine.match(/(?:0\d{2,4}|\+49)[\s\/\-]*\d[\d\s\/\-]{4,}/) || [phoneLine])[0].trim();
+            }
+        }
+
+        // Spiellokal 1 im sichtbaren Text finden
+        const slIdx = allLines.findIndex(l => /^Spiellokal\s*1?$/i.test(l));
+        if (slIdx !== -1) {
+            const slSlice = [];
+            for (let k = slIdx + 1; k < Math.min(allLines.length, slIdx + 12); k++) {
+                if (/^Spiellokal\s*[23]|^Mannschaftskontakt|^Verein/i.test(allLines[k])) break;
+                if (!/^www\.|^http/i.test(allLines[k])) slSlice.push(allLines[k]);
+            }
+            const plzIdx = slSlice.findIndex(l => /^\d{5}\s+[A-ZÄÖÜa-zäöüß]/.test(l));
+            if (plzIdx !== -1) {
+                venueInfo.city = slSlice[plzIdx];
+                if (plzIdx >= 2) {
+                    venueInfo.name = slSlice[0];
+                    venueInfo.street = slSlice[plzIdx - 1];
+                } else if (plzIdx === 1) {
+                    venueInfo.name = slSlice[0];
+                }
+            } else if (slSlice.length >= 2) {
+                venueInfo.name = slSlice[0];
+                venueInfo.street = slSlice[1];
+                if (slSlice[2] && /^\d{5}/.test(slSlice[2])) venueInfo.city = slSlice[2];
+            }
+            const vPhone = slSlice.find(l => /(?:0\d{2,4}|\+49)[\s\/\-]*\d[\d\s\/\-]{4,}/.test(l));
+            if (vPhone) {
+                venueInfo.phone = (vPhone.match(/(?:0\d{2,4}|\+49)[\s\/\-]*\d[\d\s\/\-]{4,}/) || [vPhone])[0].trim();
             }
         }
     }
 
-    const isOurGraupaTeam = !baseTeam || /TSV\s+Graupa/i.test(baseTeam.fullTeamName || '');
-    if (isOurGraupaTeam) {
-        if (!captainInfo.name || captainInfo.name.length > 35) captainInfo.name = 'Peter Kraetsch';
+    // WICHTIG: Fallback auf Peter Kraetsch & Grundschule Graupa NUR DANN,
+    // wenn es sich wirklich um unsere eigene Mannschaft (TSV Graupa) handelt!
+    const teamLabel = (targetTeam && (targetTeam.teamName || targetTeam.fullTeamName)) || '';
+    const isActuallyGraupa = Boolean(targetTeam && targetTeam.isOwnGraupaTeam) || /TSV\s+Graupa/i.test(teamLabel);
+
+    if (isActuallyGraupa) {
+        if (!captainInfo.name) captainInfo.name = 'Peter Kraetsch';
         if (!captainInfo.email) captainInfo.email = 'kraetschipe@web.de';
         if (!captainInfo.phone) captainInfo.phone = '0172 / 9 34 37 67';
         if (!venueInfo.name) venueInfo.name = 'Turnhalle der Grundschule Graupa';
@@ -670,7 +696,7 @@ function parseClickTTTeamDetailHtml(bilanzenHtml, infosHtml, spieleHtml, baseTea
     }
 
     return {
-        headerTitle: baseTeam ? `${baseTeam.fullTeamName}, ${baseTeam.tabName}` : 'Oberliga Mitte',
+        headerTitle: teamLabel || 'Oberliga Mitte',
         sourcePortal: 'click-tt',
         ballInfo,
         captainInfo,
@@ -681,11 +707,6 @@ function parseClickTTTeamDetailHtml(bilanzenHtml, infosHtml, spieleHtml, baseTea
     };
 }
 
-/**
- * Parst die Spielplan-Tabelle von click-TT fehlerfrei:
- * In click-TT steht nach der Uhrzeit (z. B. "15:00 v") oft noch eine einstellige Hallen-Ziffer ("1" oder "2"),
- * und am Ende steht das Ergebnismanchmal zusammen mit der Gastmannschaft oder einem "Vorbericht".
- */
 function extractClickTTScheduleFromTable(rows) {
     const schRows = [];
     let matchCounter = 0;
@@ -700,23 +721,20 @@ function extractClickTTScheduleFromTable(rows) {
         if (timeIdx === -1) return;
 
         matchCounter++;
-        // 1. Tag & Datum sauber trennen (z.B. "Sa. 26.09.2026" oder in getrennten Zellen "Sa." | "26.09.2026")
         let tag = '';
         let dat = cells[dateIdx];
-        const combinedDateM = dat.match(/^([A-Za-zÄÖÜäöüß]{2})\.?\s*(\d{2}\.\d{2}\.\d{2,4})$/);
+        // Trennt "Sa., 26.09.2026" oder "Sa. 26.09.2026" sauber in Tag ("Sa") und Datum ("26.09.26")!
+        const combinedDateM = dat.match(/^([A-Za-zÄÖÜäöüß]{2})[.,]?\s*(\d{2}\.\d{2}\.\d{2,4})$/);
         if (combinedDateM) {
             tag = combinedDateM[1];
             dat = combinedDateM[2];
-        } else if (dateIdx > 0 && /^[A-Za-zÄÖÜäöüß]{2}\.?$/.test(cells[dateIdx - 1])) {
-            tag = cells[dateIdx - 1].replace(/\.$/, '');
+        } else if (dateIdx > 0 && /^[A-Za-zÄÖÜäöüß]{2}[.,]?$/.test(cells[dateIdx - 1])) {
+            tag = cells[dateIdx - 1].replace(/[.,]+$/, '');
         }
-        // Jahreszahl 2026 -> 26 vereinheitlichen
-        dat = dat.replace(/\.20(\d{2})$/, '.$1');
+        dat = dat.replace(/^[A-Za-zÄÖÜäöüß]{2}[.,]?\s*/, '').replace(/\.20(\d{2})$/, '.$1');
 
-        // 2. Uhrzeit (z. B. "15:00 v" oder "10:00")
         const zeit = cells[timeIdx].replace(/\s+/g, ' ').trim();
 
-        // 3. Nach der Uhrzeit folgen in click-TT evtl. Hallen-Kennziffern ("1", "2", "(1)", "H1"), die wir überspringen!
         let cursor = timeIdx + 1;
         while (cursor < cells.length && (/^\(?\d\)?$|^H\d$/i.test(cells[cursor]) || !cells[cursor])) {
             cursor++;
@@ -726,7 +744,6 @@ function extractClickTTScheduleFromTable(rows) {
         let gast = cells[cursor + 1] || '';
         let tail = cells.slice(cursor + 2).join(' ').trim();
 
-        // Falls in "gast" hinten schon das Ergebnis mit drinsteckt (z.B. "SV Dresden-Mitte 1950 II 6:4" oder "TTC Holzhausen 4:6")
         const scoreInGast = gast.match(/^(.*?)\s+(\d{1,2}:\d{1,2})(?:\s+.*)?$/);
         let erg = '';
         if (scoreInGast) {
@@ -743,7 +760,6 @@ function extractClickTTScheduleFromTable(rows) {
             }
         }
 
-        // Falls in "erg" noch der Gastname vorne klebte (weil die Hallenspalte heim/gast verschoben hatte), ebenfalls bereinigen:
         const strayScore = erg.match(/^(.*?)\s+(\d{1,2}:\d{1,2})$/);
         if (strayScore && !gast) {
             gast = strayScore[1].trim();
@@ -1013,9 +1029,10 @@ async function selectLeagueTableRowTeam(rowIdx, forceRefresh = false) {
     const row = team.standingsRows[rowIdx];
     if (!row.rowTeamUrl || !row.rowTeamKey) return;
 
-    const isOwn = (row.rowTeamKey === team.teamKey);
+    // Eigenes Team zuverlässig erkennen (auch wenn click-TT "team_clicktt_3080673" nutzt)
+    const isOwn = (row.rowTeamKey === team.teamKey) || Boolean(row.isGraupa && /TSV\s+Graupa/i.test(row.rowTeamName || ''));
     inspectedSubTeam = {
-        teamKey: row.rowTeamKey,
+        teamKey: isOwn ? team.teamKey : row.rowTeamKey,
         teamName: row.rowTeamName || row.cells[1] || 'Mannschaft',
         teamUrl: row.rowTeamUrl,
         isOwnGraupaTeam: isOwn,
@@ -1038,11 +1055,8 @@ async function loadAndRenderInspectedTeam(baseGraupaTeam, subTeam, forceRefresh)
     const cached = !forceRefresh ? (ttTeamDetailsCache[tKey] || (subTeam.isOwnGraupaTeam ? ttTeamDetailsCache[baseGraupaTeam.id] : null)) : null;
     const isValidCache = hasValidParsedDetails(cached);
 
-    // 1. Sofort-Anzeige aus Cache, falls vorhanden
     renderGraupaTeamLayout(baseGraupaTeam, isValidCache ? cached : null, !isValidCache);
 
-    // Bei Archiv-Saisons (< 2026) reicht der gültige Cache.
-    // Bei der aktuellen Saison (2026) wird im Hintergrund IMMER gegen TTLive / click-TT geprüft, falls noch nicht live verifiziert!
     if (isValidCache && (!isCurrentSeason || cached._verifiedLiveInSession)) {
         return;
     }
@@ -1052,8 +1066,9 @@ async function loadAndRenderInspectedTeam(baseGraupaTeam, subTeam, forceRefresh)
         const result = await fetchTTLiveHtmlCascade('team', subTeam.teamUrl, tKey, Boolean(forceRefresh));
         if (ttCurrentSaison !== mySaison) return;
 
+        // WICHTIG: Hier wird jetzt "subTeam" (das tatsächlich angeklickte Team!) übergeben!
         const details = subTeam.sourcePortal === 'click-tt'
-            ? parseClickTTTeamDetailHtml(result.html, result.infosHtml, result.spieleHtml, baseGraupaTeam)
+            ? parseClickTTTeamDetailHtml(result.html, result.infosHtml, result.spieleHtml, subTeam)
             : parseTTLiveTeamDetailHtml(result.html);
 
         if (hasValidParsedDetails(details)) {
@@ -1064,7 +1079,7 @@ async function loadAndRenderInspectedTeam(baseGraupaTeam, subTeam, forceRefresh)
 
             ttTeamDetailsCache[tKey] = details;
             if (subTeam.isOwnGraupaTeam) ttTeamDetailsCache[baseGraupaTeam.id] = details;
-            try { localStorage.setItem('dippe_tt_details_v7_' + mySaison, JSON.stringify(ttTeamDetailsCache)); } catch (e) {}
+            try { localStorage.setItem('dippe_tt_details_v8_' + mySaison, JSON.stringify(ttTeamDetailsCache)); } catch (e) {}
 
             if (activeGraupaTeamId === baseGraupaTeam.id && inspectedSubTeam && inspectedSubTeam.teamKey === tKey) {
                 renderGraupaTeamLayout(baseGraupaTeam, details, false);
