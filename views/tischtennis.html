@@ -1,37 +1,182 @@
 <!-- ===============================================================
-     SPORT-ECKE: TISCHTENNIS (MANNNSCHAFTEN, LIGA-TABELLEN & GEGNER-INSPEKTOR)
+     SPORT-ECKE: PI'S PERSÖNLICHES TISCHTENNIS-COCKPIT & MEINE LIGA
      =============================================================== -->
 <section id="page-tischtennis" class="page-section">
     <div class="section-header">
         <div>
-            <span class="eyebrow">Sport-Ecke · TSV Graupa Spielbetrieb · Alle Ligen, Bilanzen & Spielpläne</span>
+            <span class="eyebrow">Sport-Ecke · π's Persönliche LivePZ-Telemetrie, Spiel-Analyse & Meine Liga</span>
             <h2 style="font-size:32px; font-weight:800;">🏓 Tischtennis</h2>
         </div>
         <div style="display:flex; flex-wrap:wrap; gap:8px;"></div>
     </div>
 
-    <div class="sand-card">
-        <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px;">
-            <div>
-                <span id="tt-saison-eyebrow" class="eyebrow-dark">Saison 2026/27 · Punktspielbetrieb · Klicke in der Tabelle auf beliebige Vereine für deren Details</span>
-                <h3 style="font-size:23px; font-weight:800;">🏅 Mannschaften des TSV Graupa</h3>
+    <!-- ===============================================================
+         1. BANNER & DIREKTLINKS ZUR OFFIZIELLEN VEREINSHOMEPAGE
+         =============================================================== -->
+    <div class="hero-card" style="padding:18px 24px; margin-bottom:20px; background:linear-gradient(135deg, rgba(6,40,30,0.96), rgba(16,185,129,0.22)); border:1.5px solid rgba(52,211,153,0.45);">
+        <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:16px;">
+            <div style="display:flex; align-items:center; gap:14px; flex:1; min-width:260px;">
+                <div class="cybershape-badge" style="width:48px; height:48px; font-size:23px; flex-shrink:0;">🌐</div>
+                <div>
+                    <span class="eyebrow" style="margin-bottom:2px;">Offizielle Abteilungs-Plattform · TSV Graupa e.V.</span>
+                    <h3 style="font-size:20px; font-weight:800; color:#fff; margin:0 0 3px;">
+                        Alle 11 Mannschaften, Trainings-Challenge, Turnierplaner &amp; Zählboard
+                    </h3>
+                    <p style="font-size:12.8px; color:var(--text-cream); margin:0; opacity:0.9;">
+                        Der komplette Vereins-Spielbetrieb ist umgezogen auf unsere eigene Domain <b>www.tsvgraupa-tischtennis.de</b>.
+                    </p>
+                </div>
             </div>
+            <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+                <a href="https://www.tsvgraupa-tischtennis.de" target="_blank" rel="noopener" class="btn btn-emerald" style="padding:10px 16px; font-size:13.5px; text-decoration:none;">
+                    🏓 Zu tsvgraupa-tischtennis.de ↗
+                </a>
+                <a href="https://www.tsvgraupa-tischtennis.de/#tt-ranking" target="_blank" rel="noopener" class="btn btn-amber" style="padding:10px 14px; font-size:12.5px; text-decoration:none;">
+                    🏆 Trainings-Challenge ↗
+                </a>
+                <a href="https://www.tsvgraupa-tischtennis.de/#zaehlboard" target="_blank" rel="noopener" class="btn btn-dark" style="padding:10px 13px; font-size:12.5px; border:1px solid var(--border-green); text-decoration:none;">
+                    🔢 Zählboard ↗
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===============================================================
+         2. PI'S PERSÖNLICHE PERFORMANCE-TELEMETRIE (LPZ-KURVE & 9 DONUTS)
+         =============================================================== -->
+    <div class="hero-card" style="padding:22px 26px; margin-bottom:22px;">
+        <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:14px; margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid var(--border-green);">
+            <div style="display:flex; align-items:center; gap:12px;">
+                <div class="cybershape-badge" style="width:46px; height:46px; font-size:21px;">📈</div>
+                <div>
+                    <span class="eyebrow" style="margin-bottom:2px;">Persönliche Spieler-Telemetrie · Peter Dippe (TSV Graupa)</span>
+                    <h3 style="font-size:22px; font-weight:800; color:#fff; margin:0;">
+                        ⚡ Meine LivePZ-Entwicklung &amp; Spiel-Analyse
+                    </h3>
+                </div>
+            </div>
+
             <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
-                <label style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; color:var(--text-dark);">
-                    📅 Saison:
-                    <select id="tt-saison-select" class="form-input" style="width:auto; padding:5px 10px; font-weight:700; cursor:pointer;" onchange="changeTTSaison(this.value)"></select>
-                </label>
-                <span id="tt-live-sync-badge" class="badge" style="background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; font-size:11.5px; padding:5px 10px;">Lade Saison …</span>
-                <a id="tt-team-direct-link" href="https://dresden.tischtennislive.de/?L1=Public&L2=Verein&L2P=870&Page=Spielbetrieb&Sportart=96&Page2=Tabellen&Saison=2026" target="_blank" rel="noopener" class="btn btn-dark" style="padding:7px 12px; font-size:12px;">
-                    Original in TTLive ↗
+                <button id="pi-tt-tab-curve" class="btn btn-emerald" style="padding:8px 14px; font-size:12.5px;" onclick="piSwitchStatsTab('curve')">
+                    📈 LPZ-Kurve (Spiel für Spiel)
+                </button>
+                <button id="pi-tt-tab-analyse" class="btn btn-dark" style="padding:8px 14px; font-size:12.5px; border:1px solid var(--border-green);" onclick="piSwitchStatsTab('analyse')">
+                    🎯 Meine 9 Analyse-Donuts
+                </button>
+                <span id="pi-tt-stats-badge" class="badge" style="background:rgba(16,185,129,0.18); color:#34d399; border:1px solid var(--border-green); font-size:11px; padding:6px 10px;">
+                    ⏳ Lade Statistik …
+                </span>
+                <button class="btn btn-dark" style="padding:8px 12px; font-size:12px; border:1px solid var(--border-green);" onclick="loadPiPersonalStats(true)" title="Meine LPZ-Daten frisch aus TTLive abrufen">
+                    🔄
+                </button>
+                <a href="https://dresden.tischtennislive.de/default.aspx?L1=Public&L2=Kontakt&L2P=30994&MID=27885&Page1=Bilanz&SA=96&Page=EntwicklungTTR" target="_blank" rel="noopener" class="btn btn-amber" style="padding:8px 13px; font-size:12px; text-decoration:none;">
+                    Mein TTLive-Profil ↗
                 </a>
             </div>
         </div>
 
-        <!-- Reiter (Tabs) für alle Mannschaften des TSV Graupa -->
-        <div id="tt-team-tabs" class="tt-team-tabs"></div>
+        <!-- 5 KENNZAHLEN ZU PETER DIPPE -->
+        <div class="grid-3" style="grid-template-columns:repeat(auto-fit, minmax(165px, 1fr)); gap:12px; margin-bottom:18px;">
+            <div class="sport-stat-box">
+                <div class="telemetry-label">🏓 Mein Aktueller LPZ</div>
+                <div id="pi-kpi-current" class="sport-stat-val" style="font-size:28px;">–</div>
+                <div id="pi-kpi-team" style="font-size:11.5px; color:var(--text-muted); margin-top:2px;">TSV Graupa 3</div>
+            </div>
+            <div class="sport-stat-box">
+                <div class="telemetry-label">🏅 Vereins-Rang (Graupa)</div>
+                <div id="pi-kpi-rank" class="sport-stat-val" style="font-size:28px; color:#fbbf24;">–</div>
+                <div id="pi-kpi-rank-sub" style="font-size:11.5px; color:var(--text-muted); margin-top:2px;">innerhalb der Abteilung</div>
+            </div>
+            <div class="sport-stat-box">
+                <div class="telemetry-label">📊 Performance-Trend</div>
+                <div id="pi-kpi-trend" class="sport-stat-val" style="font-size:28px;">–</div>
+                <div id="pi-kpi-trend-sub" style="font-size:11.5px; color:var(--text-muted); margin-top:2px;">Veränderung im Zeitraum</div>
+            </div>
+            <div class="sport-stat-box">
+                <div class="telemetry-label">👑 Persönlicher Peak</div>
+                <div id="pi-kpi-max" class="sport-stat-val" style="font-size:28px; color:#38bdf8;">–</div>
+                <div id="pi-kpi-min" style="font-size:11.5px; color:var(--text-muted); margin-top:2px;">Tiefstwert: –</div>
+            </div>
+            <div class="sport-stat-box">
+                <div class="telemetry-label">⚡ Einzel-Bilanz (Auswahl)</div>
+                <div id="pi-kpi-count" class="sport-stat-val" style="font-size:28px; color:#fff;">–</div>
+                <div id="pi-kpi-winrate" style="font-size:11.5px; color:var(--text-muted); margin-top:2px;">Siege : Niederlagen</div>
+            </div>
+        </div>
 
-        <!-- Zweispaltige Mannschaftsansicht (Klick auf jedes Team der Liga möglich!) -->
+        <!-- TAB 1: SPIEL-FÜR-SPIEL LPZ-ENTWICKLUNGSKURVE -->
+        <div id="pi-panel-curve" style="background:rgba(7, 18, 15, 0.85); border:1px solid var(--border-green); border-radius:18px; padding:16px 18px; position:relative;">
+            <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px; margin-bottom:12px;">
+                <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
+                    <strong style="font-size:15px; color:#fff;">LPZ-Verlauf von Spiel zu Spiel (Peter Dippe)</strong>
+                    <span style="font-size:11.5px; color:var(--text-muted);">
+                        <span style="color:#10b981;">● Sieg</span> · <span style="color:#ef4444;">● Niederlage</span> · <span style="color:#fbbf24;">◆ Q-TTR-Stichtag</span>
+                    </span>
+                </div>
+                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                    <button id="pi-range-100" class="btn btn-emerald" style="padding:6px 12px; font-size:12px;" onclick="piSetChartRange(100)">Letzte 100 Spiele</button>
+                    <button id="pi-range-50" class="btn btn-dark" style="padding:6px 12px; font-size:12px; border:1px solid var(--border-green);" onclick="piSetChartRange(50)">Letzte 50 Spiele</button>
+                    <button id="pi-range-25" class="btn btn-dark" style="padding:6px 12px; font-size:12px; border:1px solid var(--border-green);" onclick="piSetChartRange(25)">Letzte 25 Spiele</button>
+                </div>
+            </div>
+
+            <div style="position:relative; width:100%; height:340px;">
+                <canvas id="pi-chart-canvas" style="width:100%; height:100%; display:block; cursor:crosshair;"></canvas>
+                <div id="pi-chart-tooltip" class="hidden" style="position:absolute; pointer-events:none; background:rgba(9,21,18,0.96); border:1.5px solid #34d399; color:#fff; padding:10px 13px; border-radius:12px; font-size:12px; box-shadow:0 12px 28px rgba(0,0,0,0.55); z-index:20; min-width:225px; transition:opacity 0.1s;"></div>
+            </div>
+
+            <details style="margin-top:12px; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px;">
+                <summary style="cursor:pointer; font-size:12.5px; font-weight:700; color:#34d399;">
+                    📋 Meine gewerteten Einzelspiele &amp; Q-TTR-Stichtage im Detail einblenden
+                </summary>
+                <div id="pi-history-table-wrap" style="margin-top:10px; max-height:290px; overflow-y:auto;"></div>
+            </details>
+        </div>
+
+        <!-- TAB 2: DIE 9 ANALYSE-DONUTS -->
+        <div id="pi-panel-analyse" class="hidden" style="background:rgba(7, 18, 15, 0.85); border:1px solid var(--border-green); border-radius:18px; padding:18px 20px;">
+            <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px; margin-bottom:16px;">
+                <div>
+                    <strong style="font-size:16px; color:#fff;">🎯 Detail-Analyse: Mein Stärke- &amp; Nervenprofil (9 Donuts)</strong>
+                    <span style="font-size:12px; color:var(--text-muted); margin-left:8px;">(Auswertung aller offiziellen Punkt- &amp; Turnierspiele)</span>
+                </div>
+                <span class="badge" style="background:rgba(52,211,153,0.15); color:#34d399; font-size:11px; padding:4px 9px;">
+                    🟢 Gewonnen vs. 🔴 Verloren
+                </span>
+            </div>
+            <div id="pi-analyse-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:14px;"></div>
+        </div>
+    </div>
+
+    <!-- ===============================================================
+         3. MEINE LIGA & MANNSCHAFT (INKL. GEGNER-INSPEKTOR)
+         =============================================================== -->
+    <div class="sand-card">
+        <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px; margin-bottom:14px;">
+            <div>
+                <span id="tt-saison-eyebrow" class="eyebrow-dark">Meine Liga im Punktspielbetrieb · Tabelle, Spielplan &amp; Bilanzen</span>
+                <h3 style="font-size:23px; font-weight:800;" id="pi-league-main-title">🏅 Meine Mannschaft &amp; Liga-Tabelle</h3>
+            </div>
+            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
+                <label style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; color:var(--text-dark);">
+                    🏓 Mannschaft:
+                    <select id="pi-team-select" class="form-input" style="width:auto; padding:5px 10px; font-weight:700; cursor:pointer;" onchange="selectGraupaTeamTab(this.value, false)"></select>
+                </label>
+                <label style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; color:var(--text-dark);">
+                    📅 Saison:
+                    <select id="tt-saison-select" class="form-input" style="width:auto; padding:5px 10px; font-weight:700; cursor:pointer;" onchange="changeTTSaison(this.value)"></select>
+                </label>
+                <span id="tt-live-sync-badge" class="badge" style="background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; font-size:11.5px; padding:5px 10px;">Lade Liga …</span>
+                <button class="btn btn-sand" style="padding:6px 11px; font-size:11.5px;" onclick="loadPiLeagueFromTTLive(true)" title="Liga-Tabelle & Bilanzen frisch mit TTLive abgleichen">
+                    🔄 Live-Abgleich
+                </button>
+                <a id="tt-team-direct-link" href="https://dresden.tischtennislive.de/?L1=Public&L2=Verein&L2P=870&Page=Spielbetrieb&Sportart=96&Page2=Tabellen&Saison=2026" target="_blank" rel="noopener" class="btn btn-dark" style="padding:7px 12px; font-size:12px;">
+                    In TTLive öffnen ↗
+                </a>
+            </div>
+        </div>
+
+        <!-- Zweispaltige Liga-Ansicht (Links: Liga-Tabelle & Spielplan | Rechts: Bilanzen mit Hervorhebung für Peter Dippe) -->
         <div id="tt-team-content" class="tt-hub-layout"></div>
     </div>
 </section>
