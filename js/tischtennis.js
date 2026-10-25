@@ -375,58 +375,53 @@ async function preloadRemainingSeasonTeams(saisonForRun) {
 // ===================================================================
 function parseClickTTOverviewTeam(ctObj) {
     if (!ctObj || !ctObj.tabelleHtml) return null;
-    const doc = sanitizeTTLiveDom(ctObj.tabelleHtml);
+    const rawHtml = ctObj.tabelleHtml;
+    const doc = new DOMParser().parseFromString(rawHtml, 'text/html');
     const tables = Array.from(doc.querySelectorAll('table'));
 
-    // Suche die Liga-Tabelle, in der "TSV Graupa" vorkommt
-    const leagueTbl = tables.find(t => /TSV\s+Graupa/i.test(t.textContent) && /Mannschaft|Begegnungen|Spiele|Punkte/i.test(t.textContent));
-    if (!leagueTbl) return null;
-
-    const rows = getDirectRows(leagueTbl);
+    const leagueTbl = tables.find(t => /Graupa/i.test(t.textContent) && /Mannschaft|Begegnungen|Spiele|Punkte|Pl\./i.test(t.textContent));
     let standingsHeaders = [];
     const standingsRows = [];
 
-    rows.forEach(r => {
-        const rawCells = Array.from(r.children).filter(el => el.tagName === 'TD' || el.tagName === 'TH');
-        const texts = rawCells.map(c => c.textContent.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim());
-        const nonEmpty = texts.filter(Boolean);
-        if (nonEmpty.length < 4) return;
+    if (leagueTbl) {
+        const rows = getDirectRows(leagueTbl);
+        rows.forEach(r => {
+            const rawCells = Array.from(r.children).filter(el => el.tagName === 'TD' || el.tagName === 'TH');
+            const texts = rawCells.map(c => c.textContent.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim());
+            const nonEmpty = texts.filter(Boolean);
+            if (nonEmpty.length < 4) return;
 
-        if (!standingsHeaders.length && r.querySelector('th') && /Mannschaft/i.test(nonEmpty.join(' '))) {
-            // Erste leere Auf-/Abstiegs-Spalte von click-TT überspringen, falls nötig
-            standingsHeaders = texts.filter(x => x !== '');
-            return;
-        }
-        if (/Mannschaft/i.test(nonEmpty[0]) || /Mannschaft/i.test(nonEmpty[1] || '')) return;
+            if (!standingsHeaders.length && (r.querySelector('th') || /Mannschaft/i.test(nonEmpty.join(' ')))) {
+                standingsHeaders = nonEmpty;
+                return;
+            }
+            if (/^Platz$|^Pl\.$/i.test(nonEmpty[0]) || /^Mannschaft$/i.test(nonEmpty[1] || '')) return;
 
-        // Link zur jeweiligen Mannschaft in click-TT (/mannschaft/<id>/...)
-        const anchor = Array.from(r.querySelectorAll('a')).find(a => /\/mannschaft\/\d+\//i.test(a.getAttribute('href') || ''));
-        let rowTeamUrl = anchor ? resolveTTLiveHref(anchor.getAttribute('href'), 'mytischtennis.de') : '';
-        if (rowTeamUrl && !/spielerbilanzen/i.test(rowTeamUrl)) {
-            rowTeamUrl = rowTeamUrl.replace(/\/+$/, '') + '/spielerbilanzen/gesamt';
-        }
-        const mIdMatch = rowTeamUrl.match(/\/mannschaft\/(\d+)\//i);
-        const rowTeamKey = mIdMatch ? ('team_clicktt_' + mIdMatch[1]) : '';
-        const rowTeamName = anchor ? anchor.textContent.replace(/\s+/g, ' ').trim() : '';
+            const anchor = Array.from(r.querySelectorAll('a')).find(a => /\/mannschaft\/\d+\//i.test(a.getAttribute('href') || ''));
+            let rowTeamUrl = anchor ? resolveTTLiveHref(anchor.getAttribute('href'), 'mytischtennis.de') : '';
+            if (rowTeamUrl && !/spielerbilanzen/i.test(rowTeamUrl)) {
+                rowTeamUrl = rowTeamUrl.replace(/\/+$/, '') + '/spielerbilanzen/gesamt';
+            }
+            const mIdMatch = rowTeamUrl.match(/\/mannschaft\/(\d+)\//i);
+            const rowTeamKey = mIdMatch ? ('team_clicktt_' + mIdMatch[1]) : '';
+            const rowTeamName = anchor ? anchor.textContent.replace(/\s+/g, ' ').trim() : '';
 
-        // Bereinige führende Tendenz-Pfeile von click-TT, sodass Spalte 0 der Rang ("1", "2"...) und Spalte 1 der Mannschaftsname ist
-        let cleanCells = nonEmpty.slice();
-        const rankIdx = cleanCells.findIndex(c => /^\d+\.?$/.test(c));
-        if (rankIdx > 0 && rankIdx <= 2) {
-            cleanCells = cleanCells.slice(rankIdx);
-        }
+            let cleanCells = nonEmpty.slice();
+            const rankIdx = cleanCells.findIndex(c => /^\d+\.?$/.test(c));
+            if (rankIdx > 0 && rankIdx <= 2) cleanCells = cleanCells.slice(rankIdx);
 
-        const isGraupa = /TSV\s+Graupa/i.test(cleanCells.join(' '));
-        standingsRows.push({
-            cells: cleanCells,
-            isGraupa: isGraupa,
-            isCurrentTeam: isGraupa,
-            rowTeamUrl: rowTeamUrl,
-            rowTeamKey: rowTeamKey || (isGraupa ? ctObj.teamKey : ''),
-            rowTeamName: rowTeamName || cleanCells[1] || '',
-            sourcePortal: 'click-tt'
+            const isGraupa = /TSV\s+Graupa/i.test(cleanCells.join(' '));
+            standingsRows.push({
+                cells: cleanCells,
+                isGraupa: isGraupa,
+                isCurrentTeam: isGraupa,
+                rowTeamUrl: rowTeamUrl || (isGraupa ? ctObj.bilanzenUrl : ''),
+                rowTeamKey: rowTeamKey || (isGraupa ? ctObj.teamKey : ''),
+                rowTeamName: rowTeamName || cleanCells[1] || '',
+                sourcePortal: 'click-tt'
+            });
         });
-    });
+    }
 
     if (!standingsRows.length) return null;
     const colCount = standingsRows[0].cells.length;
@@ -453,7 +448,7 @@ function parseClickTTOverviewTeam(ctObj) {
 }
 
 function parseClickTTTeamDetailHtml(bilanzenHtml, infosHtml, baseTeam) {
-    const doc = sanitizeTTLiveDom(bilanzenHtml || '');
+    const doc = new DOMParser().parseFromString(bilanzenHtml || '', 'text/html');
     const tables = Array.from(doc.querySelectorAll('table')).filter(t => !t.querySelector('table'));
 
     let singlesTable = null;
@@ -467,46 +462,61 @@ function parseClickTTTeamDetailHtml(bilanzenHtml, infosHtml, baseTeam) {
         const rows = getDirectRows(tbl);
         if (rows.length < 2) return;
         const headText = rows.slice(0, 2).map(r => r.textContent.replace(/\s+/g, ' ').trim()).join(' | ');
+        const sectionAbove = findSectionHeadingAbove(tbl);
 
-        // 1. Einzel-Bilanzen in click-TT
-        if (!singlesTable && (/Rang|Pos/i.test(headText) && /Name|Spieler/i.test(headText) && /Gesamt|Bilanz|Einsätze/i.test(headText))) {
+        // 1. Einzel-Bilanzen in click-TT (erkennt "Rang", "Pos", "Spieler", "Einzel", "Gesamt", "Bilanz")
+        if (!singlesTable && (/Rang|Pos|Einsätze|Einzel/i.test(headText + ' ' + sectionAbove) && /Name|Spieler|Gesamt|Bilanz/i.test(headText))) {
             const sRows = [];
+            const hCells = getCleanRowCells(rows[0]);
             rows.slice(1).forEach(r => {
                 const cells = getCleanRowCells(r);
-                if (cells.length < 3) return;
+                if (cells.length < 2) return;
+                if (/^Rang$|^Pos|^Spieler$/i.test(cells[0])) return;
                 const isTot = cells.some(c => /^Gesamt/i.test(c));
                 sRows.push({ cells, isTotal: isTot });
             });
             if (sRows.length) {
-                const hCells = getCleanRowCells(rows[0]);
-                singlesTable = { headers: hCells.length === sRows[0].cells.length ? hCells : ['Rang', 'Spieler', 'Einsätze', 'PK1', 'PK2', 'Gesamt'], rows: sRows };
+                const maxC = Math.max(...sRows.map(x => x.cells.length));
+                const normRows = sRows.map(x => ({
+                    cells: Array.from({ length: maxC }, (_, i) => x.cells[i] || ''),
+                    isTotal: x.isTotal
+                }));
+                const headers = hCells.length === maxC
+                    ? hCells
+                    : (maxC === 6 ? ['Rang', 'Spieler', 'Einsätze', 'PK1', 'PK2', 'Gesamt'] : Array.from({ length: maxC }, (_, i) => i === 0 ? 'Pos.' : i === 1 ? 'Spieler' : i === maxC - 1 ? 'Gesamt' : `Sp. ${i}`));
+                singlesTable = { headers, rows: normRows };
             }
             return;
         }
 
         // 2. Doppel-Bilanzen in click-TT
-        if (!doublesTable && /Doppel/i.test(headText + ' ' + findSectionHeadingAbove(tbl)) && !/Heim|Gast/i.test(headText)) {
+        if (!doublesTable && /Doppel/i.test(headText + ' ' + sectionAbove) && !/Heim|Gast/i.test(headText)) {
             const dRows = [];
+            const hCells = getCleanRowCells(rows[0]);
             rows.slice(1).forEach(r => {
                 const cells = getCleanRowCells(r);
                 if (cells.length >= 2) dRows.push({ cells, isTotal: cells.some(c => /^Gesamt/i.test(c)) });
             });
             if (dRows.length) {
-                const hCells = getCleanRowCells(rows[0]);
-                doublesTable = { headers: hCells.length === dRows[0].cells.length ? hCells : ['Doppel-Paarung', 'Einsätze', 'Bilanz'], rows: dRows };
+                const maxC = Math.max(...dRows.map(x => x.cells.length));
+                doublesTable = {
+                    headers: hCells.length === maxC ? hCells : ['Doppel-Paarung', 'Einsätze', 'Bilanz'].slice(0, maxC),
+                    rows: dRows
+                };
             }
             return;
         }
 
         // 3. Spielplan / Termine in click-TT
-        if (!scheduleTable && (/Heim/i.test(headText) || /Gast/i.test(headText)) && /Datum|Tag|Zeit/i.test(headText)) {
+        if (!scheduleTable && (/Heim/i.test(headText) || /Gast/i.test(headText) || /Begegnung|Spiele/i.test(sectionAbove)) && /\d{2}\.\d{2}\.\d{2,4}/.test(tbl.textContent)) {
             const schRows = [];
             rows.slice(1).forEach(r => {
                 const cells = getCleanRowCells(r);
-                if (cells.length < 4) return;
+                if (cells.length < 3) return;
                 const dateIdx = cells.findIndex(c => /\d{2}\.\d{2}\.\d{2,4}/.test(c));
+                if (dateIdx === -1) return;
                 const timeIdx = cells.findIndex((c, i) => i >= dateIdx && /^\d{1,2}:\d{2}/.test(c));
-                if (dateIdx !== -1 && timeIdx !== -1) {
+                if (timeIdx !== -1) {
                     const dMatch = cells[dateIdx].match(/([A-Za-z]{2})\.?\s*(\d{2}\.\d{2}\.\d{2,4})/);
                     const tag = dMatch ? dMatch[1] : (dateIdx > 0 ? cells[dateIdx - 1] : '');
                     const dat = dMatch ? dMatch[2] : cells[dateIdx];
@@ -528,9 +538,8 @@ function parseClickTTTeamDetailHtml(bilanzenHtml, infosHtml, baseTeam) {
         }
     });
 
-    // Infos-Seite (Mannschaftsführer, Spiellokal, Ballmarke) auslesen
     if (infosHtml) {
-        const iDoc = sanitizeTTLiveDom(infosHtml);
+        const iDoc = new DOMParser().parseFromString(infosHtml, 'text/html');
         const iText = iDoc.body ? iDoc.body.textContent.replace(/\s+/g, ' ') : '';
         const mfMatch = iText.match(/(?:Mannschaftskontakt|Mannschaftsführer|Kontakt)\s*[:\-]?\s*([A-ZÄÖÜa-zäöüß\s\-]{4,35}?)(?=\s+Tel|\s+Mobil|\s+E-Mail|\s+Spiellokal|$)/i);
         if (mfMatch) captainInfo.name = mfMatch[1].trim();
