@@ -212,8 +212,8 @@ async function loadAllGraupaTeamsFromTTLive(forceRefresh) {
     if (forceRefresh) {
         ttTeamDetailsCache = {};
         try {
-            localStorage.removeItem('dippe_tt_overview_v6_' + mySaison);
-            localStorage.removeItem('dippe_tt_details_v6_' + mySaison);
+            localStorage.removeItem('dippe_tt_overview_v7_' + mySaison);
+            localStorage.removeItem('dippe_tt_details_v7_' + mySaison);
         } catch (e) {}
     }
 
@@ -227,8 +227,8 @@ async function loadAllGraupaTeamsFromTTLive(forceRefresh) {
     // 1. Sofort-Anzeige aus lokalem Cache (0 ms), ABER bei aktueller Saison immer mit ehrlichem Hinweis "Prüfe Live-Stand..."
     if (!ttTeamsList.length && !forceRefresh) {
         try {
-            const cachedOverview = localStorage.getItem('dippe_tt_overview_v6_' + mySaison);
-            const cachedDetails = localStorage.getItem('dippe_tt_details_v6_' + mySaison);
+            const cachedOverview = localStorage.getItem('dippe_tt_overview_v7_' + mySaison);
+            const cachedDetails = localStorage.getItem('dippe_tt_details_v7_' + mySaison);
             if (cachedOverview) {
                 const parsedCache = JSON.parse(cachedOverview);
                 if (Array.isArray(parsedCache) && parsedCache.length) {
@@ -292,7 +292,7 @@ async function loadAllGraupaTeamsFromTTLive(forceRefresh) {
         if (!parsedTeams.length) throw new Error('Keine Graupa-Tabellen im HTML gefunden');
 
         ttTeamsList = parsedTeams;
-        try { localStorage.setItem('dippe_tt_overview_v6_' + mySaison, JSON.stringify(ttTeamsList)); } catch (e) {}
+        try { localStorage.setItem('dippe_tt_overview_v7_' + mySaison, JSON.stringify(ttTeamsList)); } catch (e) {}
 
         if (result.cachedTeams && typeof result.cachedTeams === 'object') {
             Object.keys(result.cachedTeams).forEach(tKey => {
@@ -309,7 +309,7 @@ async function loadAllGraupaTeamsFromTTLive(forceRefresh) {
                     }
                 }
             });
-            try { localStorage.setItem('dippe_tt_details_v6_' + mySaison, JSON.stringify(ttTeamDetailsCache)); } catch (e) {}
+            try { localStorage.setItem('dippe_tt_details_v7_' + mySaison, JSON.stringify(ttTeamDetailsCache)); } catch (e) {}
         }
 
         if (!activeGraupaTeamId || !ttTeamsList.some(t => t.id === activeGraupaTeamId)) {
@@ -361,7 +361,7 @@ async function preloadRemainingSeasonTeams(saisonForRun) {
                 details._fetchedAt = result.fetchedAt;
                 ttTeamDetailsCache[team.id] = details;
                 ttTeamDetailsCache[team.teamKey] = details;
-                try { localStorage.setItem('dippe_tt_details_v6_' + saisonForRun, JSON.stringify(ttTeamDetailsCache)); } catch (e) {}
+                try { localStorage.setItem('dippe_tt_details_v7_' + saisonForRun, JSON.stringify(ttTeamDetailsCache)); } catch (e) {}
                 if (activeGraupaTeamId === team.id && (!inspectedSubTeam || inspectedSubTeam.isOwnGraupaTeam)) {
                     renderGraupaTeamLayout(team, details, false);
                 }
@@ -474,7 +474,7 @@ function parseClickTTTeamDetailHtml(bilanzenHtml, infosHtml, spieleHtml, baseTea
         if (rows.length < 2) return;
         const headText = rows.slice(0, 2).map(r => r.textContent.replace(/\s+/g, ' ').trim()).join(' | ');
 
-        // KOMBINIERTE ODER GETRENNTE EINZEL- & DOPPEL-BILANZ-TABELLE IN CLICK-TT
+        // 1. KOMBINIERTE ODER GETRENNTE EINZEL- & DOPPEL-BILANZ-TABELLE IN CLICK-TT
         if (!singlesTable && (/Rang|Pos|Einsätze/i.test(headText) && /Name|Spieler|Gesamt|PK1/i.test(headText))) {
             const hCells = getCleanRowCells(rows[0]);
             const singleRows = [];
@@ -486,7 +486,6 @@ function parseClickTTTeamDetailHtml(bilanzenHtml, infosHtml, spieleHtml, baseTea
                 if (cells.length < 2) return;
                 const firstCell = (cells[0] || '').trim();
 
-                // Summenzeile "Einzel | 24:16" -> schließt die Einzel-Tabelle ab und schaltet auf Doppel um!
                 if (/^Einzel$/i.test(firstCell)) {
                     singleRows.push({
                         cells: ['Gesamt', 'Einzel gesamt', '', '', '', cells[1] || ''],
@@ -496,7 +495,6 @@ function parseClickTTTeamDetailHtml(bilanzenHtml, infosHtml, spieleHtml, baseTea
                     return;
                 }
 
-                // Summenzeile "Doppel | 5:5" -> schließt die Doppel-Tabelle ab!
                 if (/^Doppel$/i.test(firstCell)) {
                     doubleRows.push({
                         cells: ['Gesamt', '', '', cells[1] || ''],
@@ -516,7 +514,6 @@ function parseClickTTTeamDetailHtml(bilanzenHtml, infosHtml, spieleHtml, baseTea
                     return;
                 }
 
-                // Doppel-Paarungen mit " / " im ersten Feld sauber in 2 Spalten trennen
                 if (firstCell.includes(' / ') || mode === 'doubles') {
                     mode = 'doubles';
                     const pairParts = firstCell.split(/\s*\/\s*/);
@@ -561,14 +558,15 @@ function parseClickTTTeamDetailHtml(bilanzenHtml, infosHtml, spieleHtml, baseTea
             return;
         }
 
-        if (!scheduleTable && (/Heim/i.test(headText) || /Gast/i.test(headText)) && /Datum|Tag|Zeit/i.test(headText)) {
+        // 2. Spielplan-Tabelle auf der Seite (click-TT hat eine extra Spalte "Halle" z.B. "1" oder "2" nach der Uhrzeit!)
+        if (!scheduleTable && (/Heim/i.test(headText) || /Gast/i.test(headText) || /Begegnung/i.test(headText)) && /\d{2}\.\d{2}\.\d{2,4}/.test(tbl.textContent)) {
             scheduleTable = extractClickTTScheduleFromTable(rows);
         }
     });
 
-    // SPIELPLAN AUS spieleHtml (click-TT /spiele oder TTLive-Fallback team_136234) EXTRAHIEREN
+    // 3. SPIELPLAN AUS spieleHtml (click-TT /spiele oder TTLive-Fallback team_136234) EXTRAHIEREN
     if (!scheduleTable && spieleHtml) {
-        if (/TischtennisLive|Heimmannschaft/i.test(spieleHtml)) {
+        if (/TischtennisLive/i.test(spieleHtml) && !/mytischtennis/i.test(spieleHtml)) {
             const parsedFallback = parseTTLiveTeamDetailHtml(spieleHtml);
             if (parsedFallback && parsedFallback.scheduleTable) {
                 scheduleTable = parsedFallback.scheduleTable;
@@ -592,36 +590,52 @@ function parseClickTTTeamDetailHtml(bilanzenHtml, infosHtml, spieleHtml, baseTea
         }
     }
 
-    // INFOS-SEITE PARSEN: "Mannschaftskontakt" & "Spiellokal 1"
+    // 4. INFOS-SEITE PARSEN: "Mannschaftskontakt" & "Spiellokal 1" (trennt Name, Straße, PLZ/Ort, E-Mail & Telefon sauber!)
     if (infosHtml) {
-        const iDoc = sanitizeTTLiveDom(infosHtml);
-        iDoc.querySelectorAll('footer, nav, header, [class*="footer"], [id*="footer"]').forEach(el => el.remove());
+        const parseContactLines = (rawStr) => {
+            let s = String(rawStr || '')
+                .replace(/<br\s*\/?>/gi, '\n')
+                .replace(/<\/(div|p|li|tr|h[1-6]|dt|dd|span|a)>/gi, '\n')
+                .replace(/<[^>]+>/g, ' ')
+                .replace(/&nbsp;/gi, ' ');
+            // Falls im DOM alles ohne Zeilenumbruch zusammenhing (z.B. "Peter KraetschKrietzschwitz 25b01796 Pirnakraetschipe@web.de0172/9 34 37 67"),
+            // künstliche Trenner an den Übergängen (Kleinbuchstabe->Großbuchstabe, vor 5-stelliger PLZ, vor E-Mail, vor Telefonnummer) einfügen:
+            s = s.replace(/([a-zäöüß])([A-ZÄÖÜ])/g, '$1\n$2')
+                 .replace(/(\d[a-zA-Z]?)(\d{5}\s+[A-ZÄÖÜ])/g, '$1\n$2')
+                 .replace(/([A-Za-zäöüß])(\d{5}\s+[A-ZÄÖÜ])/g, '$1\n$2')
+                 .replace(/([A-Za-zäöüß])([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/g, '$1\n$2')
+                 .replace(/(\.[a-zA-Z]{2,})(0\d{2,4}[\s\/\-]*\d)/g, '$1\n$2');
+            return s.split(/\r?\n/).map(x => x.replace(/\s+/g, ' ').trim()).filter(Boolean);
+        };
 
-        const headings = Array.from(iDoc.querySelectorAll('h1, h2, h3, h4, h5, strong, b, div, dt'));
-
-        const mkHeading = headings.find(el => /^Mannschaftskontakt$/i.test(el.textContent.trim()));
-        if (mkHeading) {
-            const card = mkHeading.closest('div, section, article, td') || mkHeading.parentElement;
-            const lines = (card ? card.innerText || card.textContent : '')
-                .split(/\r?\n/)
-                .map(s => s.replace(/\s+/g, ' ').trim())
-                .filter(s => s && !/^Mannschaftskontakt$/i.test(s));
-
-            if (lines[0]) captainInfo.name = lines[0];
-            const phoneLine = lines.find(l => /^[0-9+\s\/\-()]{7,}$/.test(l));
-            if (phoneLine) captainInfo.phone = phoneLine;
-            const mailLine = lines.find(l => l.includes('@'));
-            if (mailLine) captainInfo.email = mailLine;
+        // Gezielter Ausschnitt ab "Mannschaftskontakt" bis "Spiellokal"
+        const mkBlockMatch = infosHtml.match(/Mannschaftskontakt([\s\S]{1,1200}?)(?=Spiellokal|<footer|$)/i);
+        if (mkBlockMatch) {
+            const lines = parseContactLines(mkBlockMatch[1]).filter(l => !/^Mannschaftskontakt$/i.test(l));
+            const mailLine = lines.find(l => /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/.test(l));
+            if (mailLine) {
+                const em = mailLine.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
+                if (em) captainInfo.email = em[0];
+            }
+            const phoneLine = lines.find(l => /(?:0\d{2,4}|\+49)[\s\/\-]*\d[\d\s\/\-]{4,}/.test(l));
+            if (phoneLine) {
+                const ph = phoneLine.match(/(?:0\d{2,4}|\+49)[\s\/\-]*\d[\d\s\/\-]{4,}/);
+                if (ph) captainInfo.phone = ph[0].trim();
+            }
+            const nameCandidates = lines.filter(l =>
+                !l.includes('@') &&
+                !/^\d{5}\b/.test(l) &&
+                !/\d{2,4}[\s\/\-]\d{2,}/.test(l) &&
+                !/\d+\s*[a-zA-Z]?$/.test(l) &&
+                l.length >= 4 && l.length <= 45
+            );
+            if (nameCandidates[0]) captainInfo.name = nameCandidates[0];
         }
 
-        const slHeading = headings.find(el => /^Spiellokal\s*1?$/i.test(el.textContent.trim()));
-        if (slHeading) {
-            const card = slHeading.closest('div, section, article, td') || slHeading.parentElement;
-            const lines = (card ? card.innerText || card.textContent : '')
-                .split(/\r?\n/)
-                .map(s => s.replace(/\s+/g, ' ').trim())
-                .filter(s => s && !/^Spiellokal/i.test(s) && !/^www\.|^http/i.test(s));
-
+        // Gezielter Ausschnitt ab "Spiellokal 1"
+        const slBlockMatch = infosHtml.match(/Spiellokal\s*1?([\s\S]{1,1200}?)(?=Spiellokal\s*2|Mannschaftskontakt|<footer|$)/i);
+        if (slBlockMatch) {
+            const lines = parseContactLines(slBlockMatch[1]).filter(l => !/^Spiellokal/i.test(l) && !/^www\.|^http/i.test(l));
             const plzIdx = lines.findIndex(l => /^\d{5}\s+/.test(l));
             if (plzIdx !== -1) {
                 venueInfo.city = lines[plzIdx];
@@ -634,21 +648,24 @@ function parseClickTTTeamDetailHtml(bilanzenHtml, infosHtml, spieleHtml, baseTea
             } else if (lines.length >= 2) {
                 venueInfo.name = lines[0];
                 venueInfo.street = lines[1];
-                venueInfo.city = lines[2] || '';
             }
-            const phoneLine = lines.find(l => /^[0-9+\s\/\-()]{7,}$/.test(l));
-            if (phoneLine) venueInfo.phone = phoneLine;
+            const phoneLine = lines.find(l => /(?:0\d{2,4}|\+49)[\s\/\-]*\d[\d\s\/\-]{4,}/.test(l));
+            if (phoneLine) {
+                const ph = phoneLine.match(/(?:0\d{2,4}|\+49)[\s\/\-]*\d[\d\s\/\-]{4,}/);
+                if (ph) venueInfo.phone = ph[0].trim();
+            }
         }
     }
 
     const isOurGraupaTeam = !baseTeam || /TSV\s+Graupa/i.test(baseTeam.fullTeamName || '');
     if (isOurGraupaTeam) {
-        if (!captainInfo.name) captainInfo.name = 'Peter Kraetsch';
-        if (!captainInfo.phone) captainInfo.phone = '0172/9 34 37 67';
+        if (!captainInfo.name || captainInfo.name.length > 35) captainInfo.name = 'Peter Kraetsch';
+        if (!captainInfo.email) captainInfo.email = 'kraetschipe@web.de';
+        if (!captainInfo.phone) captainInfo.phone = '0172 / 9 34 37 67';
         if (!venueInfo.name) venueInfo.name = 'Turnhalle der Grundschule Graupa';
         if (!venueInfo.street) venueInfo.street = 'Badstraße 3';
         if (!venueInfo.city) venueInfo.city = '01796 Pirna';
-        if (!venueInfo.phone) venueInfo.phone = '03501/54 82 03';
+        if (!venueInfo.phone) venueInfo.phone = '03501 / 54 82 03';
         if (!ballInfo) ballInfo = 'Victas VP40+***';
     }
 
@@ -664,27 +681,81 @@ function parseClickTTTeamDetailHtml(bilanzenHtml, infosHtml, spieleHtml, baseTea
     };
 }
 
+/**
+ * Parst die Spielplan-Tabelle von click-TT fehlerfrei:
+ * In click-TT steht nach der Uhrzeit (z. B. "15:00 v") oft noch eine einstellige Hallen-Ziffer ("1" oder "2"),
+ * und am Ende steht das Ergebnismanchmal zusammen mit der Gastmannschaft oder einem "Vorbericht".
+ */
 function extractClickTTScheduleFromTable(rows) {
     const schRows = [];
+    let matchCounter = 0;
+
     rows.slice(1).forEach(r => {
         const cells = getCleanRowCells(r);
         if (cells.length < 3) return;
         const dateIdx = cells.findIndex(c => /\d{2}\.\d{2}\.\d{2,4}/.test(c));
         if (dateIdx === -1) return;
+
         const timeIdx = cells.findIndex((c, i) => i >= dateIdx && /^\d{1,2}:\d{2}/.test(c));
-        if (timeIdx !== -1) {
-            const dMatch = cells[dateIdx].match(/([A-Za-z]{2})\.?\s*(\d{2}\.\d{2}\.\d{2,4})/);
-            const tag = dMatch ? dMatch[1] : (dateIdx > 0 ? cells[dateIdx - 1] : '');
-            const dat = dMatch ? dMatch[2] : cells[dateIdx];
-            const zeit = cells[timeIdx];
-            const heim = cells[timeIdx + 1] || '';
-            const gast = cells[timeIdx + 2] || '';
-            const erg  = cells.slice(timeIdx + 3).join(' ').trim() || 'Vorbericht';
-            schRows.push({ cells: ['–', tag, dat, zeit, heim, gast, erg], isTotal: false });
-        } else {
-            schRows.push({ cells: cells.slice(0, 7), isTotal: false });
+        if (timeIdx === -1) return;
+
+        matchCounter++;
+        // 1. Tag & Datum sauber trennen (z.B. "Sa. 26.09.2026" oder in getrennten Zellen "Sa." | "26.09.2026")
+        let tag = '';
+        let dat = cells[dateIdx];
+        const combinedDateM = dat.match(/^([A-Za-zÄÖÜäöüß]{2})\.?\s*(\d{2}\.\d{2}\.\d{2,4})$/);
+        if (combinedDateM) {
+            tag = combinedDateM[1];
+            dat = combinedDateM[2];
+        } else if (dateIdx > 0 && /^[A-Za-zÄÖÜäöüß]{2}\.?$/.test(cells[dateIdx - 1])) {
+            tag = cells[dateIdx - 1].replace(/\.$/, '');
         }
+        // Jahreszahl 2026 -> 26 vereinheitlichen
+        dat = dat.replace(/\.20(\d{2})$/, '.$1');
+
+        // 2. Uhrzeit (z. B. "15:00 v" oder "10:00")
+        const zeit = cells[timeIdx].replace(/\s+/g, ' ').trim();
+
+        // 3. Nach der Uhrzeit folgen in click-TT evtl. Hallen-Kennziffern ("1", "2", "(1)", "H1"), die wir überspringen!
+        let cursor = timeIdx + 1;
+        while (cursor < cells.length && (/^\(?\d\)?$|^H\d$/i.test(cells[cursor]) || !cells[cursor])) {
+            cursor++;
+        }
+
+        let heim = cells[cursor] || '';
+        let gast = cells[cursor + 1] || '';
+        let tail = cells.slice(cursor + 2).join(' ').trim();
+
+        // Falls in "gast" hinten schon das Ergebnis mit drinsteckt (z.B. "SV Dresden-Mitte 1950 II 6:4" oder "TTC Holzhausen 4:6")
+        const scoreInGast = gast.match(/^(.*?)\s+(\d{1,2}:\d{1,2})(?:\s+.*)?$/);
+        let erg = '';
+        if (scoreInGast) {
+            gast = scoreInGast[1].trim();
+            erg  = scoreInGast[2].trim();
+        } else {
+            const scoreInTail = tail.match(/(\d{1,2}:\d{1,2})/);
+            if (scoreInTail) {
+                erg = scoreInTail[1];
+            } else if (/Vorbericht|verlegt|abgesagt|kampflos/i.test(tail)) {
+                erg = (tail.match(/Vorbericht|verlegt|abgesagt|kampflos/i) || ['Vorbericht'])[0];
+            } else {
+                erg = tail || 'Vorbericht';
+            }
+        }
+
+        // Falls in "erg" noch der Gastname vorne klebte (weil die Hallenspalte heim/gast verschoben hatte), ebenfalls bereinigen:
+        const strayScore = erg.match(/^(.*?)\s+(\d{1,2}:\d{1,2})$/);
+        if (strayScore && !gast) {
+            gast = strayScore[1].trim();
+            erg = strayScore[2].trim();
+        }
+
+        schRows.push({
+            cells: [String(matchCounter), tag || 'Sa', dat, zeit, heim, gast, erg],
+            isTotal: false
+        });
     });
+
     if (!schRows.length) return null;
     return {
         headers: ['Nr.', 'Tag', 'Datum', 'Zeit', 'Heimmannschaft', 'Gastmannschaft', 'Ergebnis'],
@@ -993,7 +1064,7 @@ async function loadAndRenderInspectedTeam(baseGraupaTeam, subTeam, forceRefresh)
 
             ttTeamDetailsCache[tKey] = details;
             if (subTeam.isOwnGraupaTeam) ttTeamDetailsCache[baseGraupaTeam.id] = details;
-            try { localStorage.setItem('dippe_tt_details_v6_' + mySaison, JSON.stringify(ttTeamDetailsCache)); } catch (e) {}
+            try { localStorage.setItem('dippe_tt_details_v7_' + mySaison, JSON.stringify(ttTeamDetailsCache)); } catch (e) {}
 
             if (activeGraupaTeamId === baseGraupaTeam.id && inspectedSubTeam && inspectedSubTeam.teamKey === tKey) {
                 renderGraupaTeamLayout(baseGraupaTeam, details, false);
@@ -1453,10 +1524,12 @@ function renderGraupaTeamLayout(team, details, isLoadingDetails) {
                         <span class="person-role">📋 Metadaten · ${domEsc(curSub.teamName)}</span>
                         <div style="font-size:10.5px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.04em; margin-top:6px;">Mannschaftsführer</div>
                         <h5 style="font-size:17px; font-weight:800; margin:1px 0 8px; color:var(--text-dark);">${domEsc(cap.name || ('Siehe ' + portalName))}</h5>
-                        <div style="font-size:12.5px; color:#475569; line-height:1.65;">
-                            ${cap.deputy ? `<div><b>Vertretung:</b> ${domEsc(cap.deputy)}</div>` : ''}
-                            ${ven.matchDay ? `<div><b>Heimspieltag:</b> ${domEsc(ven.matchDay)}</div>` : ''}
-                            ${cleanBall ? `<div><b>Spielball:</b> 🟡 ${domEsc(cleanBall)}</div>` : ''}
+                        <div style="font-size:12.5px; color:#475569; line-height:1.75;">
+                            ${cap.phone ? `<div>📞 <b>Telefon:</b> <a href="tel:${domEsc(cap.phone.replace(/[^0-9+]/g, ''))}" style="color:var(--emerald-dark); font-weight:700; text-decoration:none;">${domEsc(cap.phone)}</a></div>` : ''}
+                            ${cap.email ? `<div>✉️ <b>E-Mail:</b> <a href="mailto:${domEsc(cap.email)}" style="color:var(--emerald-dark); font-weight:700; text-decoration:none;">${domEsc(cap.email)}</a></div>` : ''}
+                            ${cap.deputy ? `<div>👥 <b>Vertretung:</b> ${domEsc(cap.deputy)}</div>` : ''}
+                            ${ven.matchDay ? `<div>📅 <b>Heimspieltag:</b> ${domEsc(ven.matchDay)}</div>` : ''}
+                            ${cleanBall ? `<div>🟡 <b>Spielball:</b> ${domEsc(cleanBall)}</div>` : ''}
                             <div style="margin-top:8px;">
                                 <a href="${domEsc(curSub.teamUrl)}" target="_blank" rel="noopener" style="color:var(--emerald-dark); font-weight:700; font-size:12px;">
                                     🔗 Offizielle Seite in ${portalName} ↗
