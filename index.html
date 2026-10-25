@@ -25,7 +25,7 @@
 
     <!-- MOBILE HEADER -->
     <div class="mobile-bar">
-        <div style="display:flex; align-items:center; gap:10px;">
+        <div style="display:flex; align-items:center; gap:10px; cursor:pointer;" onclick="switchPage('home')">
             <div class="brand-logo" style="width:34px; height:34px;">
                 <img src="Pi-vektor.jpg" alt="π" onerror="if(!this.dataset.low){this.dataset.low='1';this.src='pi-vektor.jpg';}else{this.outerHTML='<span style=\'color:#122620;font-weight:800;\'>π</span>';}">
             </div>
@@ -40,7 +40,7 @@
     <!-- SEITENLEISTE (SIDEBAR) -->
     <aside id="sidebar" class="sidebar">
         <div>
-            <div class="brand-box">
+            <div class="brand-box" style="cursor:pointer;" onclick="switchPage('home')">
                 <div class="brand-logo">
                     <img src="Pi-vektor.jpg" alt="π" onerror="if(!this.dataset.low){this.dataset.low='1';this.src='pi-vektor.jpg';}else{this.outerHTML='<span style=\'color:#122620;font-weight:800;font-size:22px;\'>π</span>';}">
                 </div>
@@ -74,21 +74,6 @@
                     <span id="caret-sport" class="nav-caret">▸</span>
                 </button>
                 <div class="sub-nav" id="subnav-group-sport">
-                    <button onclick="switchPage('tischtennis')" id="subnav-tischtennis" class="sub-nav-btn">
-                        <span>🏓 Tischtennis</span>
-                    </button>
-                    <button onclick="switchPage('tt-news')" id="subnav-tt-news" class="sub-nav-btn">
-                        <span>📰 TT-News</span>
-                    </button>
-                    <button onclick="switchPage('tt-ranking')" id="subnav-tt-ranking" class="sub-nav-btn">
-                        <span>📈 TT-Ranking</span>
-                    </button>
-                    <button onclick="switchPage('turnierplaner')" id="subnav-turnierplaner" class="sub-nav-btn">
-                        <span>🏆 Turnierplaner</span>
-                    </button>
-                    <button onclick="switchPage('zaehlboard')" id="subnav-zaehlboard" class="sub-nav-btn">
-                        <span>🔢 Digitales Zählboard</span>
-                    </button>
                     <button onclick="switchPage('radfahren')" id="subnav-radfahren" class="sub-nav-btn">
                         <span>🚴 Fahrradfahren</span>
                     </button>
@@ -98,6 +83,9 @@
                     <button onclick="switchPage('kicker')" id="subnav-kicker" class="sub-nav-btn">
                         <span>⚽ Kickerabend</span>
                     </button>
+                    <a href="https://www.tsvgraupa-tischtennis.de" target="_blank" rel="noopener" class="sub-nav-btn" style="text-decoration:none; color:#34d399; font-weight:700;">
+                        <span>🏓 TSV Graupa TT ↗</span>
+                    </a>
                 </div>
 
                 <button onclick="toggleNavGroup('maptools')" id="nav-maptools" class="nav-btn">
@@ -179,7 +167,7 @@
     <div class="modal-overlay" id="pwd-modal" onclick="if(event.target===this) closePasswordModal(null)">
         <div class="modal-box" style="max-width:400px; text-align:center;">
             <div style="font-size:36px; margin-bottom:6px;">🔐</div>
-            <h3 id="pwd-modal-title" style="font-size:21px; font-weight:800; margin-bottom:6px;">Admin-Passwort</h3>
+            <h3 id="pwd-modal-title" style="font-size:21px; font-weight:800; margin-bottom:6px;">Passwort-Eingabe</h3>
             <p id="pwd-modal-sub" style="font-size:13.5px; color:#475569; margin-bottom:14px;">Bitte gib das Passwort ein (Eingabe erfolgt verdeckt):</p>
             <form onsubmit="submitPasswordModal(event)" style="display:flex; flex-direction:column; gap:10px;">
                 <input type="password" id="pwd-modal-input" class="form-input" placeholder="••••••••" autocomplete="current-password"
@@ -193,18 +181,12 @@
     </div>
 
     <!-- ===================================================================
-         MODULARE JAVASCRIPT-EINBINDUNG (1:1 SEITEN-ARCHITEKTUR)
+         MODULARE JAVASCRIPT-EINBINDUNG (PRIVATES PROFIL OHNE VEREINS-TT)
          =================================================================== -->
     <script src="js/core.js"></script>
     <script src="js/home.js"></script>
     <script src="js/pinnwand.js"></script>
     <script src="js/fotos.js"></script>
-    <script src="js/tischtennis.js"></script>
-    <script src="js/tt-news.js"></script>
-    <script src="js/tt-ranking.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-    <script src="js/turnierplaner.js"></script>
-    <script src="js/zaehlboard.js"></script>
     <script src="js/radfahren.js"></script>
     <script src="js/wandern.js"></script>
     <script src="js/kicker.js"></script>
