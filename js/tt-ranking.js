@@ -541,6 +541,7 @@ async function ttrLoadRankingList(forceRefresh) {
         try { localStorage.removeItem('dippe_ttr_players_v2'); } catch (e) {}
     }
 
+    // 1. Sofort-Anzeige aus lokalem Speicher, während im Hintergrund TTLive geprüft wird
     if (!forceRefresh && !ttrPlayers.length) {
         try {
             const cached = localStorage.getItem('dippe_ttr_players_v2');
@@ -549,6 +550,7 @@ async function ttrLoadRankingList(forceRefresh) {
                 if (parsed.length) {
                     ttrPlayers = parsed;
                     ttrUpdateDropdownAndTable();
+                    setTTRSyncBadge('⚡ Cache geladen · 🔄 Prüfe aktuellen LPZ-Stand bei TTLive …', 'rgba(251,191,36,0.2)', '#fbbf24');
                 }
             }
         } catch (e) {}
@@ -556,7 +558,9 @@ async function ttrLoadRankingList(forceRefresh) {
 
     if (!cloudUrl || !cloudUrl.startsWith('https://script.google.com/')) return;
 
-    setTTRSyncBadge('⏳ Lade TSV Graupa Spieler …', 'rgba(251,191,36,0.2)', '#fbbf24');
+    if (!ttrPlayers.length) {
+        setTTRSyncBadge('⏳ Verbinde mit TischtennisLive …', 'rgba(251,191,36,0.2)', '#fbbf24');
+    }
     try {
         const res = await fetch(`${cloudUrl}?kind=tt_ranking_list${forceRefresh ? '&force=1' : ''}&t=${Date.now()}`, { redirect: 'follow' });
         if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -564,14 +568,16 @@ async function ttrLoadRankingList(forceRefresh) {
         if (data && data.ok && Array.isArray(data.players)) {
             ttrPlayers = sanitizeGraupaPlayers(data.players);
             try { localStorage.setItem('dippe_ttr_players_v2', JSON.stringify(ttrPlayers)); } catch (e) {}
-            ttrUpdateDropdownAndTable();
+            ttrUpdateDropdownAndTable(true);
 
             const withLpz = ttrPlayers.filter(p => p.lpz && p.lpz > 0).length;
-            setTTRSyncBadge(`✓ ${ttrPlayers.length} Mitglieder (${withLpz} mit LPZ)`, 'rgba(16,185,129,0.2)', '#34d399');
+            const timeStr = data.updatedAt ? new Date(data.updatedAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : 'aktuell';
+            const srcLabel = data.cached === 'live' ? '✅ Live aus TTLive' : '☁️ TTLive-Stand';
+            setTTRSyncBadge(`${srcLabel} (${timeStr} Uhr) · ${ttrPlayers.length} Mitglieder (${withLpz} mit LPZ)`, 'rgba(16,185,129,0.2)', '#34d399');
             ttrRunBackgroundBatchResolver();
         }
     } catch (err) {
-        setTTRSyncBadge('⚠️ Offline / Lokaler Stand', 'rgba(239,68,68,0.2)', '#fca5a5');
+        setTTRSyncBadge('⚠️ Offline-Backup (Letzter gespeicherter Stand)', 'rgba(239,68,68,0.2)', '#fca5a5');
     }
 }
 
@@ -790,16 +796,21 @@ async function ttrSelectPlayer(playerId, forceRefresh = false) {
     }
 
     const localKey = 'dippe_ttr_pack_v3_' + playerId;
+    let hadLocalCache = false;
+
+    // 1. Sofort-Anzeige aus dem lokalen Browser-Cache (0 ms Wartezeit),
+    //    aber OHNE return, damit im Hintergrund immer gegen TTLive geprüft wird!
     if (!forceRefresh) {
         try {
             const localPack = localStorage.getItem(localKey);
             if (localPack) {
                 const parsed = JSON.parse(localPack);
                 if (parsed && Array.isArray(parsed.points) && parsed.points.length > 0 && Array.isArray(parsed.analyse) && parsed.analyse.length > 0) {
+                    hadLocalCache = true;
                     ttrCurrentAnalyse = parsed.analyse;
                     ttrApplyChartPoints(player, parsed.points);
                     ttrRenderAnalyseDonuts();
-                    return;
+                    setTTRSyncBadge(`⚡ Cache geladen · 🔄 Prüfe TTLive auf neue Spiele …`, 'rgba(251,191,36,0.2)', '#fbbf24');
                 }
             }
         } catch (e) {}
@@ -808,15 +819,26 @@ async function ttrSelectPlayer(playerId, forceRefresh = false) {
     const cloudUrl = (CONFIG.pinnwandCloudUrl || '').trim();
     if (!cloudUrl) return;
 
-    setTTRSyncBadge(`⏳ Lade Kurve & Analyse für ${player.displayName || player.lastName} …`, 'rgba(251,191,36,0.2)', '#fbbf24');
+    if (!hadLocalCache) {
+        setTTRSyncBadge(`⏳ Lade Kurve & Analyse für ${player.displayName || player.lastName} …`, 'rgba(251,191,36,0.2)', '#fbbf24');
+    }
+
+    // 2. Hintergrund-Abgleich mit Cloud / TischtennisLive
     try {
         const url = `${cloudUrl}?kind=tt_player_lpz&mid=${encodeURIComponent(player.mid || '')}&l2p=${encodeURIComponent(player.l2p || '')}${forceRefresh ? '&force=1' : ''}&t=${Date.now()}`;
         const res = await fetch(url, { redirect: 'follow' });
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
 
+        // Falls der Nutzer inzwischen schon auf einen anderen Spieler geklickt hat, abbrechen
+        if (ttrSelectedPlayerId !== playerId) return;
+
         if (data && data.ok) {
             if (data.player) Object.assign(player, data.player);
+            if (directLink && player.l2p) {
+                directLink.href = `https://dresden.tischtennislive.de/default.aspx?L1=Public&L2=Kontakt&L2P=${player.l2p}${player.mid ? '&MID=' + player.mid : ''}&Page1=Bilanz&SA=96&Page=EntwicklungTTR`;
+            }
+
             const points = parseTTLiveEntwicklungHtml(data.entwHtml || '', data.bilanzHtml || '', player);
             const analyse = parseTTLiveAnalyseHtml(data.analyseHtml || '', points);
             ttrCurrentAnalyse = analyse;
@@ -827,22 +849,30 @@ async function ttrSelectPlayer(playerId, forceRefresh = false) {
                 try { localStorage.setItem(localKey, JSON.stringify({ points, analyse })); } catch (e) {}
                 try { localStorage.setItem('dippe_ttr_players_v2', JSON.stringify(ttrPlayers)); } catch (e) {}
             }
+
             ttrUpdateDropdownAndTable(true);
             ttrApplyChartPoints(player, points);
             ttrRenderAnalyseDonuts();
+
             const matchCount = points.filter(p => !p.isStichtag).length;
-            setTTRSyncBadge(`✓ ${matchCount} Spiele & 9 Analyse-Charts bereit`, 'rgba(16,185,129,0.2)', '#34d399');
-        } else {
+            const timeStr = data.updatedAt ? new Date(data.updatedAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : 'aktuell';
+            const srcTag = data.cached === 'live' ? '✅ Live aus TTLive' : '☁️ TTLive-Stand';
+            setTTRSyncBadge(`${srcTag} (${timeStr} Uhr) · ${matchCount} Spiele & 9 Donuts`, 'rgba(16,185,129,0.2)', '#34d399');
+        } else if (!hadLocalCache) {
             ttrCurrentAnalyse = [];
             ttrApplyChartPoints(player, []);
             ttrRenderAnalyseDonuts();
-            setTTRSyncBadge('⚠️ Keine LPZ-Spiele gefunden', 'rgba(251,191,36,0.2)', '#fbbf24');
+            setTTRSyncBadge('⚠️ Keine LPZ-Spiele in TTLive gefunden', 'rgba(251,191,36,0.2)', '#fbbf24');
         }
     } catch (err) {
-        ttrApplyChartPoints(player, []);
+        if (!hadLocalCache) {
+            ttrApplyChartPoints(player, []);
+            setTTRSyncBadge('⚠️ Offline / Verbindungsfehler', 'rgba(239,68,68,0.2)', '#fca5a5');
+        } else {
+            setTTRSyncBadge('⚡ Lokaler Cache-Stand (Offline)', 'rgba(251,191,36,0.2)', '#fbbf24');
+        }
     }
 }
-
 function parseTTLiveAnalyseHtml(analyseHtml, fallbackPoints) {
     const categories = [
         { key: 'all',      title: 'Alle Spiele',          winLabel: 'Gewonnen',         lossLabel: 'Verloren',         icon: '🏓' },
