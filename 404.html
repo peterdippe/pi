@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <title>Weiterleitung … | π</title>
+    <script>
+        // GitHub Pages SPA-Router: fängt Pfade wie /tischtennis oder /kicker ab
+        // und übergibt sie nahtlos an die index.html
+        (function() {
+            var path = window.location.pathname.replace(/^\/+|\/+$/g, '');
+            var parts = path.split('/');
+            var page = parts[parts.length - 1] || 'home';
+            sessionStorage.setItem('dippe_spa_redirect', page);
+            var basePath = window.location.pathname.slice(0, window.location.pathname.lastIndexOf('/') + 1);
+            window.location.replace(window.location.origin + basePath + '#' + encodeURIComponent(page));
+        })();
+    </script>
+</head>
+<body style="background:#091512; color:#a7c4bc; font-family:sans-serif; text-align:center; padding-top:20vh;">
+    Lade Ansicht …
+</body>
+</html>
