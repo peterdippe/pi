@@ -1,27 +1,15 @@
-// -----------------------------------------------------------------
-// 14. TISCHTENNIS-HUB: LIVE-SCRAPER FÜR ALLE TSV GRAUPA MANNSCHAFTEN
-// -----------------------------------------------------------------
+// ===================================================================
+// TISCHTENNIS-HUB: ALLE GRAUPA-TEAMS & KLICKBARE LIGA-GEGNER (js/tischtennis.js)
+// ===================================================================
 const TTLIVE_BASE = 'https://dresden.tischtennislive.de/';
 const TTLIVE_OVERVIEW_URL = 'https://dresden.tischtennislive.de/?L1=Public&L2=Verein&L2P=870&Page=Spielbetrieb&Sportart=96&Page2=Tabellen&Saison=2026';
-
-const DEFAULT_TT_NEWS = [
-    { source: 'myTischtennis.de', title: 'WTT Champions & TTBL: Die aktuellen Top-Duelle im Überblick', desc: 'Spannende Fünfsatz-Krimis in der Bundesliga und internationale Highlights der WTT-Serie.', link: 'https://www.mytischtennis.de/public/home/' },
-    { source: 'TTVSA / Bezirk Dresden', title: 'Punktspielsaison 2026/27: Alle Tabellen & LivePZ-Werte des TSV Graupa', desc: 'Direkter Durchgriff auf alle Ligen, Einzelbilanzen und Spielpläne unserer Mannschaften.', link: TTLIVE_OVERVIEW_URL },
-    { source: 'Material & Technik', title: '8-Eck-Hölzer, Hybrid-Beläge & Plastikball-Rotation im Check', desc: 'Wie moderne Schlägergeometrien den Sweetspot vergrößern und welche Beläge maximalen Spin erzeugen.', link: 'https://tt-spin.de/' },
-    { source: 'TSV Graupa TT', title: 'Abteilungs-News & Heimspiel-Wochenenden in der Grundschule Graupa', desc: 'Aktuelle Berichte, Nachwuchsarbeit und Termine unserer Tischtennis-Abteilung.', link: 'https://www.tsv-graupa.de/index.php?s=Tischtennis&c=TT_Start' }
-];
-
-const DEFAULT_TT_VIDEOS = [
-    { channel: 'World Table Tennis (WTT)', title: 'Top 10 Unbelievable Rallies · WTT Star Contender & Champions', url: 'https://www.youtube.com/@WTTGlobal/videos', badge: '🔥 WTT Highlights' },
-    { channel: 'TableTennisDaily', title: 'Pro vs Amateur & Equipment Review · Spin, Speed & Cybershape', url: 'https://www.youtube.com/@TableTennisDaily/videos', badge: '🏓 Equipment & Action' },
-    { channel: 'Tischtennis Deutschland', title: 'DTTB-Nationalteam · Beste Ballwechsel & Turnier-Specials', url: 'https://www.youtube.com/@tischtennisdeutschland/videos', badge: '🇩🇪 DTTB Team' },
-    { channel: 'Adam Bobrow', title: 'The Snake, Around the Net & Crazy Exhibition Points!', url: 'https://www.youtube.com/@AdamBobrow/videos', badge: '⚡ Viral TT' }
-];
 
 let ttCurrentSaison = '2026';
 let ttTeamsList = [];
 let ttTeamDetailsCache = {};
 let activeGraupaTeamId = null;
+// Speichert, welche Mannschaft innerhalb der aktuellen Liga-Tabelle gerade inspiziert wird
+let inspectedSubTeam = null; // { teamKey, teamName, teamUrl, isOwnGraupaTeam }
 let ttHubInitialized = false;
 let ttPreloadGen = 0;
 
@@ -42,10 +30,11 @@ function changeTTSaison(newSaison) {
     ttTeamsList = [];
     ttTeamDetailsCache = {};
     activeGraupaTeamId = null;
+    inspectedSubTeam = null;
 
     const eb = document.getElementById('tt-saison-eyebrow');
     if (eb) {
-        eb.textContent = `Saison ${newSaison}/${String(+newSaison + 1).slice(-2)} · Punktspielbetrieb · Tabellen, Bilanzen & Spielpläne`;
+        eb.textContent = `Saison ${newSaison}/${String(+newSaison + 1).slice(-2)} · Punktspielbetrieb · Klicke in der Tabelle auf beliebige Vereine für deren Details`;
     }
 
     loadAllGraupaTeamsFromTTLive(false);
@@ -55,66 +44,8 @@ function initTTHubIfNeeded() {
     if (!ttHubInitialized) {
         ttHubInitialized = true;
         initTTSaisonSelect();
-        renderTTNewsAndVideos(DEFAULT_TT_NEWS, DEFAULT_TT_VIDEOS);
-        loadTTNewsFeed(false);
         loadAllGraupaTeamsFromTTLive(false);
     }
-}
-
-function decodeHtmlEntities(str) {
-    if (!str) return '';
-    const txt = document.createElement('textarea');
-    txt.innerHTML = String(str);
-    return txt.value;
-}
-
-function renderTTNewsAndVideos(newsList, videoList) {
-    const nBox = document.getElementById('tt-news-container');
-    if (nBox) {
-        nBox.innerHTML = newsList.map(n => `
-            <a href="${domEsc(n.link)}" target="_blank" rel="noopener" class="tt-news-item">
-                <div style="display:flex; justify-content:space-between; font-size:10.5px; color:#fbbf24; font-weight:800; text-transform:uppercase;">
-                    <span>${domEsc(decodeHtmlEntities(n.source))}</span><span>Artikel öffnen ↗</span>
-                </div>
-                <div style="font-weight:800; font-size:13.2px; margin:2px 0 3px; color:#fff;">${domEsc(decodeHtmlEntities(n.title))}</div>
-                <div style="font-size:11.8px; color:var(--text-muted); line-height:1.45;">${domEsc(decodeHtmlEntities(n.desc))}</div>
-            </a>
-        `).join('');
-    }
-
-    const yBox = document.getElementById('tt-yt-container');
-    if (yBox) {
-        yBox.innerHTML = videoList.map(v => `
-            <a href="${domEsc(v.url)}" target="_blank" rel="noopener" class="tt-yt-card">
-                ${v.thumb
-                    ? `<img src="${domEsc(v.thumb)}" alt="${domEsc(decodeHtmlEntities(v.title))}" class="tt-yt-thumb">`
-                    : `<div class="tt-yt-thumb" style="display:flex; flex-direction:column; align-items:center; justify-content:center; background:linear-gradient(135deg,#0f2922,#1e1b4b); padding:8px; text-align:center;">
-                        <span style="font-size:24px;">▶️</span>
-                        <span style="font-size:10px; color:#fbbf24; font-weight:800; margin-top:2px;">${domEsc(v.badge || 'YouTube')}</span>
-                       </div>`
-                }
-                <div style="padding:7px 9px;">
-                    <div style="font-size:10px; color:#34d399; font-weight:700;">${domEsc(decodeHtmlEntities(v.channel))}</div>
-                    <div style="font-size:11.8px; font-weight:700; line-height:1.35; margin-top:2px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${domEsc(decodeHtmlEntities(v.title))}</div>
-                </div>
-            </a>
-        `).join('');
-    }
-}
-
-async function loadTTNewsFeed() {
-    const url = (CONFIG.pinnwandCloudUrl || '').trim();
-    if (!url || !url.startsWith('https://script.google.com/')) return;
-    try {
-        const res = await fetch(url + '?kind=tt_news&t=' + Date.now());
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data && data.ok) {
-            const news = (data.news && data.news.length) ? data.news : DEFAULT_TT_NEWS;
-            const vids = (data.videos && data.videos.length) ? data.videos : DEFAULT_TT_VIDEOS;
-            renderTTNewsAndVideos(news, vids);
-        }
-    } catch (e) {}
 }
 
 function setTTLiveSyncBadge(text, bg, color) {
@@ -133,11 +64,12 @@ function resolveTTLiveHref(href) {
     return TTLIVE_BASE + clean.replace(/^\/+/, '');
 }
 
+// Erlaubt sowohl die Vereinsübersicht (TSV Graupa) als auch Detailseiten beliebiger Liga-Mannschaften!
 function isHtmlValidTTLive(html) {
-    if (!html || !/TSV\s+Graupa/i.test(html)) return false;
+    if (!html || html.length < 300) return false;
     if (/Ich bin ein Mensch/i.test(html) || /<form[^>]+Token=/i.test(html)) return false;
     if (/benötigt Ihre Nutzeranmeldung/i.test(html) || /Benutzeranmeldung/i.test(html)) return false;
-    return true;
+    return /TSV\s+Graupa|Position|Einzel|Doppel|Spielplan|Heimmannschaft|L3=Mannschaft/i.test(html);
 }
 
 function hasValidParsedDetails(d) {
@@ -153,7 +85,6 @@ function hasValidParsedDetails(d) {
 async function fetchTTLiveHtmlCascade(kind, targetUrl, teamKey, forceRefresh) {
     const cloudUrl = (CONFIG.pinnwandCloudUrl || '').trim();
 
-    // STUFE 1: Google Apps Script (inkl. Server-Login & Saison-JSON auf Google Drive)
     if (cloudUrl && cloudUrl.startsWith('https://script.google.com/')) {
         try {
             const gasUrl = kind === 'overview'
@@ -173,7 +104,6 @@ async function fetchTTLiveHtmlCascade(kind, targetUrl, teamKey, forceRefresh) {
         } catch (e) {}
     }
 
-    // STUFE 2: Browser-CORS-Proxies (nur falls die Seite keine Benutzeranmeldung verlangt!)
     const proxies = [
         {
             name: 'CodeTabs',
@@ -219,46 +149,14 @@ async function fetchTTLiveHtmlCascade(kind, targetUrl, teamKey, forceRefresh) {
     throw new Error('Abruf erfordert aktuellen Google-Script-Login (Neue Version bereitstellen)');
 }
 
-function openManualTTImportModal() {
-    const pasted = prompt(
-        'Quelltext-Direktimport in deine Google-Drive-Saison-JSON:\n\n' +
-        '1. Öffne die TTLive-Seite über den gelben Button.\n' +
-        '2. Drücke dort Strg+U (Seitenquelltext), dann Strg+A und Strg+C.\n' +
-        '3. Füge den kopierten Quelltext hier mit Strg+V ein:'
-    );
-    if (!pasted || !/TSV\s+Graupa/i.test(pasted)) {
-        if (pasted) alert('Im eingefügten Text wurden keine Tabellen des TSV Graupa gefunden.');
-        return;
-    }
-    const parsedTeams = parseTTLiveOverviewHtml(pasted);
-    if (!parsedTeams.length) {
-        alert('Keine Liga-Tabellen im Quelltext erkannt.');
-        return;
-    }
-    ttTeamsList = parsedTeams;
-    try { localStorage.setItem('dippe_tt_overview_v3_' + ttCurrentSaison, JSON.stringify(ttTeamsList)); } catch (e) {}
-    const cloudUrl = (CONFIG.pinnwandCloudUrl || '').trim();
-    if (cloudUrl) {
-        fetch(cloudUrl, {
-            method: 'POST', redirect: 'follow',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ kind: 'tt_save_cache', saison: ttCurrentSaison, type: 'overview', html: pasted })
-        }).catch(() => {});
-    }
-    activeGraupaTeamId = ttTeamsList[0].id;
-    setTTLiveSyncBadge(`☁️ Synchronisiert (${ttTeamsList.length} Mannschaften)`, '#d1fae5', '#065f46');
-    renderGraupaTeamTabs();
-    selectGraupaTeamTab(activeGraupaTeamId, false);
-}
-
 async function loadAllGraupaTeamsFromTTLive(forceRefresh) {
     const cont = document.getElementById('tt-team-content');
     const mySaison = ttCurrentSaison;
     if (forceRefresh) {
         ttTeamDetailsCache = {};
         try {
-            localStorage.removeItem('dippe_tt_overview_v3_' + mySaison);
-            localStorage.removeItem('dippe_tt_details_v3_' + mySaison);
+            localStorage.removeItem('dippe_tt_overview_v4_' + mySaison);
+            localStorage.removeItem('dippe_tt_details_v4_' + mySaison);
         } catch (e) {}
     }
 
@@ -269,11 +167,11 @@ async function loadAllGraupaTeamsFromTTLive(forceRefresh) {
     const directLink = document.getElementById('tt-team-direct-link');
     if (directLink) directLink.href = overviewUrl;
 
-    // 1. Lokalen Browser-Cache (v2) für 0 ms Sofort-Anzeige prüfen
+    // 1. Lokalen Browser-Cache (v4 inkl. Gegner-Links) prüfen
     if (!ttTeamsList.length && !forceRefresh) {
         try {
-            const cachedOverview = localStorage.getItem('dippe_tt_overview_v3_' + mySaison);
-            const cachedDetails = localStorage.getItem('dippe_tt_details_v3_' + mySaison);
+            const cachedOverview = localStorage.getItem('dippe_tt_overview_v4_' + mySaison);
+            const cachedDetails = localStorage.getItem('dippe_tt_details_v4_' + mySaison);
             if (cachedOverview) {
                 const parsedCache = JSON.parse(cachedOverview);
                 if (Array.isArray(parsedCache) && parsedCache.length) {
@@ -315,7 +213,7 @@ async function loadAllGraupaTeamsFromTTLive(forceRefresh) {
         if (!parsedTeams.length) throw new Error('Keine Graupa-Tabellen im HTML gefunden');
 
         ttTeamsList = parsedTeams;
-        try { localStorage.setItem('dippe_tt_overview_v3_' + mySaison, JSON.stringify(ttTeamsList)); } catch (e) {}
+        try { localStorage.setItem('dippe_tt_overview_v4_' + mySaison, JSON.stringify(ttTeamsList)); } catch (e) {}
 
         if (result.cachedTeams && typeof result.cachedTeams === 'object') {
             Object.keys(result.cachedTeams).forEach(tKey => {
@@ -332,7 +230,7 @@ async function loadAllGraupaTeamsFromTTLive(forceRefresh) {
                     }
                 }
             });
-            try { localStorage.setItem('dippe_tt_details_v3_' + mySaison, JSON.stringify(ttTeamDetailsCache)); } catch (e) {}
+            try { localStorage.setItem('dippe_tt_details_v4_' + mySaison, JSON.stringify(ttTeamDetailsCache)); } catch (e) {}
         }
 
         if (!activeGraupaTeamId || !ttTeamsList.some(t => t.id === activeGraupaTeamId)) {
@@ -351,26 +249,6 @@ async function loadAllGraupaTeamsFromTTLive(forceRefresh) {
             setTTLiveSyncBadge(`⚡ Gespeicherter Stand ${saisonLabel} (${ttTeamsList.length} Mannschaften)`, '#e0f2fe', '#0369a1');
         } else {
             setTTLiveSyncBadge('⚠️ TTLive Abruf-Hinweis', '#fee2e2', '#b91c1c');
-            if (cont) {
-                cont.innerHTML = `<div class="tp-section-card" style="grid-column:1/-1; text-align:center; padding:24px;">
-                    <div style="font-size:28px; margin-bottom:8px;">🛡️</div>
-                    <h4 style="font-size:18px; font-weight:800; color:#b91c1c;">TischtennisLive-Abruf benötigt Freigabe</h4>
-                    <p style="font-size:13.5px; margin:8px 0 16px; color:#475569;">
-                        Stelle sicher, dass das aktualisierte Google Apps Script als <b>Neue Version</b> bereitgestellt ist:
-                    </p>
-                    <div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap;">
-                        <a href="${overviewUrl}" target="_blank" rel="noopener" class="btn btn-amber">
-                            🏓 1. TTLive-Tabellen (${saisonLabel}) öffnen ↗
-                        </a>
-                        <button class="btn btn-emerald" onclick="loadAllGraupaTeamsFromTTLive(true)">
-                            🔄 2. Erneut automatisch abrufen
-                        </a>
-                        <button class="btn btn-dark" onclick="openManualTTImportModal()">
-                            📋 3. Quelltext einfügen (Cloud-Sync)
-                        </button>
-                    </div>
-                </div>`;
-            }
         }
     }
 }
@@ -392,8 +270,8 @@ async function preloadRemainingSeasonTeams(saisonForRun) {
             if (hasValidParsedDetails(details)) {
                 ttTeamDetailsCache[team.id] = details;
                 ttTeamDetailsCache[team.teamKey] = details;
-                try { localStorage.setItem('dippe_tt_details_v3_' + saisonForRun, JSON.stringify(ttTeamDetailsCache)); } catch (e) {}
-                if (activeGraupaTeamId === team.id) {
+                try { localStorage.setItem('dippe_tt_details_v4_' + saisonForRun, JSON.stringify(ttTeamDetailsCache)); } catch (e) {}
+                if (activeGraupaTeamId === team.id && (!inspectedSubTeam || inspectedSubTeam.isOwnGraupaTeam)) {
                     renderGraupaTeamLayout(team, details, false);
                 }
             }
@@ -402,7 +280,7 @@ async function preloadRemainingSeasonTeams(saisonForRun) {
 }
 
 // -----------------------------------------------------------------
-// PRÄZISER DOM-PARSER FÜR TISCHTENNISLIVE (INKL. MEHRERER TEAMS PRO LIGA)
+// PRÄZISER DOM-PARSER (EXTRAHIERT AUCH DIE LINKS ALLER LIGA-GEGNER!)
 // -----------------------------------------------------------------
 function sanitizeTTLiveDom(htmlString) {
     const doc = new DOMParser().parseFromString(htmlString, 'text/html');
@@ -552,9 +430,23 @@ function parseTTLiveOverviewHtml(htmlString) {
 
             if (/^Platz$/i.test(cells[0]) || /^Mannschaft$/i.test(cells[1] || '')) return;
 
+            // NEU: Extrahiere den Mannschafts-Link (L3=Mannschaft&L3P=...) für JEDE Mannschaft in der Liga-Tabelle!
+            const rowAnchor = Array.from(r.querySelectorAll('a')).find(a => /L3=Mannschaft|L3P=/i.test(a.getAttribute('href') || ''));
+            const rowTeamUrl = rowAnchor ? resolveTTLiveHref(rowAnchor.getAttribute('href') || '') : '';
+            const rowL3pMatch = rowTeamUrl.match(/L3P=(\d+)/i);
+            const rowTeamKey = rowL3pMatch ? ('team_' + rowL3pMatch[1]) : '';
+            const rowTeamName = rowAnchor ? rowAnchor.textContent.replace(/\s+/g, ' ').trim() : (cells[1] || '');
+
             const isGraupa = /TSV\s+Graupa/i.test(joined);
             const isCurrentTeam = r.contains(teamAnchor);
-            standingsRows.push({ cells, isGraupa, isCurrentTeam });
+            standingsRows.push({
+                cells,
+                isGraupa,
+                isCurrentTeam,
+                rowTeamUrl,
+                rowTeamKey,
+                rowTeamName
+            });
         });
 
         if (!standingsRows.length) return;
@@ -612,40 +504,67 @@ function renderGraupaTeamTabs() {
     `;
 }
 
+// Wenn ein Reiter (Tab) oben geklickt wird -> Default ist immer unsere eigene TSV-Graupa-Mannschaft!
 async function selectGraupaTeamTab(teamId, forceRefresh) {
     activeGraupaTeamId = teamId;
-    renderGraupaTeamTabs();
-
     const team = ttTeamsList.find(t => t.id === teamId);
     if (!team) return;
 
-    const directLink = document.getElementById('tt-team-direct-link');
-    if (directLink && team.teamUrl) directLink.href = team.teamUrl;
+    inspectedSubTeam = {
+        teamKey: team.teamKey,
+        teamName: team.fullTeamName || team.tabName,
+        teamUrl: team.teamUrl,
+        isOwnGraupaTeam: true
+    };
+    renderGraupaTeamTabs();
+    await loadAndRenderInspectedTeam(team, inspectedSubTeam, forceRefresh);
+}
 
-    const cached = !forceRefresh ? (ttTeamDetailsCache[teamId] || ttTeamDetailsCache[team.teamKey] || null) : null;
+// NEU: Wird aufgerufen, wenn der User in der Liga-Tabelle auf irgendeine Mannschaft (auch Gegner!) klickt
+async function selectLeagueTableRowTeam(rowIdx, forceRefresh = false) {
+    const team = ttTeamsList.find(t => t.id === activeGraupaTeamId);
+    if (!team || !team.standingsRows[rowIdx]) return;
+    const row = team.standingsRows[rowIdx];
+    if (!row.rowTeamUrl || !row.rowTeamKey) return;
+
+    const isOwn = (row.rowTeamKey === team.teamKey);
+    inspectedSubTeam = {
+        teamKey: row.rowTeamKey,
+        teamName: row.rowTeamName || row.cells[1] || 'Mannschaft',
+        teamUrl: row.rowTeamUrl,
+        isOwnGraupaTeam: isOwn
+    };
+    await loadAndRenderInspectedTeam(team, inspectedSubTeam, forceRefresh);
+}
+
+async function loadAndRenderInspectedTeam(baseGraupaTeam, subTeam, forceRefresh) {
+    const directLink = document.getElementById('tt-team-direct-link');
+    if (directLink && subTeam.teamUrl) directLink.href = subTeam.teamUrl;
+
+    const tKey = subTeam.teamKey;
+    const cached = !forceRefresh ? (ttTeamDetailsCache[tKey] || (subTeam.isOwnGraupaTeam ? ttTeamDetailsCache[baseGraupaTeam.id] : null)) : null;
     const isValidCache = hasValidParsedDetails(cached);
 
-    renderGraupaTeamLayout(team, isValidCache ? cached : null, !isValidCache);
+    renderGraupaTeamLayout(baseGraupaTeam, isValidCache ? cached : null, !isValidCache);
     if (isValidCache) return;
 
     const mySaison = ttCurrentSaison;
     try {
-        const tKey = team.teamKey || ('team_' + ((team.teamUrl.match(/L3P=(\d+)/i) || [])[1] || teamId));
-        const result = await fetchTTLiveHtmlCascade('team', team.teamUrl, tKey, Boolean(forceRefresh));
+        const result = await fetchTTLiveHtmlCascade('team', subTeam.teamUrl, tKey, Boolean(forceRefresh));
         if (ttCurrentSaison !== mySaison) return;
 
         const details = parseTTLiveTeamDetailHtml(result.html);
-        ttTeamDetailsCache[teamId] = details;
         ttTeamDetailsCache[tKey] = details;
-        try { localStorage.setItem('dippe_tt_details_v3_' + mySaison, JSON.stringify(ttTeamDetailsCache)); } catch (e) {}
+        if (subTeam.isOwnGraupaTeam) ttTeamDetailsCache[baseGraupaTeam.id] = details;
+        try { localStorage.setItem('dippe_tt_details_v4_' + mySaison, JSON.stringify(ttTeamDetailsCache)); } catch (e) {}
 
-        if (activeGraupaTeamId === teamId) {
-            renderGraupaTeamLayout(team, details, false);
+        if (activeGraupaTeamId === baseGraupaTeam.id && inspectedSubTeam && inspectedSubTeam.teamKey === tKey) {
+            renderGraupaTeamLayout(baseGraupaTeam, details, false);
         }
     } catch (err) {
         console.warn('Fehler beim Laden der Mannschaftsdetails:', err);
-        if (activeGraupaTeamId === teamId) {
-            renderGraupaTeamLayout(team, { error: String(err.message || err) }, false);
+        if (activeGraupaTeamId === baseGraupaTeam.id && inspectedSubTeam && inspectedSubTeam.teamKey === tKey) {
+            renderGraupaTeamLayout(baseGraupaTeam, { error: String(err.message || err) }, false);
         }
     }
 }
@@ -659,7 +578,7 @@ function parseTTLiveTeamDetailHtml(htmlString) {
     for (const el of candidates) {
         if (el.querySelector('table')) continue;
         const t = el.textContent.replace(/\s+/g, ' ').trim();
-        if (/^TSV\s+Graupa\s*,\s*[^,]{3,45}$/i.test(t)) {
+        if (/^[^,\n\r]{3,45},\s*[^,\n\r]{3,45}$/i.test(t) && /Erwachsene|Herren|Damen|Jugend|Schüler|Nachwuchs|Senioren/i.test(t)) {
             headerTitle = t.replace(/\s+(Vorrunde|Rückrunde|Gesamt)$/i, '').trim();
             break;
         }
@@ -741,7 +660,6 @@ function parseTTLiveTeamDetailHtml(htmlString) {
 function extractCleanDataTable(rows, headerIdx, kind) {
     const readCellText = (el) => {
         let txt = el.textContent.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
-        // Badges aus Bildern (z. B. "E" für Ersatzspieler, "J" für Jugend, "S" für Sperrvermerk) immer voranstellen
         const imgs = Array.from(el.querySelectorAll('img'));
         const badges = [];
         imgs.forEach(img => {
@@ -780,12 +698,10 @@ function extractCleanDataTable(rows, headerIdx, kind) {
         }
     }
 
-    // 1. SPIELPLAN & ERGEBNISSE: Feste 7-Spalten-Verankerung (verhindert Verschiebung bei "v", "h", "v h" etc.)
     if (kind === 'schedule') {
         const headers = ['Nr.', 'Tag', 'Datum', 'Zeit', 'Heimmannschaft', 'Gastmannschaft', 'Ergebnis'];
         const bodyRows = rawBodyRows.map(rCols => {
             const nonEmpty = rCols.filter(Boolean);
-            // Suche den Index der Uhrzeit (z. B. "19:30", "10:00") oder den Index des Datums ("24.10.26")
             const dateIdx = nonEmpty.findIndex(c => /^\d{2}\.\d{2}\.\d{2,4}$/.test(c));
             const timeIdx = nonEmpty.findIndex((c, idx) => idx > dateIdx && /^\d{1,2}:\d{2}(\s*Uhr)?$/i.test(c));
 
@@ -793,7 +709,6 @@ function extractCleanDataTable(rows, headerIdx, kind) {
                 const nr  = nonEmpty[0] || '';
                 const tag = dateIdx >= 2 ? nonEmpty[dateIdx - 1] : (nonEmpty[1] || '');
                 const dat = nonEmpty[dateIdx] || '';
-                // Alle Hinweis-Kürzel zwischen Datum und Uhrzeit (z. B. "v", "h", "v h", "t") sauber zur Zeit ziehen
                 const flags = nonEmpty.slice(dateIdx + 1, timeIdx).join(' ').trim();
                 const zeit = flags ? `${flags} ${nonEmpty[timeIdx]}` : nonEmpty[timeIdx];
                 const heim = nonEmpty[timeIdx + 1] || '';
@@ -802,7 +717,6 @@ function extractCleanDataTable(rows, headerIdx, kind) {
                 return { cells: [nr, tag, dat, zeit, heim, gast, erg], isTotal: false };
             }
 
-            // Fallback, falls keine Uhrzeit angegeben ist
             const merged = [];
             for (let c = 0; c < nonEmpty.length; c++) {
                 if (/^[vhtauVHTAU\s]{1,5}$/.test(nonEmpty[c]) && c + 1 < nonEmpty.length && /^\d{1,2}:\d{2}/.test(nonEmpty[c + 1])) {
@@ -817,7 +731,6 @@ function extractCleanDataTable(rows, headerIdx, kind) {
         return { headers, rows: bodyRows };
     }
 
-    // 2. DOPPEL-BILANZEN (4 feste Zielspalten)
     if (kind === 'doubles') {
         const headers = ['Spieler 1', 'Spieler 2', 'Bilanz', '+/-'];
         const bodyRows = rawBodyRows.map(rCols => {
@@ -838,12 +751,10 @@ function extractCleanDataTable(rows, headerIdx, kind) {
         return { headers, rows: bodyRows };
     }
 
-    // 3. EINZEL-BILANZEN: Dynamische Erkennung beliebig vieler Paarkreuze (PK1 bis PK6)
     const maxCols = Math.max(rawHeaderCols.length, ...rawBodyRows.map(r => r.length));
     const normHeader = Array.from({ length: maxCols }, (_, s) => rawHeaderCols[s] || '');
 
     if (kind === 'singles') {
-        // Alle PK-Spalten im Header dynamisch erfassen (z. B. PK1, PK2, PK3, PK4)
         const pkHeaders = [];
         normHeader.forEach(h => {
             const m = h.match(/PK\s*(\d+)/i);
@@ -852,9 +763,7 @@ function extractCleanDataTable(rows, headerIdx, kind) {
                 if (!pkHeaders.includes(label)) pkHeaders.push(label);
             }
         });
-        if (pkHeaders.length === 0) {
-            pkHeaders.push('PK1', 'PK2', 'PK3');
-        }
+        if (pkHeaders.length === 0) pkHeaders.push('PK1', 'PK2', 'PK3');
         const pkCount = pkHeaders.length;
         const hasLpz = normHeader.some(h => /LivePZ|LPZ/i.test(h));
         const headers = ['Position', 'Spieler', 'Kz.', 'ST', ...pkHeaders, 'Gesamt', ...(hasLpz ? ['LivePZ'] : [])];
@@ -872,37 +781,30 @@ function extractCleanDataTable(rows, headerIdx, kind) {
                 return { cells, isTotal: true };
             }
 
-            // 1. Position (z. B. "1.", "2.", "5Er/4")
             let idxPos = rCols.findIndex(c => /^\d+\.?$|^\d+[A-Za-z]+\/\d+$/.test(c));
             if (idxPos === -1) idxPos = 0;
             const posVal = rCols[idxPos] || '';
 
-            // 2. Spielername
             let idxName = -1;
             for (let k = idxPos + 1; k < rCols.length; k++) {
                 if (rCols[k] && !/^\d+$/.test(rCols[k])) { idxName = k; break; }
             }
             const nameVal = idxName !== -1 ? rCols[idxName] : '';
 
-            // 3. ST (Einsätze: erste reine 1-2-stellige Zahl nach dem Namen)
             let idxSt = -1;
             for (let k = (idxName !== -1 ? idxName + 1 : idxPos + 1); k < rCols.length; k++) {
                 if (/^\d{1,2}$/.test(rCols[k])) { idxSt = k; break; }
             }
             const stVal = idxSt !== -1 ? rCols[idxSt] : '';
 
-            // 4. Kennzeichnung (z. B. "E WES", "J NES", "WES", "SPV")
             let kzVal = '';
             if (idxName !== -1 && idxSt !== -1 && idxSt > idxName + 1) {
                 kzVal = rCols.slice(idxName + 1, idxSt).filter(Boolean).join(' ');
             }
 
-            // 5. Nach ST folgen exakt die pkCount Spalten (PK1..PKn), danach Gesamt und LivePZ
             const afterSt = idxSt !== -1 ? rCols.slice(idxSt + 1) : [];
             const pkVals = [];
-            for (let p = 0; p < pkCount; p++) {
-                pkVals.push(afterSt[p] || '');
-            }
+            for (let p = 0; p < pkCount; p++) pkVals.push(afterSt[p] || '');
             const totalVal = afterSt[pkCount] || '';
             const lpzVal = hasLpz ? (afterSt[pkCount + 1] || '') : '';
 
@@ -918,35 +820,50 @@ function extractCleanDataTable(rows, headerIdx, kind) {
 }
 
 // -----------------------------------------------------------------
-// SCHRITT C: ZWEISPALTIGES RENDERING FÜR JEDE MANNSCHAFT
-// Links: Liga-Tabelle + Spielplan
-// Rechts: Einzel-Bilanzen + Doppel-Bilanzen + Metadaten (inkl. Ball) + Spielstätte
+// SCHRITT C: ZWEISPALTIGES RENDERING INKL. GEGNER-AUSWAHL IN DER LIGA
 // -----------------------------------------------------------------
 function renderGraupaTeamLayout(team, details, isLoadingDetails) {
     const cont = document.getElementById('tt-team-content');
     if (!cont) return;
 
+    const curSub = inspectedSubTeam || {
+        teamKey: team.teamKey,
+        teamName: team.fullTeamName || team.tabName,
+        teamUrl: team.teamUrl,
+        isOwnGraupaTeam: true
+    };
+
     const standingsHtml = `
         <div class="tp-section-card" style="margin-bottom:0;">
-            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px;">
+            <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px;">
                 <div>
                     <span class="eyebrow-dark">${domEsc(team.league)}</span>
                     <h4 style="font-size:18px; font-weight:800;">📊 Liga-Tabelle · ${domEsc(team.tabName)}</h4>
                 </div>
-                <span class="badge" style="background:var(--emerald-dark); color:#fff;">Live-Tabelle</span>
+                <span class="badge" style="background:var(--emerald-dark); color:#fff; font-size:11px;">👆 Verein antippen für Details</span>
             </div>
-            <div style="overflow-x:auto;">
+            <div class="tt-table-scroll" style="overflow-x:auto;">
                 <table class="tt-data-table">
                     <thead>
                         <tr>${team.standingsHeaders.map(h => `<th>${domEsc(h)}</th>`).join('')}</tr>
                     </thead>
                     <tbody>
-                        ${team.standingsRows.map(r => {
-                            const isActiveRow = r.isCurrentTeam || (r.isGraupa && !team.standingsRows.some(x => x.isCurrentTeam));
-                            const rowStyle = (!isActiveRow && r.isGraupa) ? 'background:#ecfdf5; font-weight:700; color:#047857;' : '';
+                        ${team.standingsRows.map((r, rIdx) => {
+                            const isSelectedRow = (r.rowTeamKey && r.rowTeamKey === curSub.teamKey) || (!curSub.teamKey && r.isCurrentTeam);
+                            const clickableCls = r.rowTeamUrl ? 'tt-clickable-team' : '';
+                            const selectedCls = isSelectedRow ? 'tt-selected-team' : '';
+                            const graupaCls = r.isGraupa ? 'graupa-row' : '';
                             return `
-                                <tr class="${isActiveRow ? 'graupa-row' : ''}" style="${rowStyle}">
-                                    ${r.cells.map((c, idx) => `<td class="${idx === 1 ? 'tt-col-wrap' : ''}" style="${idx >= r.cells.length - 3 ? 'font-family:JetBrains Mono,monospace;font-weight:700;' : ''}">${r.isGraupa && idx === 1 ? '🏓 ' : ''}${domEsc(c)}</td>`).join('')}
+                                <tr class="${graupaCls} ${clickableCls} ${selectedCls}"
+                                    ${r.rowTeamUrl ? `onclick="selectLeagueTableRowTeam(${rIdx}, false)" title="Klicken, um Spielplan, Bilanzen & Halle von ${domEsc(r.rowTeamName || r.cells[1])} anzuzeigen"` : ''}>
+                                    ${r.cells.map((c, idx) => {
+                                        let prefix = '';
+                                        if (idx === 1) {
+                                            if (r.isGraupa) prefix = '🏓 ';
+                                            else if (isSelectedRow) prefix = '🔎 ';
+                                        }
+                                        return `<td class="${idx === 1 ? 'tt-col-wrap' : ''}" style="${idx >= r.cells.length - 3 ? 'font-family:JetBrains Mono,monospace;font-weight:700;' : ''}">${prefix}${domEsc(c)}</td>`;
+                                    }).join('')}
                                 </tr>
                             `;
                         }).join('')}
@@ -956,16 +873,26 @@ function renderGraupaTeamLayout(team, details, isLoadingDetails) {
         </div>
     `;
 
+    // Banner falls gerade ein Gast-/Gegnerverein inspiziert wird
+    const opponentBannerHtml = !curSub.isOwnGraupaTeam ? `
+        <div style="background:#fef3c7; border:1.5px solid #f59e0b; color:#92400e; border-radius:12px; padding:10px 14px; display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px; font-size:12.5px; font-weight:700;">
+            <span>🔎 Du siehst aktuell die Liga-Details von: <b>${domEsc(curSub.teamName)}</b></span>
+            <button class="btn btn-emerald" style="padding:5px 11px; font-size:11.5px;" onclick="selectGraupaTeamTab('${team.id}', false)">
+                🏓 Zurück zu ${domEsc(team.fullTeamName || team.tabName)}
+            </button>
+        </div>
+    ` : '';
+
     let scheduleHtml = '';
     if (isLoadingDetails) {
         scheduleHtml = `<div class="tp-section-card" style="margin-bottom:0; text-align:center; padding:22px;">
-            ⏳ Lade aktuellen Spielplan für <b>${domEsc(team.tabName)}</b> …
+            ⏳ Lade aktuellen Spielplan für <b>${domEsc(curSub.teamName)}</b> …
         </div>`;
     } else if (details && details.scheduleTable && details.scheduleTable.rows.length) {
         scheduleHtml = `
             <div class="tp-section-card" style="margin-bottom:0;">
-                <h4 style="font-size:18px; font-weight:800; margin-bottom:8px;">📅 Spielplan & Ergebnisse</h4>
-                <div style="overflow-x:auto;">
+                <h4 style="font-size:18px; font-weight:800; margin-bottom:8px;">📅 Spielplan & Ergebnisse · ${domEsc(curSub.teamName)}</h4>
+                <div class="tt-table-scroll" style="overflow-x:auto;">
                     <table class="tt-data-table">
                         <thead>
                             <tr>${details.scheduleTable.headers.map(h => `<th>${domEsc(h)}</th>`).join('')}</tr>
@@ -974,8 +901,14 @@ function renderGraupaTeamLayout(team, details, isLoadingDetails) {
                             ${details.scheduleTable.rows.map(r => {
                                 return `<tr>${r.cells.map((c, idx) => {
                                     const isGraupaCell = /TSV\s+Graupa/i.test(c);
+                                    const isInspectedCell = !isGraupaCell && curSub.teamName && c.toLowerCase().includes(curSub.teamName.toLowerCase());
                                     const isTeamCol = idx === 4 || idx === 5;
-                                    return `<td class="${isTeamCol ? 'tt-col-wrap' : ''}" style="${isGraupaCell ? 'font-weight:800;color:var(--emerald-dark);' : ''}${idx === r.cells.length - 1 ? 'font-family:JetBrains Mono,monospace;font-weight:800;' : ''}">${domEsc(c)}</td>`;
+                                    const highlightStyle = isGraupaCell
+                                        ? 'font-weight:800;color:var(--emerald-dark);'
+                                        : isInspectedCell
+                                            ? 'font-weight:800;color:#d97706;'
+                                            : '';
+                                    return `<td class="${isTeamCol ? 'tt-col-wrap' : ''}" style="${highlightStyle}${idx === r.cells.length - 1 ? 'font-family:JetBrains Mono,monospace;font-weight:800;' : ''}">${isGraupaCell ? '🏓 ' : ''}${domEsc(c)}</td>`;
                                 }).join('')}</tr>`;
                             }).join('')}
                         </tbody>
@@ -990,19 +923,25 @@ function renderGraupaTeamLayout(team, details, isLoadingDetails) {
     let rightCol = '';
     if (isLoadingDetails) {
         rightCol = `
-            <div class="tp-section-card" style="text-align:center; padding:34px;">
-                <div style="font-size:26px; margin-bottom:8px;">⏳</div>
-                <h4 style="font-size:17px; font-weight:800;">Ziehe Einzel-/Doppel-Bilanzen & Metadaten aus TischtennisLive …</h4>
+            <div style="display:flex; flex-direction:column; gap:16px;">
+                ${opponentBannerHtml}
+                <div class="tp-section-card" style="text-align:center; padding:34px;">
+                    <div style="font-size:26px; margin-bottom:8px;">⏳</div>
+                    <h4 style="font-size:17px; font-weight:800;">Lade Bilanzen & Metadaten für ${domEsc(curSub.teamName)} …</h4>
+                </div>
             </div>
         `;
     } else if (!details || details.error) {
         rightCol = `
-            <div class="tp-section-card">
-                <h4 style="font-size:17px; font-weight:800;">📊 Detail-Auswertung auf TischtennisLive</h4>
-                <p class="tp-help" style="margin:8px 0 14px;">Die Detailseite konnte gerade nicht geladen werden (${domEsc(details?.error || 'Unbekannter Status')}).</p>
-                <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                    <button class="btn btn-emerald" onclick="selectGraupaTeamTab('${team.id}', true)">🔄 Erneut mit Login abrufen</button>
-                    <a href="${domEsc(team.teamUrl)}" target="_blank" rel="noopener" class="btn btn-sand">Direkt in TischtennisLive öffnen ↗</a>
+            <div style="display:flex; flex-direction:column; gap:16px;">
+                ${opponentBannerHtml}
+                <div class="tp-section-card">
+                    <h4 style="font-size:17px; font-weight:800;">📊 Detail-Auswertung (${domEsc(curSub.teamName)})</h4>
+                    <p class="tp-help" style="margin:8px 0 14px;">Die Detailseite konnte gerade nicht geladen werden (${domEsc(details?.error || 'Unbekannter Status')}).</p>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <button class="btn btn-emerald" onclick="loadAndRenderInspectedTeam(ttTeamsList.find(t=>t.id==='${team.id}'), inspectedSubTeam, true)">🔄 Erneut abrufen</button>
+                        <a href="${domEsc(curSub.teamUrl)}" target="_blank" rel="noopener" class="btn btn-sand">Direkt in TischtennisLive öffnen ↗</a>
+                    </div>
                 </div>
             </div>
         `;
@@ -1010,7 +949,7 @@ function renderGraupaTeamLayout(team, details, isLoadingDetails) {
         const renderParsedTable = (tblObj, emptyMsg) => {
             if (!tblObj || !tblObj.rows.length) return `<p class="tp-help">${emptyMsg}</p>`;
             return `
-                <div style="overflow-x:auto;">
+                <div class="tt-table-scroll" style="overflow-x:auto;">
                     <table class="tt-data-table">
                         <thead>
                             <tr>${tblObj.headers.map(h => `<th>${domEsc(h)}</th>`).join('')}</tr>
@@ -1029,32 +968,42 @@ function renderGraupaTeamLayout(team, details, isLoadingDetails) {
 
         const cap = details.captainInfo || {};
         const ven = details.venueInfo || {};
-        const fullAddress = [ven.street || 'Badstr. 3', ven.city || '01796 Pirna OT Graupa'].filter(Boolean).join(', ');
+        const isGraupaVenue = curSub.isOwnGraupaTeam || /Graupa/i.test((ven.name || '') + ' ' + (ven.city || ''));
+        const fullAddress = [ven.street || (isGraupaVenue ? 'Badstr. 3' : ''), ven.city || (isGraupaVenue ? '01796 Pirna OT Graupa' : '')].filter(Boolean).join(', ');
         const cleanBall = (details.ballInfo || '')
             .replace(/^Die\s+Mannschaft\s+verwendet\s+Bälle\s+der\s+Marke\s*/i, '')
             .trim();
 
+        const mapSectionHtml = isGraupaVenue
+            ? `<iframe title="Karte Spielstätte"
+                       src="https://www.openstreetmap.org/export/embed.html?bbox=13.9165%2C50.9995%2C13.9285%2C51.0055&layer=mapnik&marker=51.0025%2C13.9225"
+                       style="width:100%; height:115px; border:1px solid var(--border-sand); border-radius:10px;"></iframe>`
+            : `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((ven.name ? ven.name + ', ' : '') + fullAddress)}"
+                  target="_blank" rel="noopener" class="btn btn-emerald" style="width:100%; padding:10px; font-size:12.5px; margin-top:6px;">
+                  🗺️ Route zur Gast-Halle in Google Maps öffnen ↗
+               </a>`;
+
         rightCol = `
             <div style="display:flex; flex-direction:column; gap:16px;">
+                ${opponentBannerHtml}
                 <div class="tp-section-card" style="margin-bottom:0;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                        <h4 style="font-size:17px; font-weight:800;">👤 Einzel-Bilanzen</h4>
-                        <a href="${domEsc(team.teamUrl)}" target="_blank" rel="noopener" style="font-size:11.5px; font-weight:700; color:var(--emerald-dark); text-decoration:none;">Alle Reiter (Analyse/Matrix/LivePZ) ↗</a>
+                    <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:6px; margin-bottom:6px;">
+                        <h4 style="font-size:17px; font-weight:800;">👤 Einzel-Bilanzen · ${domEsc(curSub.teamName)}</h4>
+                        <a href="${domEsc(curSub.teamUrl)}" target="_blank" rel="noopener" style="font-size:11.5px; font-weight:700; color:var(--emerald-dark); text-decoration:none;">Original in TTLive ↗</a>
                     </div>
                     <div style="margin-bottom:16px;">
                         ${renderParsedTable(details.singlesTable, 'Noch keine Einzel-Einsätze verbucht.')}
                     </div>
 
-                    <h4 style="font-size:17px; font-weight:800; margin-bottom:6px;">👥 Doppel-Bilanzen</h4>
+                    <h4 style="font-size:17px; font-weight:800; margin-bottom:6px;">👥 Doppel-Bilanzen · ${domEsc(curSub.teamName)}</h4>
                     <div>
                         ${renderParsedTable(details.doublesTable, 'Noch keine Doppel-Einsätze verbucht.')}
                     </div>
                 </div>
 
-                <!-- Metadaten (inkl. Mannschaftsführer & Ballmarke) + Sportstätte darunter -->
                 <div class="grid-2" style="gap:12px;">
                     <div class="tp-section-card" style="margin-bottom:0;">
-                        <span class="person-role">📋 Metadaten</span>
+                        <span class="person-role">📋 Metadaten · ${domEsc(curSub.teamName)}</span>
                         <div style="font-size:10.5px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.04em; margin-top:6px;">Mannschaftsführer</div>
                         <h5 style="font-size:17px; font-weight:800; margin:1px 0 8px; color:var(--text-dark);">${domEsc(cap.name || 'Siehe TischtennisLive')}</h5>
                         <div style="font-size:12.5px; color:#475569; line-height:1.65;">
@@ -1062,7 +1011,7 @@ function renderGraupaTeamLayout(team, details, isLoadingDetails) {
                             ${ven.matchDay ? `<div><b>Heimspieltag:</b> ${domEsc(ven.matchDay)}</div>` : ''}
                             ${cleanBall ? `<div><b>Spielball:</b> 🟡 ${domEsc(cleanBall)}</div>` : ''}
                             <div style="margin-top:8px;">
-                                <a href="${domEsc(team.teamUrl)}" target="_blank" rel="noopener" style="color:var(--emerald-dark); font-weight:700; font-size:12px;">
+                                <a href="${domEsc(curSub.teamUrl)}" target="_blank" rel="noopener" style="color:var(--emerald-dark); font-weight:700; font-size:12px;">
                                     🔗 Kontaktdaten in TTLive ↗
                                 </a>
                             </div>
@@ -1070,14 +1019,12 @@ function renderGraupaTeamLayout(team, details, isLoadingDetails) {
                     </div>
 
                     <div class="tp-section-card" style="margin-bottom:0;">
-                        <span class="person-role">📍 Sportstätte & Karte</span>
-                        <h5 style="font-size:14.5px; font-weight:800; margin:4px 0 4px;">${domEsc(ven.name || 'Turnhalle Grundschule Graupa')}</h5>
+                        <span class="person-role">📍 Sportstätte & Anfahrt</span>
+                        <h5 style="font-size:14.5px; font-weight:800; margin:4px 0 4px;">${domEsc(ven.name || (isGraupaVenue ? 'Turnhalle Grundschule Graupa' : 'Sporthalle'))}</h5>
                         <div style="font-size:12px; color:#475569; margin-bottom:8px;">
-                            ${domEsc(fullAddress)}${ven.phone ? ' · Tel: ' + domEsc(ven.phone) : ''}
+                            ${domEsc(fullAddress || 'Adresse siehe TTLive')}${ven.phone ? ' · Tel: ' + domEsc(ven.phone) : ''}
                         </div>
-                        <iframe title="Karte Spielstätte"
-                                src="https://www.openstreetmap.org/export/embed.html?bbox=13.9165%2C50.9995%2C13.9285%2C51.0055&layer=mapnik&marker=51.0025%2C13.9225"
-                                style="width:100%; height:115px; border:1px solid var(--border-sand); border-radius:10px;"></iframe>
+                        ${mapSectionHtml}
                     </div>
                 </div>
             </div>
