@@ -3,8 +3,11 @@
 // ===================================================================
 
 const CONFIG = {
-    // HIER DEINE GOOGLE APPS SCRIPT WEB-APP-URL EINTRAGEN (beginnt mit https://script.google.com/macros/s/.../exec):
-    pinnwandCloudUrl: "https://script.google.com/macros/s/AKfycbyE7MhfR_aSdhyaM0nXhC7XSxcYIHukQXqwr8cUvgZeKMk_qv5qtzIO5Qyc7Vbd4rvwBg/exec",
+    // NEU: URL deiner Kopie (Pi-Homepage-Backend) für Pinnwand, Fotos, Kicker & Highscores
+    pinnwandCloudUrl: 'https://script.google.com/macros/s/AKfycbzF85qdTeoZMu_sf8EDJKiTinO3Gouwnr855l2Z7uKE8BJuBy0dhpovHk0eUh5GjLo/exec',
+
+    // ALT: Bisherige URL des Originals (TSV-Graupa-TT-Backend) für deine persönliche TT-Seite
+    ttCloudUrl: 'https://script.google.com/macros/s/AKfycbyE7MhfR_aSdhyaM0nXhC7XSxcYIHukQXqwr8cUvgZeKMk_qv5qtzIO5Qyc7Vbd4rvwBg/exec',
     alben: [
         {
             titel: "Familienfotos & Schnappschüsse",
