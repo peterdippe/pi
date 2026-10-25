@@ -1,7 +1,7 @@
 // ===================================================================
 // PI'S PERSÖNLICHES TISCHTENNIS-COCKPIT & MEINE LIGA (js/tischtennis.js)
-// Kombiniert Peter Dippes persönliche LPZ-Kurve + 9 Analyse-Donuts
-// mit der Liga-Tabelle, dem Spielplan und den Bilanzen seiner Mannschaft.
+// Für pi.dippe-sippe.de – nutzt CONFIG.ttCloudUrl (Vereins-Backend)
+// und synchronisiert das aktive Spieljahr vollautomatisch!
 // ===================================================================
 
 const TTLIVE_BASE = 'https://dresden.tischtennislive.de/';
@@ -26,18 +26,24 @@ let piPlayerMeta = {
     team: '3. Erwachsene (TSV Graupa 3)'
 };
 
-// --- State für Pi's Liga & Mannschaft ---
-let ttCurrentSaison = '2026';
+// --- State für Pi's Liga & Mannschaft (dynamisch aus Backend-Meta) ---
+let ttActiveSaison = localStorage.getItem('dippe_tt_active_saison') || '2026';
+let ttCurrentSaison = ttActiveSaison;
 let ttTeamsList = [];
 let ttTeamDetailsCache = {};
 let activeGraupaTeamId = null;
 let inspectedSubTeam = null;
+
+function getTTBackendUrl() {
+    return ((typeof CONFIG !== 'undefined' && (CONFIG.ttCloudUrl || CONFIG.pinnwandCloudUrl)) || '').trim();
+}
 
 function initPersonalTTHubIfNeeded() {
     if (!personalTTInitialized) {
         personalTTInitialized = true;
         initTTSaisonSelect();
         bindPiChartEvents();
+        syncActiveSeasonFromBackend();
         loadPiPersonalStats(false);
         loadPiLeagueFromTTLive(false);
     } else {
@@ -45,7 +51,6 @@ function initPersonalTTHubIfNeeded() {
     }
 }
 
-// Kompatibilitäts-Alias falls noch irgendwo initTTHubIfNeeded aufgerufen wird
 function initTTHubIfNeeded() {
     initPersonalTTHubIfNeeded();
 }
@@ -86,7 +91,7 @@ function piSetChartRange(range) {
 }
 
 async function loadPiPersonalStats(forceRefresh = false) {
-    const cloudUrl = (CONFIG.ttCloudUrl || CONFIG.pinnwandCloudUrl || '').trim();
+    const cloudUrl = getTTBackendUrl();
     const localKey = 'dippe_pi_personal_tt_v1';
     let hadCache = false;
 
@@ -112,7 +117,6 @@ async function loadPiPersonalStats(forceRefresh = false) {
     if (!hadCache) setPiStatsBadge('⏳ Lade meine TTLive-Daten …', 'rgba(251,191,36,0.2)', '#fbbf24');
 
     try {
-        // 1. Parallel Vereinsrangliste (für Vereinsrang) + persönliche 100-Spiele-Historie abrufen
         const [rankRes, lpzRes] = await Promise.all([
             fetch(`${cloudUrl}?kind=tt_ranking_list&t=${Date.now()}`, { redirect: 'follow' }).catch(() => null),
             fetch(`${cloudUrl}?kind=tt_player_lpz&mid=${PI_MID}&l2p=${PI_L2P}${forceRefresh ? '&force=1' : ''}&t=${Date.now()}`, { redirect: 'follow' })
@@ -755,15 +759,17 @@ function bindPiChartEvents() {
 }
 
 // ===================================================================
-// TEIL 2: PI'S MANNSCHAFT & LIGA-TABELLE (AUTO-FOKUS AUF TSV GRAUPA 3)
+// TEIL 2: PI'S MANNSCHAFT & LIGA-TABELLE (MIT AUTO-SAISON-SYNC)
 // ===================================================================
-function initTTSaisonSelect() {
+function initTTSaisonSelect(maxYearParam) {
     const sel = document.getElementById('tt-saison-select');
-    if (!sel || sel.children.length > 0) return;
+    if (!sel) return;
+    const maxY = Math.max(2026, Number(maxYearParam || ttActiveSaison || 2026));
+    const curVal = Number(ttCurrentSaison || maxY);
     const years = [];
-    for (let y = 2026; y >= 2009; y--) {
+    for (let y = maxY; y >= 2009; y--) {
         const nextShort = String(y + 1).slice(-2);
-        years.push(`<option value="${y}"${y === 2026 ? ' selected' : ''}>${y}/${nextShort}</option>`);
+        years.push(`<option value="${y}"${y === curVal ? ' selected' : ''}>${y}/${nextShort}</option>`);
     }
     sel.innerHTML = years.join('');
 }
@@ -807,7 +813,6 @@ function hasValidParsedDetails(d) {
     return Boolean(hasSingles || hasSchedule);
 }
 
-// Findet in der Saison automatisch Pi's Stamm-Mannschaft (3. Erwachsene / TSV Graupa 3 oder ein Team, in dem Peter Dippe gelistet ist)
 function findPiPreferredTeamId(teams, detailsMap) {
     if (!teams || !teams.length) return null;
     for (const tm of teams) {
@@ -825,7 +830,7 @@ function findPiPreferredTeamId(teams, detailsMap) {
 }
 
 async function fetchTTLiveHtmlCascade(kind, targetUrl, teamKey, forceRefresh) {
-    const cloudUrl = (CONFIG.ttCloudUrl || CONFIG.pinnwandCloudUrl || '').trim();
+    const cloudUrl = getTTBackendUrl();
     if (cloudUrl && cloudUrl.startsWith('https://script.google.com/')) {
         const gasUrl = kind === 'overview'
             ? `${cloudUrl}?kind=tt_overview&saison=${ttCurrentSaison}${forceRefresh ? '&force=1' : ''}&t=${Date.now()}`
@@ -834,6 +839,12 @@ async function fetchTTLiveHtmlCascade(kind, targetUrl, teamKey, forceRefresh) {
         if (res.ok) {
             const data = await res.json();
             if (data && data.ok && isHtmlValidTTLive(data.html)) {
+                if (data.activeSaison) {
+                    const serverActive = String(data.activeSaison);
+                    ttActiveSaison = serverActive;
+                    try { localStorage.setItem('dippe_tt_active_saison', serverActive); } catch (e) {}
+                    initTTSaisonSelect(serverActive);
+                }
                 return {
                     html: data.html,
                     cachedTeams: data.cachedTeams || null,
@@ -849,7 +860,7 @@ async function fetchTTLiveHtmlCascade(kind, targetUrl, teamKey, forceRefresh) {
 async function loadPiLeagueFromTTLive(forceRefresh) {
     const cont = document.getElementById('tt-team-content');
     const mySaison = ttCurrentSaison;
-    const isCurrentSeason = Number(mySaison) >= 2026;
+    const isCurrentSeason = Number(mySaison) >= Number(ttActiveSaison);
     const saisonLabel = `${mySaison}/${String(+mySaison + 1).slice(-2)}`;
     const overviewUrl = `https://dresden.tischtennislive.de/?L1=Public&L2=Verein&L2P=870&Page=Spielbetrieb&Sportart=96&Page2=Tabellen&Saison=${mySaison}`;
 
@@ -976,7 +987,7 @@ async function loadAndRenderInspectedTeam(baseGraupaTeam, subTeam, forceRefresh)
     if (directLink && subTeam.teamUrl) directLink.href = subTeam.teamUrl;
 
     const tKey = subTeam.teamKey;
-    const isCurrentSeason = Number(ttCurrentSaison) >= 2026;
+    const isCurrentSeason = Number(ttCurrentSaison) >= Number(ttActiveSaison);
     const cached = !forceRefresh ? (ttTeamDetailsCache[tKey] || (subTeam.isOwnGraupaTeam ? ttTeamDetailsCache[baseGraupaTeam.id] : null)) : null;
     const isValidCache = hasValidParsedDetails(cached);
 
@@ -1511,7 +1522,6 @@ function renderGraupaTeamLayout(team, details, isLoadingDetails) {
             </div>
         `;
     } else {
-        // Hebt Peter Dippes eigene Zeile in den Einzel- und Doppel-Bilanzen prominent hervor!
         const renderParsedTable = (tblObj, emptyMsg) => {
             if (!tblObj || !tblObj.rows.length) return `<p class="tp-help">${emptyMsg}</p>`;
             return `
@@ -1604,3 +1614,30 @@ function renderGraupaTeamLayout(team, details, isLoadingDetails) {
 
     cont.innerHTML = leftCol + rightCol;
 }
+
+// ===================================================================
+// AUTOMATISCHE SAISON-SYNCHRONISATION MIT DEM VEREINS-BACKEND
+// ===================================================================
+async function syncActiveSeasonFromBackend() {
+    const cloudUrl = getTTBackendUrl();
+    if (!cloudUrl || !cloudUrl.startsWith('https://script.google.com/')) return;
+    try {
+        const res = await fetch(`${cloudUrl}?kind=tt_meta&t=${Date.now()}`, { redirect: 'follow' });
+        if (!res.ok) return;
+        const j = await res.json();
+        if (j && j.ok && j.meta && j.meta.activeSaison) {
+            const serverActive = String(j.meta.activeSaison);
+            const prevActive = ttActiveSaison;
+            ttActiveSaison = serverActive;
+            try { localStorage.setItem('dippe_tt_active_saison', serverActive); } catch (e) {}
+            initTTSaisonSelect(serverActive);
+            if (prevActive !== serverActive && ttCurrentSaison === prevActive) {
+                changeTTSaison(serverActive);
+            }
+        }
+    } catch (e) {}
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+    syncActiveSeasonFromBackend();
+});
