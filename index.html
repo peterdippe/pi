@@ -74,6 +74,9 @@
                     <span id="caret-sport" class="nav-caret">▸</span>
                 </button>
                 <div class="sub-nav" id="subnav-group-sport">
+                    <button onclick="switchPage('tischtennis')" id="subnav-tischtennis" class="sub-nav-btn">
+                        <span>🏓 Tischtennis</span>
+                    </button>
                     <button onclick="switchPage('radfahren')" id="subnav-radfahren" class="sub-nav-btn">
                         <span>🚴 Fahrradfahren</span>
                     </button>
@@ -83,9 +86,6 @@
                     <button onclick="switchPage('kicker')" id="subnav-kicker" class="sub-nav-btn">
                         <span>⚽ Kickerabend</span>
                     </button>
-                    <a href="https://www.tsvgraupa-tischtennis.de" target="_blank" rel="noopener" class="sub-nav-btn" style="text-decoration:none; color:#34d399; font-weight:700;">
-                        <span>🏓 TSV Graupa TT ↗</span>
-                    </a>
                 </div>
 
                 <button onclick="toggleNavGroup('maptools')" id="nav-maptools" class="nav-btn">
@@ -181,12 +181,13 @@
     </div>
 
     <!-- ===================================================================
-         MODULARE JAVASCRIPT-EINBINDUNG (PRIVATES PROFIL OHNE VEREINS-TT)
+         MODULARE JAVASCRIPT-EINBINDUNG (INKL. PI'S PERSÖNLICHEM TT-COCKPIT)
          =================================================================== -->
     <script src="js/core.js"></script>
     <script src="js/home.js"></script>
     <script src="js/pinnwand.js"></script>
     <script src="js/fotos.js"></script>
+    <script src="js/tischtennis.js"></script>
     <script src="js/radfahren.js"></script>
     <script src="js/wandern.js"></script>
     <script src="js/kicker.js"></script>
