@@ -86,7 +86,7 @@ function piSetChartRange(range) {
 }
 
 async function loadPiPersonalStats(forceRefresh = false) {
-    const cloudUrl = (CONFIG.pinnwandCloudUrl || '').trim();
+    const cloudUrl = (CONFIG.ttCloudUrl || CONFIG.pinnwandCloudUrl || '').trim();
     const localKey = 'dippe_pi_personal_tt_v1';
     let hadCache = false;
 
@@ -825,7 +825,7 @@ function findPiPreferredTeamId(teams, detailsMap) {
 }
 
 async function fetchTTLiveHtmlCascade(kind, targetUrl, teamKey, forceRefresh) {
-    const cloudUrl = (CONFIG.pinnwandCloudUrl || '').trim();
+    const cloudUrl = (CONFIG.ttCloudUrl || CONFIG.pinnwandCloudUrl || '').trim();
     if (cloudUrl && cloudUrl.startsWith('https://script.google.com/')) {
         const gasUrl = kind === 'overview'
             ? `${cloudUrl}?kind=tt_overview&saison=${ttCurrentSaison}${forceRefresh ? '&force=1' : ''}&t=${Date.now()}`
