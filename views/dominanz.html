@@ -1,18 +1,80 @@
+<!-- ===============================================================
+     MAP-TOOLS (2): "BERG-DOMINANZ-ATLAS" (MIT LIVE-GPS & UMGEBUNGSRADAR)
+     =============================================================== -->
 <section id="page-dominanz" class="page-section">
+    <style>
+        /* Eleganter blauer Standort-Pfeil mit blinkender Umrandung */
+        .dom-user-loc-wrap {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .dom-user-loc-ring {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: 2.5px solid #3b82f6;
+            background: rgba(37, 99, 235, 0.20);
+            box-shadow: 0 0 12px rgba(37, 99, 235, 0.85), inset 0 0 6px rgba(255, 255, 255, 0.6);
+            animation: domUserBlink 1.35s ease-in-out infinite;
+            pointer-events: none;
+        }
+        .dom-user-loc-arrow {
+            position: relative;
+            z-index: 2;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.55));
+            transition: transform 0.25s ease-out;
+        }
+        .dom-legend-user-arrow {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            border: 2px solid #2563eb;
+            background: rgba(37, 99, 235, 0.16);
+            box-shadow: 0 0 6px rgba(37, 99, 235, 0.75);
+            animation: domUserBlink 1.35s ease-in-out infinite;
+        }
+        @keyframes domUserBlink {
+            0%, 100% {
+                transform: scale(0.88);
+                border-color: #2563eb;
+                box-shadow: 0 0 4px rgba(37, 99, 235, 0.5);
+                opacity: 0.95;
+            }
+            50% {
+                transform: scale(1.22);
+                border-color: #60a5fa;
+                box-shadow: 0 0 14px rgba(59, 130, 246, 1), 0 0 0 3px rgba(59, 130, 246, 0.28);
+                opacity: 1;
+            }
+        }
+    </style>
+
     <div class="section-header">
         <div>
-            <span class="eyebrow">Map-Tools · Topografie, Isolation & Prominenz</span>
+            <span class="eyebrow">Map-Tools · Topografie, Isolation &amp; Live-Standort</span>
             <h2 style="font-size:32px; font-weight:800;">⛰️ Berg-Dominanz-Atlas</h2>
         </div>
         <div style="display:flex; flex-wrap:wrap; gap:8px;">
             <button class="btn btn-sand" onclick="switchPage('area-maps')">🌍 Maps Math</button>
             <button class="btn btn-emerald" onclick="switchPage('dominanz')">⛰️ Berg-Dominanz-Atlas</button>
-            <button class="btn btn-sand" onclick="switchPage('luftlinie')">✈️ Luftlinie</button>
+            <button class="btn btn-sand" onclick="switchPage('luftlinie')">✈️ Luftlinien-Entfernung</button>
             <button class="btn btn-sand" onclick="switchPage('area-pur')">📏 Pure Math</button>
         </div>
     </div>
 
     <div class="sand-card">
+        <!-- Obere Steuerleiste -->
         <div class="toolbar-box" style="margin-bottom:16px;">
             <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
                 <label style="display:inline-flex; align-items:center; gap:8px; font-size:12.5px; white-space:nowrap;">
@@ -24,12 +86,16 @@
                 </label>
             </div>
             <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
+                <button id="dom-locate-btn" class="btn btn-emerald" style="padding:8px 13px; font-size:12.5px;" onclick="domLocateUserAndSelectNearest(true)" title="Meinen GPS-Standort bestimmen und nächstgelegenen Berg auswählen">
+                    🧭 Nächster Berg (GPS)
+                </button>
                 <button id="dom-pick-btn" class="btn btn-amber" style="padding:8px 12px; font-size:12.5px;" onclick="toggleDomPickMode()">📍 Eigenen Punkt setzen: AUS</button>
-                <button class="btn btn-emerald" style="padding:8px 14px; font-size:12.5px;" onclick="openDominanzInfo()">❓ Was ist Dominanz?</button>
+                <button class="btn btn-sand" style="padding:8px 14px; font-size:12.5px;" onclick="openDominanzInfo()">❓ Was ist Dominanz?</button>
                 <button class="btn btn-dark" style="padding:8px 12px; font-size:12.5px;" onclick="dominanzWorldView()">🌍 Weltansicht</button>
             </div>
         </div>
 
+        <!-- Farblegende (Höhenklassen + eigener Standort) über der Karte -->
         <div class="dom-legend" id="dom-legend">
             <strong style="font-size:12px; margin-right:2px;">Höhe ü. NN:</strong>
             <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#1a6b2e;"></span> &lt; 1000 m</span>
@@ -43,27 +109,42 @@
             <span class="dom-legend-sep">|</span>
             <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#111;"></span> gewählter Berg</span>
             <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#fff; border-color:#111;"></span> Bezugsberg</span>
+            <span class="dom-legend-item">
+                <span class="dom-legend-user-arrow" title="Deine aktuelle GPS-Position">
+                    <svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true">
+                        <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z" fill="#2563eb" stroke="#ffffff" stroke-width="2" stroke-linejoin="round"/>
+                    </svg>
+                </span>
+                eigener Standort
+            </span>
         </div>
 
         <div style="font-size:11.5px; color:#64748b; margin-bottom:12px;">
-            <span id="dom-count">lade Gipfel …</span> · <span id="dom-visible"></span> Daten aus Wikidata/Wikipedia · Start: Zugspitze
+            <span id="dom-count">lade Gipfel …</span> · <span id="dom-visible"></span> Daten aus Wikidata/Wikipedia · <span id="dom-start-info">Start: Ermittle nächsten Berg per GPS …</span>
         </div>
 
+        <!-- Hauptbereich: Links Karte, Rechts Suche & Gipfel-Details -->
         <div class="dominanz-layout">
+            <!-- Karte -->
             <div>
                 <div id="dominanzMapContainer"></div>
                 <div id="dom-status" style="font-size:12px; color:#b45309; margin-top:8px; min-height:16px;"></div>
             </div>
+
+            <!-- Rechte Spalte: Suche / Umgebungs-Berge + aktiver Gipfel -->
             <div style="display:flex; flex-direction:column; gap:14px;">
                 <div style="background:var(--bg-sand-light); border:1px solid var(--border-sand); border-radius:16px; padding:14px;">
-                    <input type="text" id="dom-search-input" class="form-input" placeholder="🔍 Berg suchen (weltweit, z. B. Fuji, Denali …)" autocomplete="off">
-                    <div id="dom-results" class="peak-list" style="margin-top:10px;"></div>
+                    <input type="text" id="dom-search-input" class="form-input" placeholder="🔍 Berg suchen (oder leer lassen für Berge im Umkreis)" autocomplete="off">
+                    <div id="dom-results-Caption" style="font-size:11px; font-weight:800; color:var(--emerald-dark); text-transform:uppercase; letter-spacing:0.05em; margin-top:8px;"></div>
+                    <div id="dom-results" class="peak-list" style="margin-top:6px;"></div>
                 </div>
+                <!-- Info-Box zum ausgewählten Berg -->
                 <div id="dom-detail" style="background:#fff; border:2px solid var(--emerald-dark); border-radius:16px; padding:16px;"></div>
             </div>
         </div>
     </div>
 
+    <!-- Info-Modal: Was ist Dominanz? -->
     <div class="modal-overlay" id="dom-info-modal" onclick="if(event.target===this) closeDominanzInfo()">
         <div class="modal-box">
             <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">
@@ -87,11 +168,8 @@
             <p style="font-size:13px; color:#475569;">
                 In dieser Karte reicht der Kreis genau bis zum <strong>Bezugsgipfel</strong>
                 (dem nächsthöheren Berg) – sein Radius ist der Abstand zwischen den
-                beiden Gipfeln. Der eigentliche Dominanzwert steht separat in der
-                Infokarte und kann kleiner sein, weil der gleich hohe Geländepunkt
-                meist am Hang liegt. Über das rote Feld
-                „Nächsthöherer Berg“ kannst du dich Schritt für Schritt nach oben
-                klicken – am Ende landest du beim Mount Everest.
+                beiden Gipfeln. Über das rote Feld „Nächsthöherer Berg“ kannst du dich
+                Schritt für Schritt nach oben klicken – am Ende landest du beim Mount Everest.
             </p>
             <p style="margin-bottom:4px;">
                 🔗 Mehr dazu bei Wikipedia:
