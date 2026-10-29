@@ -1,14 +1,16 @@
 <!-- ===============================================================
-     MAP-TOOLS (2): "BERG-DOMINANZ-ATLAS" (MIT LIVE-GPS & UMGEBUNGSRADAR)
+     MAP-TOOLS (2): "BERG-DOMINANZ-ATLAS" (LIVE-GPS, HÖHE, SPEED & RADAR)
      =============================================================== -->
 <section id="page-dominanz" class="page-section">
     <style>
-        /* Eleganter blauer Standort-Pfeil mit blinkender Umrandung */
+        /* Eleganter blauer Standort-Pfeil mit blinkender Umrandung + Höhen- & Speed-Badges */
         .dom-user-loc-wrap {
             display: flex;
             align-items: center;
             justify-content: center;
             position: relative;
+            width: 32px;
+            height: 32px;
         }
         .dom-user-loc-ring {
             position: absolute;
@@ -31,6 +33,36 @@
             justify-content: center;
             filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.55));
             transition: transform 0.25s ease-out;
+        }
+        .dom-user-badge-top,
+        .dom-user-badge-bottom {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10.5px;
+            font-weight: 800;
+            line-height: 1.1;
+            padding: 2px 6px;
+            border-radius: 999px;
+            pointer-events: none;
+            z-index: 3;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+        }
+        .dom-user-badge-top {
+            bottom: 100%;
+            margin-bottom: 3px;
+            background: rgba(9, 21, 18, 0.92);
+            color: #34d399;
+            border: 1.5px solid #10b981;
+        }
+        .dom-user-badge-bottom {
+            top: 100%;
+            margin-top: 3px;
+            background: rgba(30, 58, 138, 0.94);
+            color: #ffffff;
+            border: 1.5px solid #60a5fa;
         }
         .dom-legend-user-arrow {
             display: inline-flex;
@@ -110,12 +142,12 @@
             <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#111;"></span> gewählter Berg</span>
             <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#fff; border-color:#111;"></span> Bezugsberg</span>
             <span class="dom-legend-item">
-                <span class="dom-legend-user-arrow" title="Deine aktuelle GPS-Position">
+                <span class="dom-legend-user-arrow" title="Deine aktuelle GPS-Position (oben: Höhe, unten: Geschwindigkeit)">
                     <svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true">
                         <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z" fill="#2563eb" stroke="#ffffff" stroke-width="2" stroke-linejoin="round"/>
                     </svg>
                 </span>
-                eigener Standort
+                eigener Standort (⛰️ Höhe / km/h)
             </span>
         </div>
 
