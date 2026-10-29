@@ -1,6 +1,6 @@
 // ===================================================================
-// BERG-DOMINANZ-ATLAS (MIT LIVE-GPS-STANDORT & NÄCHSTEM BERG ALS DEFAULT)
-// Datenquelle: peaks.json (weltweite Gipfel mit Dominanz aus Wikidata)
+// BERG-DOMINANZ-ATLAS (LIVE-GPS, HÖHE ÜBER PFEIL, SPEED UNTER PFEIL
+// & ECHTZEIT-DISTANZ-RADAR FÜR DIE UMGEBUNGSBERGE)
 // ===================================================================
 
 let dominanzMap = null;
@@ -16,12 +16,14 @@ let domMarkers = null;
 let domGen = 0, domSearchGen = 0, domSearchTimer = null;
 let domInitDone = false;
 
-// --- GPS-Standort-State ---
-let domUserLoc = null;          // { lat, lon, heading, accuracy }
-let domUserMarker = null;       // Blauer Pfeil-Marker mit blinkender Umrandung
+// --- GPS-Standort- & Telemetrie-State ---
+let domUserLoc = null;          // { lat, lon, heading, speedKmh, altitude, accuracy, ts }
+let domUserMarker = null;       // Blauer Pfeil-Marker mit Höhe (oben) & Speed (unten)
 let domGeoWatchId = null;       // Laufendes GPS-Tracking während der Fahrt
 let domInitialAutoSelected = false;
-let domManualOverride = false;  // Verhindert, dass laufendes GPS eine manuelle Auswahl überschreibt
+let domManualOverride = false;
+let domLastElevFetchLoc = null; // Letzter Punkt für Höhen-Fallback via Open-Meteo
+let domFallbackAltitude = null; // Geländehöhe, falls Browser coords.altitude = null liefert
 
 function initDominanzMapIfNeeded() {
     if (dominanzMap || typeof L === 'undefined') return;
@@ -42,7 +44,7 @@ function initDominanzMapIfNeeded() {
 
     const si = document.getElementById('dom-search-input');
     if (si) {
-        si.oninput = () => { clearTimeout(domSearchTimer); domSearchTimer = setTimeout(domSearch, 260); };
+        si.oninput = () => { clearTimeout(domSearchTimer); domSearchTimer = setTimeout(domSearch, 200); };
         si.onkeydown = e => {
             if (e.key === 'Enter') document.querySelector('#dom-results .peak-item')?.click();
             if (e.key === 'Escape') { si.value = ''; domSearch(); }
@@ -57,23 +59,40 @@ function initDominanzMapIfNeeded() {
         };
     }
 
-    // Parallel Bergdaten laden UND Standortbestimmung des Smartphones/Rechners starten
     startDomGeolocation(false);
     loadDominanzData();
 }
 
 // ===================================================================
-// STANDORTERKENNUNG (BLAUER PFEIL MIT BLINKENDER UMRANDUNG & NÄCHSTER BERG)
+// STANDORTERKENNUNG, HÖHEN- & GESCHWINDIGKEITS-BADGES AM BLAUEN PFEIL
 // ===================================================================
+function formatUserAltText() {
+    const alt = (domUserLoc && domUserLoc.altitude != null)
+        ? domUserLoc.altitude
+        : domFallbackAltitude;
+    return alt != null ? `⛰️ ${Math.round(alt)} m` : '⛰️ … m';
+}
+
+function formatUserSpeedText() {
+    const spd = (domUserLoc && domUserLoc.speedKmh != null && isFinite(domUserLoc.speedKmh))
+        ? Math.max(0, Math.round(domUserLoc.speedKmh))
+        : 0;
+    return `${spd} km/h`;
+}
+
 function buildUserLocationIcon(headingDeg) {
     const rot = (typeof headingDeg === 'number' && isFinite(headingDeg)) ? Math.round(headingDeg) : 0;
+    const altTxt = formatUserAltText();
+    const spdTxt = formatUserSpeedText();
+
     return L.divIcon({
         className: 'dom-user-loc-icon',
         iconSize: [32, 32],
         iconAnchor: [16, 16],
-        popupAnchor: [0, -14],
+        popupAnchor: [0, -24],
         html: `
-            <div class="dom-user-loc-wrap" style="width:32px;height:32px;">
+            <div class="dom-user-loc-wrap">
+                <div class="dom-user-badge-top">${domEsc(altTxt)}</div>
                 <span class="dom-user-loc-ring"></span>
                 <span class="dom-user-loc-arrow" style="transform: rotate(${rot}deg);">
                     <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
@@ -81,36 +100,72 @@ function buildUserLocationIcon(headingDeg) {
                               fill="#2563eb" stroke="#ffffff" stroke-width="2.2" stroke-linejoin="round"/>
                     </svg>
                 </span>
+                <div class="dom-user-badge-bottom">${domEsc(spdTxt)}</div>
             </div>
         `
     });
 }
 
-function domCompassDirection(fromPt, toPt) {
+function domBearingDeg(fromPt, toPt) {
     const rad = Math.PI / 180;
     const lat1 = fromPt.lat * rad, lat2 = toPt.lat * rad;
     const dLon = (toPt.lon - fromPt.lon) * rad;
     const y = Math.sin(dLon) * Math.cos(lat2);
     const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
-    const brng = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+function domCompassDirection(fromPt, toPt) {
+    const brng = domBearingDeg(fromPt, toPt);
     const dirs = ['N', 'NNO', 'NO', 'ONO', 'O', 'OSO', 'SO', 'SSO', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
     return dirs[Math.round(brng / 22.5) % 16];
+}
+
+// Holt die Geländehöhe von Open-Meteo, falls das Smartphone-GPS keine eigene Höhe liefert
+function ensureUserAltitudeFallback() {
+    if (!domUserLoc) return;
+    if (domUserLoc.altitude != null && isFinite(domUserLoc.altitude)) return;
+    if (domLastElevFetchLoc && domDistanceKm(domLastElevFetchLoc, domUserLoc) < 0.15 && domFallbackAltitude != null) {
+        return;
+    }
+    domLastElevFetchLoc = { lat: domUserLoc.lat, lon: domUserLoc.lon };
+    fetch(`//api.open-meteo.com/v1/elevation?latitude=${domUserLoc.lat.toFixed(5)}&longitude=${domUserLoc.lon.toFixed(5)}`)
+        .then(r => r.ok ? r.json() : Promise.reject())
+        .then(data => {
+            if (data && Array.isArray(data.elevation) && data.elevation.length) {
+                domFallbackAltitude = Math.round(data.elevation[0]);
+                updateDomUserMarker();
+                refreshLiveUserDistancesUI();
+            }
+        })
+        .catch(() => {});
 }
 
 function updateDomUserMarker() {
     if (!dominanzMap || !domUserLoc) return;
     const { lat, lon, heading, accuracy } = domUserLoc;
-    const icon = buildUserLocationIcon(heading);
+    const rot = (typeof heading === 'number' && isFinite(heading)) ? Math.round(heading) : 0;
 
     if (!domUserMarker) {
         domUserMarker = L.marker([lat, lon], {
-            icon: icon,
+            icon: buildUserLocationIcon(rot),
             title: 'Mein Standort (GPS)',
             zIndexOffset: 1600
         }).addTo(dominanzMap);
     } else {
         domUserMarker.setLatLng([lat, lon]);
-        domUserMarker.setIcon(icon);
+        // Direktes DOM-Update verhindert ein Zurücksetzen der Blink-Animation!
+        const el = domUserMarker.getElement();
+        if (el) {
+            const topB = el.querySelector('.dom-user-badge-top');
+            const botB = el.querySelector('.dom-user-badge-bottom');
+            const arrEl = el.querySelector('.dom-user-loc-arrow');
+            if (topB) topB.textContent = formatUserAltText();
+            if (botB) botB.textContent = formatUserSpeedText();
+            if (arrEl) arrEl.style.transform = `rotate(${rot}deg)`;
+        } else {
+            domUserMarker.setIcon(buildUserLocationIcon(rot));
+        }
     }
 
     const nearest = findNearestPeakTo(lat, lon);
@@ -118,10 +173,62 @@ function updateDomUserMarker() {
     const accStr = accuracy ? ` · ±${Math.round(accuracy)} m` : '';
     domUserMarker.bindPopup(
         `<b>🧭 Mein Standort</b>${accStr}<br>` +
-        `<span style="font-size:12px;color:#475569;">${lat.toFixed(5)}° N, ${lon.toFixed(5)}° O</span>` +
+        `<span style="font-size:12px;color:#047857;font-weight:700;">${domEsc(formatUserAltText())} · 🚗 ${domEsc(formatUserSpeedText())}</span><br>` +
+        `<span style="font-size:11.5px;color:#475569;">${lat.toFixed(5)}° N, ${lon.toFixed(5)}° O</span>` +
         (nearest ? `<br><span style="font-size:12.5px;">⛰️ Nächster Berg: <b>${domEsc(nearest.peak.name)}</b> (${distStr})</span>` : '')
     );
-    domUserMarker.bindTooltip('🧭 Mein Standort', { direction: 'top', offset: [0, -12] });
+}
+
+// Aktualisiert bei jeder Positionsänderung sofort alle Distanzen (Liste, aktiver Berg & Statuszeile)
+function refreshLiveUserDistancesUI() {
+    if (!domUserLoc || !domPeaks.length) return;
+
+    // 1. Obere Statuszeile aktualisieren
+    const nearest = findNearestPeakTo(domUserLoc.lat, domUserLoc.lon);
+    const startInfo = document.getElementById('dom-start-info');
+    if (nearest && startInfo) {
+        const dir = domCompassDirection(domUserLoc, nearest.peak);
+        startInfo.innerHTML =
+            `📍 <b>${domEsc(formatUserAltText())}</b> · 🚗 <b>${domEsc(formatUserSpeedText())}</b> · ` +
+            `Nächster Berg: <b>${domEsc(nearest.peak.name)}</b> (${domNum(nearest.distKm, 2)} km ${dir})`;
+    }
+
+    // 2. Distanz-Anzeige in der Detail-Box des aktuell gewählten Bergs aktualisieren
+    if (domActive && isFinite(domActive.lat) && isFinite(domActive.lon)) {
+        const distEl = document.getElementById('dom-active-user-dist');
+        if (distEl) {
+            const dActive = domDistanceKm(domUserLoc, domActive);
+            const dirActive = domCompassDirection(domUserLoc, domActive);
+            distEl.textContent = `${domNum(dActive, 2)} km (${dirActive})`;
+        }
+    }
+
+    // 3. Liste der nächstgelegenen Berge (oder aktuelle Suchtreffer) live mit neuer Distanz aktualisieren
+    const si = document.getElementById('dom-search-input');
+    const q = (si ? si.value : '').trim();
+    if (!q) {
+        const cap = document.getElementById('dom-results-Caption');
+        if (cap) cap.textContent = '🧭 Nächste Berge rund um deinen Standort (Live):';
+        const nearestList = [...domPeaks]
+            .filter(p => isFinite(p.lat) && isFinite(p.lon))
+            .map(p => ({ peak: p, d: domDistanceKm(domUserLoc, p) }))
+            .sort((a, b) => a.d - b.d)
+            .slice(0, 10)
+            .map(x => x.peak);
+        domRenderResults(nearestList, false, true);
+    } else {
+        // Falls eine Suche aktiv ist, die Distanz-Badges der sichtbaren Suchergebnisse live nachziehen
+        document.querySelectorAll('#dom-results .peak-item[data-peak-id]').forEach(row => {
+            const pid = row.getAttribute('data-peak-id');
+            const pk = domPeaks.find(x => x.id === pid);
+            const badge = row.querySelector('.dom-live-dist-line');
+            if (pk && badge) {
+                const dKm = domDistanceKm(domUserLoc, pk);
+                const dir = domCompassDirection(domUserLoc, pk);
+                badge.textContent = `🧭 ${domNum(dKm, 2)} km · Richtung ${dir}`;
+            }
+        });
+    }
 }
 
 function findNearestPeakTo(lat, lon) {
@@ -145,17 +252,11 @@ function selectNearestPeakForUser(forceSelect = false) {
     const nearest = findNearestPeakTo(domUserLoc.lat, domUserLoc.lon);
     if (!nearest) return;
 
-    const dir = domCompassDirection(domUserLoc, nearest.peak);
-    const startInfo = document.getElementById('dom-start-info');
-    if (startInfo) {
-        startInfo.innerHTML = `📍 Standort aktiv · Nächster Berg: <b>${domEsc(nearest.peak.name)}</b> (${domNum(nearest.distKm, 2)} km ${dir})`;
-    }
-
     if (forceSelect || !domInitialAutoSelected || !domManualOverride) {
         domInitialAutoSelected = true;
         domSelect(nearest.peak, null, { isAutoNearest: true, clearSearchInput: true });
-        domSearch();
     }
+    refreshLiveUserDistancesUI();
 }
 
 function startDomGeolocation(forceSelectNearest = false) {
@@ -169,35 +270,70 @@ function startDomGeolocation(forceSelectNearest = false) {
 
     const onPosSuccess = (pos, shouldSelect) => {
         const prevLoc = domUserLoc;
+        const nowTs = pos.timestamp || Date.now();
+        const newLat = pos.coords.latitude;
+        const newLon = pos.coords.longitude;
+
+        // 1. Geschwindigkeit (km/h): Direkt vom GPS (m/s * 3.6) oder aus Positionsdelta berechnen
+        let speedKmh = null;
+        if (pos.coords.speed != null && isFinite(pos.coords.speed) && pos.coords.speed >= 0) {
+            speedKmh = pos.coords.speed * 3.6;
+        } else if (prevLoc && prevLoc.ts && nowTs > prevLoc.ts) {
+            const dtHours = (nowTs - prevLoc.ts) / 3600000;
+            const dKm = domDistanceKm(prevLoc, { lat: newLat, lon: newLon });
+            if (dtHours > 0.0002 && dKm >= 0.008 && dKm / dtHours < 260) {
+                speedKmh = dKm / dtHours;
+            } else {
+                speedKmh = prevLoc.speedKmh || 0;
+            }
+        } else {
+            speedKmh = 0;
+        }
+
+        // 2. Fahrtrichtung (Heading): Direkt vom GPS oder aus Bewegungsvektor berechnen
+        let heading = (pos.coords.heading != null && isFinite(pos.coords.heading) && pos.coords.heading >= 0)
+            ? pos.coords.heading
+            : null;
+        if (heading === null && prevLoc) {
+            const movedKm = domDistanceKm(prevLoc, { lat: newLat, lon: newLon });
+            if (movedKm > 0.012) {
+                heading = domBearingDeg(prevLoc, { lat: newLat, lon: newLon });
+            } else {
+                heading = prevLoc.heading || 0;
+            }
+        }
+
+        // 3. Höhe (m ü. NHN): Direkt vom GPS oder per Open-Meteo-Geländemodell
+        const gpsAlt = (pos.coords.altitude != null && isFinite(pos.coords.altitude))
+            ? Math.round(pos.coords.altitude)
+            : null;
+
         domUserLoc = {
-            lat: pos.coords.latitude,
-            lon: pos.coords.longitude,
-            heading: pos.coords.heading,
-            accuracy: pos.coords.accuracy
+            lat: newLat,
+            lon: newLon,
+            heading: heading,
+            speedKmh: speedKmh,
+            altitude: gpsAlt,
+            accuracy: pos.coords.accuracy,
+            ts: nowTs
         };
+
+        ensureUserAltitudeFallback();
         updateDomUserMarker();
 
         if (shouldSelect || !domInitialAutoSelected) {
             if (shouldSelect) domManualOverride = false;
             selectNearestPeakForUser(shouldSelect);
             if (shouldSelect) setDomStatus('');
-        } else if (prevLoc && domDistanceKm(prevLoc, domUserLoc) > 0.25) {
-            // Während der Autofahrt die Entfernungen in der Umgebungsliste live nachführen
-            const si = document.getElementById('dom-search-input');
-            if (si && !si.value.trim()) domSearch();
-            const nearest = findNearestPeakTo(domUserLoc.lat, domUserLoc.lon);
-            const startInfo = document.getElementById('dom-start-info');
-            if (nearest && startInfo) {
-                const dir = domCompassDirection(domUserLoc, nearest.peak);
-                startInfo.innerHTML = `📍 Standort aktiv · Nächster Berg: <b>${domEsc(nearest.peak.name)}</b> (${domNum(nearest.distKm, 2)} km ${dir})`;
-            }
+        } else {
+            // Bei JEDEM GPS-Impuls sofort alle Distanzen in der Liste & im Cockpit aktualisieren!
+            refreshLiveUserDistancesUI();
         }
     };
 
     navigator.geolocation.getCurrentPosition(
         (pos) => onPosSuccess(pos, forceSelectNearest),
         () => {
-            // Fallback mit geringerer Genauigkeit (z. B. Mobilfunk/WLAN), falls reines GPS im Auto kurz dauert
             navigator.geolocation.getCurrentPosition(
                 (pos) => onPosSuccess(pos, forceSelectNearest),
                 () => {
@@ -212,16 +348,15 @@ function startDomGeolocation(forceSelectNearest = false) {
                 { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
             );
         },
-        { enableHighAccuracy: true, timeout: 8000, maximumAge: 15000 }
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 5000 }
     );
 
-    // Kontinuierliches Nachführen des blauen Pfeils während der Autofahrt
     if (domGeoWatchId === null) {
         try {
             domGeoWatchId = navigator.geolocation.watchPosition(
                 (pos) => onPosSuccess(pos, false),
                 () => {},
-                { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+                { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
             );
         } catch (e) {}
     }
@@ -347,12 +482,10 @@ function loadDominanzData() {
 
             if (dominanzMap) dominanzMap.invalidateSize();
 
-            // Wenn GPS-Position schon vorliegt -> sofort den nächstgelegenen Berg wählen!
             if (domUserLoc) {
                 updateDomUserMarker();
                 selectNearestPeakForUser(true);
             } else {
-                // Übergangsweise Zugspitze zeigen, bis das GPS-Signal (oft nach wenigen 100ms) da ist
                 const z = domPeaks.find(p => p.name === 'Zugspitze') || domPeaks.find(p => p.id === 'Q3375');
                 if (z) domSelect(z, null, { isFallback: true, clearSearchInput: true });
                 domSearch();
@@ -571,7 +704,6 @@ function domOfferHigher(p, next, token) {
 
     const bounds = domCircle ? domCircle.getBounds() : L.latLngBounds([[p.lat, p.lon]]);
     bounds.extend([next.lat, lon]);
-    // Falls der eigene Standort nahe am gewählten Berg liegt (< 50 km), auch den blauen Pfeil im Kartenausschnitt halten
     if (domUserLoc && domDistanceKm(domUserLoc, p) < 50) {
         bounds.extend([domUserLoc.lat, domUserLoc.lon]);
     }
@@ -629,7 +761,6 @@ function domSelect(p, known, opts = {}) {
     }
     domPaint();
 
-    // Entfernung & Richtung vom eigenen Standort zu diesem Berg berechnen
     let userDistHtml = '';
     if (domUserLoc) {
         const distFromUser = domDistanceKm(domUserLoc, p);
@@ -637,7 +768,7 @@ function domSelect(p, known, opts = {}) {
         userDistHtml = `
             <div style="background:#eff6ff; border:1px solid #bfdbfe; color:#1e40af; border-radius:11px; padding:8px 11px; font-size:12.5px; font-weight:700; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between;">
                 <span>🧭 Abstand von deinem Standort:</span>
-                <span style="font-family:'JetBrains Mono',monospace;">${domNum(distFromUser, 2)} km (${dirFromUser})</span>
+                <span id="dom-active-user-dist" style="font-family:'JetBrains Mono',monospace;">${domNum(distFromUser, 2)} km (${dirFromUser})</span>
             </div>
         `;
     }
@@ -757,7 +888,7 @@ async function domEnrich(p, token, known) {
 }
 
 // ===================================================================
-// SUCHE & LIVE-UMGEBUNGSLISTE (ZEIGT DIE NÄCHSTEN BERGE RUND UMS AUTO)
+// SUCHE & ECHTZEIT-UMGEBUNGSLISTE (INKL. LIVE-DISTANZ-NACHFÜHRUNG)
 // ===================================================================
 function domRenderResults(items, remote = false, showDistance = false) {
     const box = document.getElementById('dom-results');
@@ -768,10 +899,10 @@ function domRenderResults(items, remote = false, showDistance = false) {
         if (showDistance && domUserLoc && isFinite(p.lat) && isFinite(p.lon)) {
             const dKm = domDistanceKm(domUserLoc, p);
             const dir = domCompassDirection(domUserLoc, p);
-            subLine = `<div style="font-size:11.5px; color:#2563eb; font-weight:700; margin-top:1px;">🧭 ${domNum(dKm, 2)} km · Richtung ${dir}</div>`;
+            subLine = `<div class="dom-live-dist-line" style="font-size:11.5px; color:#2563eb; font-weight:700; margin-top:1px; font-family:'JetBrains Mono',monospace;">🧭 ${domNum(dKm, 2)} km · Richtung ${dir}</div>`;
         }
         return `
-            <div class="peak-item ${isCurrent ? 'active' : ''}" data-i="${i}">
+            <div class="peak-item ${isCurrent ? 'active' : ''}" data-i="${i}" data-peak-id="${domEsc(p.id || '')}">
                 <div>
                     <div style="font-weight:800; font-size:14px; color:var(--text-dark);">⛰️ ${domEsc(p.name)}</div>
                     ${subLine}
@@ -795,11 +926,9 @@ async function domSearch() {
     const q = (si ? si.value : '').trim();
     const token = ++domSearchGen;
 
-    // Wenn das Suchfeld leer ist:
-    // Bei aktivem GPS die 10 nächstgelegenen Berge rund um den eigenen Standort anzeigen!
     if (!q) {
         if (domUserLoc && domPeaks.length) {
-            if (cap) cap.textContent = '🧭 Nächste Berge rund um deinen Standort:';
+            if (cap) cap.textContent = '🧭 Nächste Berge rund um deinen Standort (Live):';
             const nearestList = [...domPeaks]
                 .filter(p => isFinite(p.lat) && isFinite(p.lon))
                 .map(p => ({ peak: p, d: domDistanceKm(domUserLoc, p) }))
