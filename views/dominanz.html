@@ -1,54 +1,77 @@
 <!-- ===============================================================
-     MAP-TOOLS (2): "DOMINANZ-ATLAS" (BERGE · KRAFTWERKE · STÄDTE + LIVE-GPS)
+     MAP-TOOLS (2): "DOMINANZ-ATLAS" (6 KONTEXTE + LIVE-GPS-RADAR)
      =============================================================== -->
 <section id="page-dominanz" class="page-section">
     <style>
-        /* Kontext-Umschalter (Berge | Kraftwerke | Städte) */
+        /* Kompakte Kontext-Leiste: Dropdown + Vor/Zurück-Stepper + Endpunkt-Badge */
         .dom-context-bar {
             display: flex;
             flex-wrap: wrap;
             align-items: center;
             justify-content: space-between;
             gap: 10px;
-            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-            border: 1.5px solid #cbd5e1;
+            background: linear-gradient(135deg, #ecfdf5 0%, #f1f5f9 100%);
+            border: 1.5px solid #6ee7b7;
             border-radius: 14px;
             padding: 10px 14px;
             margin-bottom: 14px;
         }
-        .dom-context- pills {
+        .dom-context-Controls {
             display: flex;
             flex-wrap: wrap;
+            align-items: center;
             gap: 8px;
+            flex: 1;
+            min-width: 260px;
         }
-        .dom-ctx-btn {
+        .dom-context-select {
+            font-weight: 800;
+            font-size: 14px;
+            color: #064e3b;
+            background-color: #ffffff;
+            border: 2px solid #059669;
+            border-radius: 10px;
+            padding: 8px 12px;
+            cursor: pointer;
+            flex: 1;
+            min-width: 210px;
+            max-width: 390px;
+            box-shadow: 0 2px 6px rgba(5, 150, 105, 0.12);
+        }
+        .dom-context-select:focus {
+            outline: none;
+            border-color: #047857;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
+        }
+        .dom-step-btn {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
-            padding: 8px 15px;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
             border-radius: 10px;
-            font-size: 13.5px;
-            font-weight: 800;
             border: 1.5px solid #cbd5e1;
             background: #ffffff;
-            color: #334155;
+            color: #0f172a;
+            font-size: 14px;
+            font-weight: 800;
             cursor: pointer;
-            transition: all 0.18s ease;
+            transition: all 0.15s ease;
         }
-        .dom-ctx-btn:hover {
+        .dom-step-btn:hover {
             border-color: #059669;
-            transform: translateY(-1px);
+            background: #ecfdf5;
+            color: #047857;
         }
-        .dom-ctx-btn.active {
-            background: #059669;
-            color: #ffffff;
-            border-color: #047857;
-            box-shadow: 0 3px 10px rgba(5, 150, 105, 0.28);
-        }
-        .dom-ctx-sub {
-            font-size: 11px;
-            font-weight: 600;
-            opacity: 0.85;
+        .dom-supreme-pill {
+            font-size: 12px;
+            font-weight: 800;
+            color: #065f46;
+            background: #ffffff;
+            border: 1px solid #a7f3d0;
+            border-radius: 999px;
+            padding: 6px 12px;
+            white-space: nowrap;
         }
 
         /* Eleganter blauer Standort-Pfeil mit blinkender Umrandung + Höhen/Speed-Badges */
@@ -140,7 +163,7 @@
 
     <div class="section-header">
         <div>
-            <span class="eyebrow" id="dom-page-eyebrow">Map-Tools · Berge, Kraftwerke, Städte &amp; Live-Standort</span>
+            <span class="eyebrow" id="dom-page-eyebrow">Map-Tools · Berge, Kraftwerke, Städte, Türme, Seen &amp; Burgen</span>
             <h2 style="font-size:32px; font-weight:800;" id="dom-page-title">🌐 Dominanz-Atlas</h2>
         </div>
         <div style="display:flex; flex-wrap:wrap; gap:8px;">
@@ -152,21 +175,22 @@
     </div>
 
     <div class="sand-card">
-        <!-- KONTEXT-UMSCHALTER: BERGE | KRAFTWERKE | STÄDTE -->
+        <!-- KONTEXT-AUSWAHL: DROPDOWN + 1-TAP VOR/ZURÜCK-SCHALTER -->
         <div class="dom-context-bar">
-            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
-                <strong style="font-size:12.5px; color:#475569; margin-right:4px;">🎛️ Kontext:</strong>
-                <button type="button" id="dom-mode-peaks" class="dom-ctx-btn active" onclick="setDominanzMode('peaks')">
-                    ⛰️ Berge <span class="dom-ctx-sub">(Höhe m)</span>
-                </button>
-                <button type="button" id="dom-mode-powerplants" class="dom-ctx-btn" onclick="setDominanzMode('powerplants')">
-                    ⚡ Kraftwerke <span class="dom-ctx-sub">(MW &amp; Live)</span>
-                </button>
-                <button type="button" id="dom-mode-towns" class="dom-ctx-btn" onclick="setDominanzMode('towns')">
-                    🏙️ Städte <span class="dom-ctx-sub">(Einwohner)</span>
-                </button>
+            <div class="dom-context-Controls">
+                <strong style="font-size:13px; color:#065f46; white-space:nowrap;">🎛️ Themenwelt:</strong>
+                <button type="button" class="dom-step-btn" onclick="cycleDominanzMode(-1)" title="Vorheriger Kontext">◀</button>
+                <select id="dom-mode-select" class="dom-context-select" onchange="setDominanzMode(this.value)">
+                    <option value="peaks" selected>⛰️ Berge (Höhe ü. NHN in m)</option>
+                    <option value="powerplants">⚡ Kraftwerke (Nennleistung in MW &amp; Live)</option>
+                    <option value="towns">🏙️ Städte &amp; Orte (Einwohnerzahl)</option>
+                    <option value="towers">📡 Türme &amp; Bauwerke (Höhe über Grund in m)</option>
+                    <option value="lakes">🌊 Seen &amp; Talsperren (Fläche km² &amp; Bade-Info)</option>
+                    <option value="castles">🏰 Burgen &amp; Monumente (Alter in Jahren)</option>
+                </select>
+                <button type="button" class="dom-step-btn" onclick="cycleDominanzMode(1)" title="Nächster Kontext">▶</button>
             </div>
-            <div id="dom-mode- supreme-hint" style="font-size:12px; font-weight:700; color:#047857;">
+            <div id="dom-mode-supreme-hint" class="dom-supreme-pill">
                 🏔️ Endpunkt: Mount Everest (8.849 m)
             </div>
         </div>
@@ -184,19 +208,19 @@
             </div>
             <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
                 <button id="dom-locate-btn" class="btn btn-emerald" style="padding:8px 13px; font-size:12.5px;" onclick="domLocateUserAndSelectNearest(true)" title="Meinen GPS-Standort bestimmen und nächstgelegenes Objekt auswählen">
-                    🧭 Nächster Punkt (GPS)
+                    🧭 Nächster Berg (GPS)
                 </button>
                 <button id="dom-pick-btn" class="btn btn-amber" style="padding:8px 12px; font-size:12.5px;" onclick="toggleDomPickMode()">📍 Eigenen Punkt setzen: AUS</button>
                 <button class="btn btn-sand" style="padding:8px 14px; font-size:12.5px;" onclick="openDominanzInfo()">❓ Was ist Dominanz?</button>
-                <button class="btn btn-dark" style="padding:8px 12px; font-size:12.5px;" onclick="dominanzWorldView()">🌍 Weltansicht</button>
+                <button class="btn btn-dark" style="padding:8px 12px; font-size:12px;" onclick="dominanzWorldView()">🌍 Weltansicht</button>
             </div>
         </div>
 
-        <!-- Dynamische Farblegende über der Karte (passt sich an Berge / Kraftwerke / Städte an) -->
+        <!-- Dynamische Farblegende über der Karte -->
         <div class="dom-legend" id="dom-legend"></div>
 
         <div style="font-size:11.5px; color:#64748b; margin-bottom:12px;">
-            <span id="dom-count">lade Daten …</span> · <span id="dom-visible"></span> Daten aus JSON &amp; Wikidata · <span id="dom-start-info">Start: Ermittle Position per GPS …</span>
+            <span id="dom-count">lade Daten …</span> · <span id="dom-visible"></span> Daten aus globalen JSONs &amp; Wikidata · <span id="dom-start-info">Start: Ermittle Position per GPS …</span>
         </div>
 
         <!-- Hauptbereich: Links Karte, Rechts Suche & Details -->
@@ -214,13 +238,13 @@
                     <div id="dom-results-Caption" style="font-size:11px; font-weight:800; color:var(--emerald-dark); text-transform:uppercase; letter-spacing:0.05em; margin-top:8px;"></div>
                     <div id="dom-results" class="peak-list" style="margin-top:6px;"></div>
                 </div>
-                <!-- Info-Box zum ausgewählten Berg / Kraftwerk / Stadt -->
+                <!-- Info-Box zum ausgewählten Objekt -->
                 <div id="dom-detail" style="background:#fff; border:2px solid var(--emerald-dark); border-radius:16px; padding:16px;"></div>
             </div>
         </div>
     </div>
 
-    <!-- Info-Modal: Was ist Dominanz? (für alle 3 Kontexte erklärt) -->
+    <!-- Info-Modal: Was ist Dominanz? (für alle 6 Kontexte erklärt) -->
     <div class="modal-overlay" id="dom-info-modal" onclick="if(event.target===this) closeDominanzInfo()">
         <div class="modal-box">
             <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">
@@ -230,18 +254,21 @@
             <p>
                 Die <strong>Dominanz</strong> beschreibt den Radius rund um einen Punkt, innerhalb
                 dessen er unübertroffen ist – also die Luftlinien-Distanz zum nächstgelegenen
-                Punkt mit einem <strong>höheren Wert</strong>.
+                Punkt mit einem <strong>höheren Wert</strong>[span_1](start_span)[span_1](end_span).
             </p>
             <p>
-                Über den Kontext-Umschalter oben kannst du das Prinzip auf drei Welten anwenden:
+                Über das Themenwelt-Dropdown oben kannst du das Prinzip auf <strong>6 globale Kontexte</strong> anwenden:
             </p>
-            <ul style="font-size:13.5px; line-height:1.55; color:#334155; padding-left:20px; margin:8px 0 12px;">
-                <li><strong>⛰️ Berge (Höhe in m):</strong> Distanz zum nächsthöheren Gipfel – die Kette endet beim <em>Mount Everest (8.849 m)</em>.</li>
-                <li><strong>⚡ Kraftwerke (Nennleistung in MW):</strong> Distanz zum nächsten Kraftwerk mit größerer maximaler Nennleistung (ohne private Dach-PV). Für Wind- und Solarparks wird zudem live aus den aktuellen Wetterdaten am Standort die momentane Einspeisung geschätzt. Die Kette endet beim <em>Drei-Schluchten-Staudamm (22.500 MW)</em>.</li>
-                <li><strong>🏙️ Städte (Einwohnerzahl):</strong> Distanz zur nächsten Stadt mit mehr Einwohnern – vom Dorf über die Kreis- und Landeshauptstadt bis nach <em>Tokio</em>.</li>
+            <ul style="font-size:13.2px; line-height:1.55; color:#334155; padding-left:20px; margin:8px 0 12px;">
+                <li><strong>⛰️ Berge (Höhe ü. NHN in m):</strong> Distanz zum nächsthöheren Gipfel – bis zum <em>Mount Everest (8.849 m)</em>[span_2](start_span)[span_2](end_span).</li>
+                <li><strong>⚡ Kraftwerke (Nennleistung in MW):</strong> Distanz zum nächststärkeren Kraftwerk inkl. Live-Einspeiseschätzung – bis zum <em>Drei-Schluchten-Staudamm (22.500 MW)</em>.</li>
+                <li><strong>🏙️ Städte &amp; Orte (Einwohnerzahl):</strong> Distanz zur nächstgrößeren Stadt – bis nach <em>Tokio (37,4 Mio.)</em>.</li>
+                <li><strong>📡 Türme &amp; Bauwerke (Höhe über Grund in m):</strong> Vom Aussichtsturm oder Fernsehturm bis zum <em>Burj Khalifa (828 m)</em>.</li>
+                <li><strong>🌊 Seen &amp; Talsperren (Wasserfläche in km²):</strong> Vom lokalen Badesee oder Stausee (inkl. Info, ob <strong>Baden erlaubt</strong> ist!) bis zum <em>Kaspischen Meer (371.000 km²)</em>.</li>
+                <li><strong>🏰 Burgen &amp; Monumente (Alter in Jahren):</strong> Von regionalen Schlössern und Ritterburgen bis zu den Pyramiden und <em>Göbekli Tepe (~11.500 Jahre)</em>.</li>
             </ul>
             <p style="margin-bottom:4px;">
-                🔗 Mehr zum Grundprinzip bei Wikipedia:
+                🔗 Grundprinzip bei Wikipedia:
                 <a href="https://de.wikipedia.org/wiki/Dominanz_(Geographie)" target="_blank" rel="noopener" style="color:var(--emerald-dark); font-weight:700;">Dominanz (Geographie)</a>
             </p>
             <div class="modal-close-row">
