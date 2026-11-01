@@ -1,4 +1,4 @@
-name: Build Global Dominanz JSONs (Powerplants & Towns)
+name: Build Global Dominanz JSONs (All Contexts)
 
 on:
   workflow_dispatch:
@@ -25,13 +25,16 @@ jobs:
       - name: Install dependencies
         run: pip install --quiet numpy scipy requests
 
-      - name: Generate global powerplants.json and towns.json
+      - name: Generate global JSON datasets with exact geodesic isolation
         run: |
           python3 - << 'EOF'
           import csv
           import io
           import json
           import math
+          import os
+          import re
+          import time
           import zipfile
           from collections import defaultdict
           import numpy as np
@@ -39,6 +42,12 @@ jobs:
           import requests
 
           EARTH_R = 6371.0088
+          CURRENT_YEAR = 2026
+          WDQS_URL = "https://query.wikidata.org/sparql"
+          HEADERS = {
+              "User-Agent": "DominanzAtlasBuilder/2.0 (https://pi.dippe-sippe.de; github.com/peterdippe/pi)",
+              "Accept": "application/sparql-results+json"
+          }
 
           def latlon_to_xyz(lats, lons):
               lat_r = np.radians(lats)
@@ -51,17 +60,12 @@ jobs:
               ))
 
           def compute_exact_isolations(items, val_key, supreme_id):
-              """
-              Berechnet für jeden Punkt weltweit die exakte geodätische Distanz (km)
-              zum nächstgelegenen Punkt mit strikt höherem Wert via 3D-cKDTree.
-              """
               valid = [it for it in items if it.get(val_key) is not None and it[val_key] > 0]
               groups = defaultdict(list)
               for it in valid:
-                  # Supreme-Eintrag garantiert ganz oben halten
                   v = float(it[val_key])
                   if it.get('id') == supreme_id:
-                      v += 1e9
+                      v += 1e12
                   groups[v].append(it)
 
               sorted_vals = sorted(groups.keys(), reverse=True)
@@ -85,12 +89,10 @@ jobs:
                           min_chord = np.minimum(min_chord, d_tree)
                       if buf_xyz:
                           buf_arr = np.vstack(buf_xyz)
-                          # Paarweise euklidische Distanz im 3D-Einheitskugelraum
                           diff = grp_xyz[:, None, :] - buf_arr[None, :, :]
                           d_buf = np.linalg.norm(diff, axis=2).min(axis=1)
                           min_chord = np.minimum(min_chord, d_buf)
 
-                      # Umrechnung Sehnenlänge -> Großkreisdistanz (Orthodrome in km)
                       km_arr = EARTH_R * 2.0 * np.arcsin(np.clip(min_chord / 2.0, 0.0, 1.0))
                       for p, km in zip(grp, km_arr):
                           if p.get('id') == supreme_id or not np.isfinite(km):
@@ -99,229 +101,510 @@ jobs:
                               p['isolation'] = round(float(km), 2)
 
                   buf_xyz.append(grp_xyz)
-                  total_buf = sum(len(x) for x in buf_xyz)
-                  if total_buf >= 500:
+                  if sum(len(x) for x in buf_xyz) >= 400:
                       tree_xyz.extend(buf_xyz)
                       buf_xyz = []
                       tree = cKDTree(np.vstack(tree_xyz))
 
+          def run_sparql(query, desc="SPARQL"):
+              for attempt in range(3):
+                  try:
+                      r = requests.post(WDQS_URL, data={'query': query, 'format': 'json'}, headers=HEADERS, timeout=55)
+                      if r.status_code == 200:
+                          return r.json().get('results', {}).get('bindings', [])
+                      elif r.status_code == 429:
+                          time.sleep(4 * (attempt + 1))
+                  except Exception as e:
+                      print(f"Warnung bei {desc} (Versuch {attempt+1}): {e}")
+                      time.sleep(2)
+              return []
+
+          def parse_wkt_point(wkt):
+              m = re.search(r'Point\(([-\d.]+)\s+([-\d.]+)\)', str(wkt or ''))
+              if not m:
+                  return None, None
+              lon, lat = float(m.group(1)), float(m.group(2))
+              if -90 <= lat <= 90 and -180 <= lon <= 180:
+                  return round(lat, 5), round(lon, 5)
+              return None, None
+
           # ===================================================================
-          # 1. POWERPLANTS.JSON (WRI Global Power Plant Database + Wikidata)
+          # 1. POWERPLANTS & 2. TOWNS (nur neu bauen, falls noch nicht im Repo)
           # ===================================================================
-          print("Lade WRI Global Power Plant Database (~35.000 Kraftwerke weltweit) ...")
-          wri_url = "https://raw.githubusercontent.com/wri/global-power-plant-database/master/output_database/global_power_plant_database.csv"
-          r = requests.get(wri_url, timeout=60)
-          r.raise_for_status()
+          if not os.path.exists('powerplants.json'):
+              print("Baue powerplants.json ...")
+              wri_url = "https://raw.githubusercontent.com/wri/global-power-plant-database/master/output_database/global_power_plant_database.csv"
+              r = requests.get(wri_url, timeout=60)
+              r.raise_for_status()
+              fuel_map = {'Solar':'solar','Wind':'wind','Hydro':'hydro','Wave and Tidal':'hydro','Pumped Storage':'hydro','Coal':'coal','Gas':'gas','Oil':'gas','Nuclear':'nuclear','Biomass':'biomass','Waste':'biomass','Biogas':'biomass'}
+              type_label_de = {'solar':'Solarpark','wind':'Windpark','hydro':'Wasserkraftwerk','coal':'Kohlekraftwerk','gas':'Gaskraftwerk','nuclear':'Kernkraftwerk','biomass':'Biomasse / Müllheizkraftwerk','other':'Kraftwerk'}
+              plants = []
+              for row in csv.DictReader(io.StringIO(r.text)):
+                  try:
+                      cap = float(row.get('capacity_mw') or 0)
+                      lat, lon = float(row.get('latitude')), float(row.get('longitude'))
+                  except Exception:
+                      continue
+                  if cap < 1.0 or not (-90 <= lat <= 90 and -180 <= lon <= 180):
+                      continue
+                  ptype = fuel_map.get((row.get('primary_fuel') or '').strip(), 'other')
+                  country = (row.get('country_long') or row.get('country') or '').strip()
+                  gppd_id = (row.get('gppd_idnr') or f"P_{len(plants)}").strip()
+                  cap_round = round(cap, 1) if cap < 100 else round(cap)
+                  plants.append({'id':gppd_id,'name':(row.get('name') or gppd_id).strip(),'lat':round(lat,5),'lon':round(lon,5),'capacity':cap_round,'height':cap_round,'type':ptype,'country':country,'range':f"{type_label_de[ptype]} · {country}" if country else type_label_de[ptype]})
+              plants.append({'id':'Q12514','name':'Drei-Schluchten-Staudamm','lat':30.82306,'lon':111.00333,'capacity':22500,'height':22500,'type':'hydro','country':'China','range':'Wasserkraftwerk · China'})
+              compute_exact_isolations(plants, 'capacity', 'Q12514')
+              plants.sort(key=lambda x: x['capacity'], reverse=True)
+              with open('powerplants.json', 'w', encoding='utf-8') as f:
+                  json.dump(plants, f, ensure_ascii=False, separators=(',', ':'))
+          else:
+              print("powerplants.json existiert bereits – überspringe Neubau.")
 
-          fuel_map = {
-              'Solar': 'solar',
-              'Wind': 'wind',
-              'Hydro': 'hydro',
-              'Wave and Tidal': 'hydro',
-              'Pumped Storage': 'hydro',
-              'Coal': 'coal',
-              'Gas': 'gas',
-              'Oil': 'gas',
-              'Nuclear': 'nuclear',
-              'Biomass': 'biomass',
-              'Waste': 'biomass',
-              'Biogas': 'biomass',
-              'Geothermal': 'other',
-              'Cogeneration': 'gas',
-              'Storage': 'other'
-          }
-          type_label_de = {
-              'solar': 'Solarpark',
-              'wind': 'Windpark',
-              'hydro': 'Wasserkraftwerk',
-              'coal': 'Kohlekraftwerk',
-              'gas': 'Gaskraftwerk',
-              'nuclear': 'Kernkraftwerk',
-              'biomass': 'Biomasse / Müllheizkraftwerk',
-              'other': 'Kraftwerk'
-          }
+          if not os.path.exists('towns.json'):
+              print("Baue towns.json ...")
+              r_geo = requests.get("https://download.geonames.org/export/dump/cities1000.zip", timeout=90)
+              r_geo.raise_for_status()
+              towns = []
+              with zipfile.ZipFile(io.BytesIO(r_geo.content)) as z:
+                  with z.open('cities1000.txt') as txt_file:
+                      for raw_line in io.TextIOWrapper(txt_file, encoding='utf-8'):
+                          parts = raw_line.rstrip('\n').split('\t')
+                          if len(parts) < 15 or parts[7].strip() in ('PPLX','PPLH','PPLW','PPLQ'):
+                              continue
+                          try:
+                              lat, lon, cc, pop = float(parts[4]), float(parts[5]), parts[8].strip(), int(parts[14] or 0)
+                          except Exception:
+                              continue
+                          min_p = 1000 if cc in ('DE','AT','CH') else (5000 if cc in ('FR','IT','ES','PL','CZ','NL','BE','DK','SE','NO','FI','GB','PT','HU','SK','SI','HR') else 12000)
+                          if pop < min_p:
+                              continue
+                          towns.append({'id':f"GN_{parts[0]}",'name':parts[1].strip(),'lat':round(lat,5),'lon':round(lon,5),'population':pop,'height':pop,'range':f"Stadt · {cc}"})
+              towns.append({'id':'Q1490','name':'Tokio','lat':35.68949,'lon':139.69171,'population':37400000,'height':37400000,'range':'Metropole · Japan'})
+              compute_exact_isolations(towns, 'population', 'Q1490')
+              towns.sort(key=lambda x: x['population'], reverse=True)
+              with open('towns.json', 'w', encoding='utf-8') as f:
+                  json.dump(towns, f, ensure_ascii=False, separators=(',', ':'))
+          else:
+              print("towns.json existiert bereits – überspringe Neubau.")
 
-          plants = []
-          reader = csv.DictReader(io.StringIO(r.text))
-          for row in reader:
-              try:
-                  cap = float(row.get('capacity_mw') or 0)
-                  lat = float(row.get('latitude'))
-                  lon = float(row.get('longitude'))
-              except (ValueError, TypeError):
-                  continue
-              if cap < 1.0 or not (-90 <= lat <= 90 and -180 <= lon <= 180):
-                  continue
-              fuel = (row.get('primary_fuel') or '').strip()
-              ptype = fuel_map.get(fuel, 'other')
-              country = (row.get('country_long') or row.get('country') or '').strip()
-              gppd_id = (row.get('gppd_idnr') or f"P_{len(plants)}").strip()
-              name = (row.get('name') or gppd_id).strip()
-              cap_round = round(cap, 1) if cap < 100 else round(cap)
-
-              plants.append({
-                  'id': gppd_id,
-                  'name': name,
-                  'lat': round(lat, 5),
-                  'lon': round(lon, 5),
-                  'capacity': cap_round,
-                  'height': cap_round,
-                  'type': ptype,
-                  'country': country,
-                  'range': f"{type_label_de[ptype]} · {country}" if country else type_label_de[ptype]
-              })
-
-          # Wichtige Referenzkraftwerke mit offiziellen deutschen Namen & Wikidata-IDs
-          curated_plants = [
-              {'id': 'Q12514',  'name': 'Drei-Schluchten-Staudamm',         'lat': 30.82306, 'lon': 111.00333, 'capacity': 22500, 'type': 'hydro',   'country': 'China'},
-              {'id': 'Q741664', 'name': 'Baihetan-Staudamm',                'lat': 27.22250, 'lon': 102.90306, 'capacity': 16000, 'type': 'hydro',   'country': 'China'},
-              {'id': 'Q172640', 'name': 'Itaipú-Staudamm',                  'lat': -25.40806,'lon': -54.58889, 'capacity': 14000, 'type': 'hydro',   'country': 'Brasilien / Paraguay'},
-              {'id': 'Q1075079','name': 'Xiluodu-Staudamm',                 'lat': 28.25833, 'lon': 103.65000, 'capacity': 13860, 'type': 'hydro',   'country': 'China'},
-              {'id': 'Q1191624','name': 'Belo-Monte-Staudamm',              'lat': -3.12639, 'lon': -51.77500, 'capacity': 11233, 'type': 'hydro',   'country': 'Brasilien'},
-              {'id': 'Q249899', 'name': 'Guri-Staudamm',                    'lat': 7.76611,  'lon': -62.99806, 'capacity': 10235, 'type': 'hydro',   'country': 'Venezuela'},
-              {'id': 'Q1054877','name': 'Kraftwerk Kashiwazaki-Kariwa',     'lat': 37.42833, 'lon': 138.60167, 'capacity': 7965,  'type': 'nuclear', 'country': 'Japan'},
-              {'id': 'Q488446', 'name': 'Kernkraftwerk Saporischschja',     'lat': 47.51222, 'lon': 34.58639,  'capacity': 5700,  'type': 'nuclear', 'country': 'Ukraine'},
-              {'id': 'Q671204', 'name': 'Kernkraftwerk Gravelines',         'lat': 51.01528, 'lon': 2.13611,   'capacity': 5460,  'type': 'nuclear', 'country': 'Frankreich'},
-              {'id': 'Q572985', 'name': 'Kraftwerk Bełchatów',              'lat': 51.26722, 'lon': 19.32667,  'capacity': 5102,  'type': 'coal',    'country': 'Polen'},
-              {'id': 'Q314114', 'name': 'Kraftwerk Neurath',                'lat': 51.03750, 'lon': 6.61528,   'capacity': 4400,  'type': 'coal',    'country': 'Deutschland'},
-              {'id': 'Q568507', 'name': 'Kraftwerk Niederaußem',            'lat': 50.99611, 'lon': 6.67139,   'capacity': 3646,  'type': 'coal',    'country': 'Deutschland'},
-              {'id': 'Q694615', 'name': 'Kraftwerk Jänschwalde',            'lat': 51.83444, 'lon': 14.46083,  'capacity': 3000,  'type': 'coal',    'country': 'Deutschland'},
-              {'id': 'Q835660', 'name': 'Kraftwerk Boxberg',                'lat': 51.41583, 'lon': 14.56472,  'capacity': 2575,  'type': 'coal',    'country': 'Deutschland'},
-              {'id': 'Q835654', 'name': 'Pumpspeicherwerk Goldisthal',      'lat': 50.50833, 'lon': 11.00611,  'capacity': 1060,  'type': 'hydro',   'country': 'Deutschland'},
-              {'id': 'Q314702', 'name': 'Pumpspeicherwerk Markersbach',     'lat': 50.52694, 'lon': 12.87111,  'capacity': 1050,  'type': 'hydro',   'country': 'Deutschland'},
-              {'id': 'Q835675', 'name': 'Kraftwerk Lippendorf',             'lat': 51.17944, 'lon': 12.37361,  'capacity': 1840,  'type': 'coal',    'country': 'Deutschland'},
-              {'id': 'Q835680', 'name': 'Kraftwerk Schwarze Pumpe',         'lat': 51.53583, 'lon': 14.35500,  'capacity': 1600,  'type': 'coal',    'country': 'Deutschland'},
-              {'id': 'Q1490801','name': 'Energiepark Witznitz (Solarpark)', 'lat': 51.15700, 'lon': 12.46300,  'capacity': 650,   'type': 'solar',   'country': 'Deutschland'},
-              {'id': 'Q2301598','name': 'Solarpark Weesow-Willmersdorf',    'lat': 52.66000, 'lon': 13.71500,  'capacity': 187,   'type': 'solar',   'country': 'Deutschland'},
-              {'id': 'Q1512677','name': 'Pumpspeicherwerk Niederwartha',    'lat': 51.09194, 'lon': 13.60194,  'capacity': 40,    'type': 'hydro',   'country': 'Deutschland'}
+          # ===================================================================
+          # 3. TOWERS.JSON (Türme, Fernsehtürme, Wolkenkratzer, Kirchen, Brücken)
+          # ===================================================================
+          print("Baue globale towers.json (Türme & Bauwerke weltweit) ...")
+          tower_batches = [
+              ("Wolkenkratzer & Hochhäuser", "wd:Q11303 wd:Q18142", "skyscraper", "Wolkenkratzer / Hochhaus", 65),
+              ("Fernseh-, Sende- & Funktürme", "wd:Q11166728 wd:Q1798641 wd:Q1811679 wd:Q1140415", "tvtower", "Fernseh- / Funkturm", 25),
+              ("Aussichtstürme, Türme & Leuchttürme", "wd:Q1440476 wd:Q12518 wd:Q39715 wd:Q274153", "lookout", "Aussichts- / Leuchtturm", 20),
+              ("Kamine, Brücken & Monumentaltürme", "wd:Q2917149 wd:Q12280 wd:Q16970 wd:Q2977", "church", "Dom / Brücke / Schornstein", 55)
           ]
 
-          # Dubletten in direkter Nachbarschaft (3 km) zu kuratierten Einträgen entfernen
-          for cp in curated_plants:
-              cp['height'] = cp['capacity']
-              cp['range'] = f"{type_label_de[cp['type']]} · {cp['country']}"
-              plants = [
-                  p for p in plants
-                  if abs(p['lat'] - cp['lat']) > 0.035 or abs(p['lon'] - cp['lon']) > 0.045
-              ]
-              plants.append(cp)
+          towers_by_id = {}
+          for batch_name, classes_str, default_t, default_label, min_h in tower_batches:
+              q = f"""
+              SELECT ?item ?coord ?h ?unit ?label_de ?label_en WHERE {{
+                VALUES ?cls {{ {classes_str} }}
+                ?item wdt:P31 ?cls ;
+                      wdt:P625 ?coord ;
+                      p:P2048/psv:P2048 ?hNode .
+                ?hNode wikibase:quantityAmount ?h ;
+                       wikibase:quantityUnit ?unit .
+                FILTER(?h >= {min_h})
+                OPTIONAL {{ ?item rdfs:label ?label_de FILTER(LANG(?label_de) = "de") }}
+                OPTIONAL {{ ?item rdfs:label ?label_en FILTER(LANG(?label_en) = "en") }}
+              }} LIMIT 9000
+              """
+              rows = run_sparql(q, batch_name)
+              print(f"  -> {batch_name}: {len(rows)} Roh-Treffer")
+              for b in rows:
+                  qid = (b.get('item', {}).get('value') or '').split('/').pop()
+                  if not qid or qid in towers_by_id:
+                      continue
+                  name = (b.get('label_de', {}).get('value') or b.get('label_en', {}).get('value') or '').strip()
+                  if not name or re.match(r'^Q\d+$', name):
+                      continue
+                  lat, lon = parse_wkt_point(b.get('coord', {}).get('value'))
+                  if lat is None:
+                      continue
+                  try:
+                      h_val = float(b.get('h', {}).get('value') or 0)
+                  except Exception:
+                      continue
+                  unit_q = (b.get('unit', {}).get('value') or '').split('/').pop()
+                  if unit_q == 'Q3710':       # Foot -> Meter
+                      h_val *= 0.3048
+                  elif unit_q == 'Q174728':   # cm -> Meter
+                      h_val *= 0.01
+                  elif unit_q == 'Q828224':   # km -> Meter
+                      h_val *= 1000.0
+                  elif unit_q != 'Q11573':
+                      continue
+                  if h_val < min_h or h_val > 830:
+                      continue
 
-          print(f"Berechne exakte Dominanz für {len(plants)} Kraftwerke weltweit ...")
-          compute_exact_isolations(plants, 'capacity', 'Q12514')
-          plants.sort(key=lambda x: x['capacity'], reverse=True)
+                  t_type = default_t
+                  t_label = default_label
+                  nl = name.lower()
+                  if any(w in nl for w in ('fernsehturm', 'funkturm', 'sendeturm', 'sender', 'tv tower', 'radio mast')):
+                      t_type, t_label = 'tvtower', 'Fernseh- / Funkturm'
+                  elif any(w in nl for w in ('aussichtsturm', 'leuchtturm', 'warte', 'observation', 'lighthouse')):
+                      t_type, t_label = 'lookout', 'Aussichts- / Leuchtturm'
+                  elif any(w in nl for w in ('dom', 'münster', 'kirche', 'kathedrale', 'cathedral', 'basilika')):
+                      t_type, t_label = 'church', 'Kirchenbauwerk / Dom'
+                  elif any(w in nl for w in ('brücke', 'bridge', 'viadukt', 'schornstein', 'kamin', 'chimney')):
+                      t_type, t_label = 'industrial', 'Brücke / Industriebauwerk'
 
-          with open('powerplants.json', 'w', encoding='utf-8') as f:
-              json.dump(plants, f, ensure_ascii=False, separators=(',', ':'))
-          print(f"powerplants.json erfolgreich geschrieben ({len(plants)} Einträge).")
+                  h_round = round(h_val, 1) if h_val < 100 else round(h_val)
+                  towers_by_id[qid] = {
+                      'id': qid,
+                      'name': name,
+                      'lat': lat,
+                      'lon': lon,
+                      'height': h_round,
+                      'type': t_type,
+                      'range': t_label
+                  }
 
-          # ===================================================================
-          # 2. TOWNS.JSON (GeoNames Worldwide Cities & DACH-Gemeinden)
-          # ===================================================================
-          print("Lade globale Städtedatenbank von GeoNames (cities1000.zip) ...")
-          geo_url = "https://download.geonames.org/export/dump/cities1000.zip"
-          r_geo = requests.get(geo_url, timeout=90)
-          r_geo.raise_for_status()
-
-          towns = []
-          with zipfile.ZipFile(io.BytesIO(r_geo.content)) as z:
-              with z.open('cities1000.txt') as txt_file:
-                  for raw_line in io.TextIOWrapper(txt_file, encoding='utf-8'):
-                      parts = raw_line.rstrip('\n').split('\t')
-                      if len(parts) < 15:
-                          continue
-                      try:
-                          geoname_id = parts[0]
-                          name = parts[1].strip()
-                          lat = float(parts[4])
-                          lon = float(parts[5])
-                          fcode = parts[7].strip()
-                          cc = parts[8].strip()
-                          pop = int(parts[14] or 0)
-                      except (ValueError, TypeError):
-                          continue
-
-                      # Vororte/Stadtteile (PPLX) überspringen, damit echte Städte dominieren
-                      if fcode in ('PPLX', 'PPLH', 'PPLW', 'PPLQ'):
-                          continue
-
-                      # Weltweit alle Städte >= 10.000 Einw., Europa >= 5.000 Einw., DACH alle Orte >= 1.000 Einw.
-                      if cc in ('DE', 'AT', 'CH'):
-                          if pop < 1000:
-                              continue
-                      elif cc in ('FR', 'IT', 'ES', 'PL', 'CZ', 'NL', 'BE', 'DK', 'SE', 'NO', 'FI', 'GB', 'PT', 'HU', 'SK', 'SI', 'HR', 'GR', 'RO', 'BG'):
-                          if pop < 5000:
-                              continue
-                      else:
-                          if pop < 12000:
-                              continue
-
-                      towns.append({
-                          'id': f"GN_{geoname_id}",
-                          'name': name,
-                          'lat': round(lat, 5),
-                          'lon': round(lon, 5),
-                          'population': pop,
-                          'height': pop,
-                          'range': f"Stadt · {cc}"
-                      })
-
-          # Wichtige Referenzstädte & Metropolen mit deutschen Namen und offiziellen Wikidata-IDs
-          curated_towns = [
-              {'id': 'Q1490',  'name': 'Tokio',              'lat': 35.68949, 'lon': 139.69171, 'population': 37400000, 'range': 'Metropole · Japan'},
-              {'id': 'Q1353',  'name': 'Delhi',              'lat': 28.65195, 'lon': 77.23149,  'population': 32941000, 'range': 'Metropole · Indien'},
-              {'id': 'Q8686',  'name': 'Shanghai',           'lat': 31.22222, 'lon': 121.45806, 'population': 29211000, 'range': 'Metropole · China'},
-              {'id': 'Q1354',  'name': 'Dhaka',              'lat': 23.71040, 'lon': 90.40744,  'population': 23210000, 'range': 'Metropole · Bangladesch'},
-              {'id': 'Q174',   'name': 'São Paulo',          'lat': -23.54750,'lon': -46.63611, 'population': 22620000, 'range': 'Metropole · Brasilien'},
-              {'id': 'Q1489',  'name': 'Mexiko-Stadt',       'lat': 19.42847, 'lon': -99.12766, 'population': 22281000, 'range': 'Metropole · Mexiko'},
-              {'id': 'Q85',    'name': 'Kairo',              'lat': 30.06263, 'lon': 31.24967,  'population': 22183000, 'range': 'Metropole · Ägypten'},
-              {'id': 'Q956',   'name': 'Peking',             'lat': 39.90750, 'lon': 116.39723, 'population': 21766000, 'range': 'Metropole · China'},
-              {'id': 'Q1156',  'name': 'Mumbai',             'lat': 19.07283, 'lon': 72.88261,  'population': 21297000, 'range': 'Metropole · Indien'},
-              {'id': 'Q406',   'name': 'Istanbul',           'lat': 41.01384, 'lon': 28.94966,  'population': 15655924, 'range': 'Metropole · Türkei'},
-              {'id': 'Q649',   'name': 'Moskau',             'lat': 55.75222, 'lon': 37.61556,  'population': 13104177, 'range': 'Hauptstadt · Russland'},
-              {'id': 'Q84',    'name': 'London',             'lat': 51.50853, 'lon': -0.12574,  'population': 8982000,  'range': 'Hauptstadt · Großbritannien'},
-              {'id': 'Q60',    'name': 'New York City',      'lat': 40.71427, 'lon': -74.00597, 'population': 8804190,  'range': 'Metropole · USA'},
-              {'id': 'Q64',    'name': 'Berlin',             'lat': 52.52437, 'lon': 13.41053,  'population': 3782202,  'range': 'Bundeshauptstadt · Deutschland'},
-              {'id': 'Q2807',  'name': 'Madrid',             'lat': 40.41650, 'lon': -3.70256,  'population': 3332035,  'range': 'Hauptstadt · Spanien'},
-              {'id': 'Q220',   'name': 'Rom',                'lat': 41.89193, 'lon': 12.51133,  'population': 2751747,  'range': 'Hauptstadt · Italien'},
-              {'id': 'Q90',    'name': 'Paris',              'lat': 48.85341, 'lon': 2.34880,   'population': 2102650,  'range': 'Hauptstadt · Frankreich'},
-              {'id': 'Q1741',  'name': 'Wien',               'lat': 48.20849, 'lon': 16.37208,  'population': 2005760,  'range': 'Bundeshauptstadt · Österreich'},
-              {'id': 'Q1055',  'name': 'Hamburg',            'lat': 53.55073, 'lon': 9.99302,   'population': 1910160,  'range': 'Freie und Hansestadt · Deutschland'},
-              {'id': 'Q270',   'name': 'Warschau',           'lat': 52.22977, 'lon': 21.01178,  'population': 1861644,  'range': 'Hauptstadt · Polen'},
-              {'id': 'Q1726',  'name': 'München',            'lat': 48.13743, 'lon': 11.57549,  'population': 1510378,  'range': 'Landeshauptstadt · Bayern'},
-              {'id': 'Q1085',  'name': 'Prag',               'lat': 50.08804, 'lon': 14.42076,  'population': 1384732,  'range': 'Hauptstadt · Tschechien'},
-              {'id': 'Q365',   'name': 'Köln',               'lat': 50.93333, 'lon': 6.95000,   'population': 1087353,  'range': 'Großstadt · Nordrhein-Westfalen'},
-              {'id': 'Q1794',  'name': 'Frankfurt am Main',  'lat': 50.11552, 'lon': 8.68417,   'population': 775790,   'range': 'Großstadt · Hessen'},
-              {'id': 'Q2079',  'name': 'Leipzig',            'lat': 51.33962, 'lon': 12.37129,  'population': 619879,   'range': 'Großstadt · Sachsen'},
-              {'id': 'Q1731',  'name': 'Dresden',            'lat': 51.05089, 'lon': 13.73832,  'population': 566222,   'range': 'Landeshauptstadt · Sachsen'},
-              {'id': 'Q2795',  'name': 'Chemnitz',           'lat': 50.83570, 'lon': 12.92922,  'population': 250681,   'range': 'Großstadt · Sachsen'},
-              {'id': 'Q14839', 'name': 'Pirna',              'lat': 50.96200, 'lon': 13.94100,  'population': 39300,    'range': 'Große Kreisstadt · Sachsen'}
+          curated_towers = [
+              {'id': 'Q12495',    'name': 'Burj Khalifa',                     'lat': 25.19714, 'lon': 55.27411,  'height': 828,   'type': 'skyscraper', 'range': 'Wolkenkratzer · Dubai (VAE)'},
+              {'id': 'Q25351660', 'name': 'Merdeka 118',                      'lat': 3.14133,  'lon': 101.70065, 'height': 678.9, 'type': 'skyscraper', 'range': 'Wolkenkratzer · Kuala Lumpur'},
+              {'id': 'Q57965',    'name': 'Tokyo Skytree',                    'lat': 35.71006, 'lon': 139.81070, 'height': 634,   'type': 'tvtower',    'range': 'Fernsehturm · Tokio (Japan)'},
+              {'id': 'Q169237',   'name': 'Shanghai Tower',                   'lat': 31.23550, 'lon': 121.50100, 'height': 632,   'type': 'skyscraper', 'range': 'Wolkenkratzer · Shanghai (China)'},
+              {'id': 'Q189960',   'name': 'Abraj Al Bait Clock Tower',        'lat': 21.41889, 'lon': 39.82639,  'height': 601,   'type': 'skyscraper', 'range': 'Uhrturm-Wolkenkratzer · Mekka'},
+              {'id': 'Q185695',   'name': 'Canton Tower',                     'lat': 23.10889, 'lon': 113.31917, 'height': 600,   'type': 'tvtower',    'range': 'Fernsehturm · Guangzhou (China)'},
+              {'id': 'Q134883',   'name': 'CN Tower',                         'lat': 43.64260, 'lon': -79.38710, 'height': 553.3, 'type': 'tvtower',    'range': 'Fernsehturm · Toronto (Kanada)'},
+              {'id': 'Q11239',    'name': 'One World Trade Center',           'lat': 40.71300, 'lon': -74.01350, 'height': 541.3, 'type': 'skyscraper', 'range': 'Wolkenkratzer · New York (USA)'},
+              {'id': 'Q131290',   'name': 'Ostankino-Fernsehturm',            'lat': 55.81972, 'lon': 37.61167,  'height': 540.1, 'type': 'tvtower',    'range': 'Fernsehturm · Moskau'},
+              {'id': 'Q83102',    'name': 'Taipei 101',                       'lat': 25.03361, 'lon': 121.56500, 'height': 508,   'type': 'skyscraper', 'range': 'Wolkenkratzer · Taipeh'},
+              {'id': 'Q15733555', 'name': 'Lachta-Zentrum',                   'lat': 59.98714, 'lon': 30.17703,  'height': 462,   'type': 'skyscraper', 'range': 'Wolkenkratzer · Sankt Petersburg'},
+              {'id': 'Q83063',    'name': 'Petronas Towers',                  'lat': 3.15785,  'lon': 101.71165, 'height': 451.9, 'type': 'skyscraper', 'range': 'Wolkenkratzer · Kuala Lumpur'},
+              {'id': 'Q9188',     'name': 'Empire State Building',            'lat': 40.74843, 'lon': -73.98566, 'height': 443.2, 'type': 'skyscraper', 'range': 'Wolkenkratzer · New York (USA)'},
+              {'id': 'Q1151292',  'name': 'Kamin Kraftwerk Ekibastus GRES-2', 'lat': 52.02222, 'lon': 75.47639,  'height': 419.7, 'type': 'industrial', 'range': 'Kraftwerksschornstein · Kasachstan'},
+              {'id': 'Q151356',   'name': 'Berliner Fernsehturm',             'lat': 52.52083, 'lon': 13.40944,  'height': 368,   'type': 'tvtower',    'range': 'Fernsehturm · Berlin'},
+              {'id': 'Q848464',   'name': 'Fernsehturm Riga',                 'lat': 56.92389, 'lon': 24.13722,  'height': 368,   'type': 'tvtower',    'range': 'Fernsehturm · Riga (Lettland)'},
+              {'id': 'Q819611',   'name': 'Kamin Kraftwerk Trbovlje',         'lat': 46.12611, 'lon': 15.06167,  'height': 360,   'type': 'industrial', 'range': 'Schornstein · Slowenien'},
+              {'id': 'Q698702',   'name': 'Europaturm Frankfurt',             'lat': 50.13528, 'lon': 8.65472,   'height': 337.5, 'type': 'tvtower',    'range': 'Fernmeldeturm · Frankfurt am Main'},
+              {'id': 'Q243',      'name': 'Eiffelturm',                       'lat': 48.85822, 'lon': 2.29450,   'height': 330,   'type': 'lookout',    'range': 'Aussichtsturm · Paris (Frankreich)'},
+              {'id': 'Q18536',    'name': 'The Shard',                        'lat': 51.50444, 'lon': -0.08667,  'height': 309.6, 'type': 'skyscraper', 'range': 'Wolkenkratzer · London'},
+              {'id': 'Q882746',   'name': 'Fernmeldeturm Nürnberg',           'lat': 49.42528, 'lon': 11.03917,  'height': 292.8, 'type': 'tvtower',    'range': 'Fernmeldeturm · Nürnberg'},
+              {'id': 'Q258165',   'name': 'Olympiaturm München',              'lat': 48.17444, 'lon': 11.55361,  'height': 291.3, 'type': 'tvtower',    'range': 'Fernsehturm · München'},
+              {'id': 'Q694825',   'name': 'Heinrich-Hertz-Turm Hamburg',      'lat': 53.56306, 'lon': 9.97583,   'height': 279.2, 'type': 'tvtower',    'range': 'Fernsehturm · Hamburg'},
+              {'id': 'Q522845',   'name': 'Colonius Köln',                    'lat': 50.94694, 'lon': 6.93194,   'height': 266,   'type': 'tvtower',    'range': 'Fernmeldeturm · Köln'},
+              {'id': 'Q151773',   'name': 'Commerzbank Tower',                'lat': 50.11111, 'lon': 8.67444,   'height': 259,   'type': 'skyscraper', 'range': 'Wolkenkratzer · Frankfurt am Main'},
+              {'id': 'Q572551',   'name': 'Fernsehturm Dresden',              'lat': 51.03972, 'lon': 13.86889,  'height': 252,   'type': 'tvtower',    'range': 'Fernsehturm · Dresden'},
+              {'id': 'Q690392',   'name': 'Donauturm Wien',                   'lat': 48.24028, 'lon': 16.41000,  'height': 252,   'type': 'tvtower',    'range': 'Aussichtsturm · Wien'},
+              {'id': 'Q20829400', 'name': 'TK-Elevator-Testturm Rottweil',    'lat': 48.18000, 'lon': 8.62722,   'height': 246,   'type': 'lookout',    'range': 'Test- & Aussichtsturm · Rottweil'},
+              {'id': 'Q697111',   'name': 'Rheinturm Düsseldorf',             'lat': 51.21778, 'lon': 6.76167,   'height': 240.5, 'type': 'tvtower',    'range': 'Fernsehturm · Düsseldorf'},
+              {'id': 'Q157729',   'name': 'Fernsehturm Stuttgart',            'lat': 48.75583, 'lon': 9.19028,   'height': 216.6, 'type': 'tvtower',    'range': 'Fernsehturm · Stuttgart'},
+              {'id': 'Q158269',   'name': 'Fernsehturm Žižkov Prag',          'lat': 50.08111, 'lon': 14.45111,  'height': 216,   'type': 'tvtower',    'range': 'Fernsehturm · Prag'},
+              {'id': 'Q153939',   'name': 'Ulmer Münster',                    'lat': 48.39861, 'lon': 9.99250,   'height': 161.5, 'type': 'church',     'range': 'Höchster Kirchturm · Ulm'},
+              {'id': 'Q4176',     'name': 'Kölner Dom',                       'lat': 50.94129, 'lon': 6.95817,   'height': 157.4, 'type': 'church',     'range': 'Kathedrale · Köln'},
+              {'id': 'Q569620',   'name': 'City-Hochhaus Leipzig',            'lat': 51.33778, 'lon': 12.37889,  'height': 142.5, 'type': 'skyscraper', 'range': 'Hochhaus · Leipzig'},
+              {'id': 'Q5943',     'name': 'Stephansdom Wien',                 'lat': 48.20849, 'lon': 16.37347,  'height': 136.4, 'type': 'church',     'range': 'Kathedrale · Wien'},
+              {'id': 'Q174087',   'name': 'Fernsehturm Ještěd (Jeschken)',    'lat': 50.73278, 'lon': 14.98472,  'height': 94,    'type': 'tvtower',    'range': 'Berghotel & Fernsehturm · Liberec'},
+              {'id': 'Q125629',   'name': 'Frauenkirche Dresden',             'lat': 51.05188, 'lon': 13.74157,  'height': 91.2,  'type': 'church',     'range': 'Kuppelbau · Dresden'},
+              {'id': 'Q1539883',  'name': 'Gottleubatalbrücke Pirna',         'lat': 50.93889, 'lon': 13.94556,  'height': 70,    'type': 'industrial', 'range': 'Talbrücke · Pirna'},
+              {'id': 'Q2555153',  'name': 'Weifbergturm Hinterhermsdorf',     'lat': 50.93556, 'lon': 14.37111,  'height': 36.9,  'type': 'lookout',    'range': 'Aussichtsturm · Sächsische Schweiz'},
+              {'id': 'Q1001501',  'name': 'Aussichtsturm Großer Winterberg',  'lat': 50.89611, 'lon': 14.25944,  'height': 31.3,  'type': 'lookout',    'range': 'Aussichtsturm · Sächsische Schweiz'}
           ]
 
-          for ct in curated_towns:
-              ct['height'] = ct['population']
-              towns = [
-                  t for t in towns
-                  if abs(t['lat'] - ct['lat']) > 0.08 or abs(t['lon'] - ct['lon']) > 0.10
+          towers_list = list(towers_by_id.values())
+          for ct in curated_towers:
+              towers_list = [
+                  t for t in towers_list
+                  if t['id'] != ct['id'] and (abs(t['lat'] - ct['lat']) > 0.008 or abs(t['lon'] - ct['lon']) > 0.010)
               ]
-              towns.append(ct)
+              towers_list.append(ct)
 
-          print(f"Berechne exakte Dominanz für {len(towns)} Städte weltweit ...")
-          compute_exact_isolations(towns, 'population', 'Q1490')
-          towns.sort(key=lambda x: x['population'], reverse=True)
+          print(f"Berechne exakte Dominanz für {len(towers_list)} Türme & Bauwerke weltweit ...")
+          compute_exact_isolations(towers_list, 'height', 'Q12495')
+          towers_list.sort(key=lambda x: x['height'], reverse=True)
+          with open('towers.json', 'w', encoding='utf-8') as f:
+              json.dump(towers_list, f, ensure_ascii=False, separators=(',', ':'))
+          print(f"towers.json geschrieben ({len(towers_list)} Einträge).")
 
-          with open('towns.json', 'w', encoding='utf-8') as f:
-              json.dump(towns, f, ensure_ascii=False, separators=(',', ':'))
-          print(f"towns.json erfolgreich geschrieben ({len(towns)} Einträge).")
+          # ===================================================================
+          # 4. LAKES.JSON (Seen, Stauseen & Talsperren + Bade-Erlaubnis!)
+          # ===================================================================
+          print("Baue globale lakes.json (Seen & Talsperren inkl. Bade-Status) ...")
+          lake_batches = [
+              ("Natürliche Seen weltweit", "wd:Q23397 wd:Q204324", 0.15),
+              ("Talsperren, Stauseen & Baggerseen", "wd:Q131681 wd:Q3253281 wd:Q12284 wd:Q1065704", 0.05)
+          ]
+
+          # Bekannte Trinkwassertalsperren & Kraftwerks-Speicherbecken mit striktem Badeverbot
+          NO_SWIM_KEYWORDS = (
+              'trinkwasser', 'hochbehälter', 'oberbecken', 'unterbecken', 'pumpspeicher',
+              'absetzbecken', 'klärteich', 'talsperre gottleuba', 'talsperre lehnmühle',
+              'talsperre klingenberg', 'talsperre lichtenberg', 'talsperre eibenstock',
+              'talsperre sosa', 'talsperre cranzahl', 'talsperre rauschenbach',
+              'talsperre saidenbach', 'talsperre neidberg', 'talsperre dröda',
+              'talsperre werda', 'talsperre muldenberg', 'talsperre carlsfeld',
+              'rappenbachtalsperre', 'rappbode-talsperre', 'rappbodetalsperre',
+              'wahnbachtalsperre', 'große dhünntalsperre', 'dreilägerbachtalsperre',
+              'kalltalsperre', 'olaftalsperre', 'breitenbachtalsperre', 'wiehltalsperre',
+              'söse-talsperre', 'grane-talsperre', 'eckertalsperre', 'schmalwasser-talsperre',
+              'ohra-talsperre', 'leibis-lichte', 'talsperre burgkhammer', 'amselsee'
+          )
+
+          lakes_by_id = {}
+          for batch_name, classes_str, min_area in lake_batches:
+              q = f"""
+              SELECT ?item ?coord ?area ?unit ?cls ?use ?label_de ?label_en WHERE {{
+                VALUES ?cls {{ {classes_str} }}
+                ?item wdt:P31 ?cls ;
+                      wdt:P625 ?coord ;
+                      p:P2046/psv:P2046 ?aNode .
+                ?aNode wikibase:quantityAmount ?area ;
+                       wikibase:quantityUnit ?unit .
+                OPTIONAL {{ ?item wdt:P366 ?use . }}
+                OPTIONAL {{ ?item rdfs:label ?label_de FILTER(LANG(?label_de) = "de") }}
+                OPTIONAL {{ ?item rdfs:label ?label_en FILTER(LANG(?label_en) = "en") }}
+              }} LIMIT 12000
+              """
+              rows = run_sparql(q, batch_name)
+              print(f"  -> {batch_name}: {len(rows)} Roh-Treffer")
+              for b in rows:
+                  qid = (b.get('item', {}).get('value') or '').split('/').pop()
+                  if not qid or qid in lakes_by_id:
+                      continue
+                  name = (b.get('label_de', {}).get('value') or b.get('label_en', {}).get('value') or '').strip()
+                  if not name or re.match(r'^Q\d+$', name):
+                      continue
+                  lat, lon = parse_wkt_point(b.get('coord', {}).get('value'))
+                  if lat is None:
+                      continue
+                  try:
+                      a_val = float(b.get('area', {}).get('value') or 0)
+                  except Exception:
+                      continue
+                  unit_q = (b.get('unit', {}).get('value') or '').split('/').pop()
+                  if unit_q == 'Q712226':      # km²
+                      pass
+                  elif unit_q == 'Q25343':     # m² -> km²
+                      a_val /= 1e6
+                  elif unit_q == 'Q35852':     # Hektar -> km²
+                      a_val *= 0.01
+                  elif unit_q == 'Q232291':    # sq mile -> km²
+                      a_val *= 2.589988
+                  else:
+                      continue
+                  if a_val < min_area or a_val > 380000:
+                      continue
+
+                  cls_q = (b.get('cls', {}).get('value') or '').split('/').pop()
+                  use_q = (b.get('use', {}).get('value') or '').split('/').pop()
+                  nl = name.lower()
+
+                  is_reservoir = cls_q == 'Q131681' or any(w in nl for w in ('talsperre', 'stausee', 'reservoir', 'speicher'))
+                  is_quarry = cls_q in ('Q3253281', 'Q12284', 'Q1065704') or any(w in nl for w in ('baggersee', 'kiessee', 'badesee', 'tagebaurestsee'))
+
+                  # Bade-Erlaubnis bestimmen
+                  if use_q in ('Q7892', 'Q474606') or any(k in nl for k in NO_SWIM_KEYWORDS):
+                      swim = 'no'
+                      swim_note = '🚫 Baden verboten (Trinkwasserschutz / Betriebsanlage)'
+                  elif cls_q == 'Q1065704' or is_quarry:
+                      swim = 'yes'
+                      swim_note = '🏊 Badesee / Baden an den Uferbereichen erlaubt'
+                  elif is_reservoir:
+                      swim = 'check'
+                      swim_note = '⚠️ Stausee / Talsperre (Baden nur an ausgewiesenen Strandbereichen; bei Trinkwasserschutz verboten)'
+                  else:
+                      swim = 'yes'
+                      swim_note = '🏊 Natursee (Baden an öffentlichen Badestellen in der Regel erlaubt)'
+
+                  a_round = round(a_val, 3) if a_val < 1 else (round(a_val, 2) if a_val < 100 else round(a_val, 1))
+                  l_type = 'reservoir' if is_reservoir else ('quarry' if is_quarry else 'lake')
+                  l_label = 'Talsperre / Stausee' if is_reservoir else ('Bade- / Tagebausee' if is_quarry else 'Natursee')
+
+                  lakes_by_id[qid] = {
+                      'id': qid,
+                      'name': name,
+                      'lat': lat,
+                      'lon': lon,
+                      'area': a_round,
+                      'height': a_round,
+                      'type': l_type,
+                      'swim': swim,
+                      'swimNote': swim_note,
+                      'range': l_label
+                  }
+
+          curated_lakes = [
+              {'id': 'Q5484',     'name': 'Kaspisches Meer',                    'lat': 42.00000, 'lon': 50.50000,  'area': 371000, 'type': 'lake',      'swim': 'yes', 'swimNote': '🏊 Baden an den Küstenstränden erlaubt', 'range': 'Größter See der Erde · Eurasien'},
+              {'id': 'Q1066',     'name': 'Oberer See (Lake Superior)',         'lat': 47.70000, 'lon': -87.50000, 'area': 82100,  'type': 'lake',      'swim': 'yes', 'swimNote': '🏊 Baden erlaubt (kühles Süßwasser)',    'range': 'Größter Süßwassersee · Nordamerika'},
+              {'id': 'Q5505',     'name': 'Victoriasee',                        'lat': -1.00000, 'lon': 33.00000,  'area': 68870,  'type': 'lake',      'swim': 'check','swimNote':'⚠️ Baden wegen Bilharziose/Wildtieren nur eingeschränkt empfohlen', 'range': 'Größter See Afrikas · Ostafrika'},
+              {'id': 'Q5513',     'name': 'Baikalsee',                          'lat': 53.50000, 'lon': 108.00000, 'area': 31722,  'type': 'lake',      'swim': 'yes', 'swimNote': '🏊 Baden erlaubt (im Sommer an Buchten)', 'range': 'Tiefster See der Erde · Sibirien'},
+              {'id': 'Q5477',     'name': 'Ladogasee',                          'lat': 60.83333, 'lon': 31.50000,  'area': 17700,  'type': 'lake',      'swim': 'yes', 'swimNote': '🏊 Baden an den Sandstränden erlaubt',    'range': 'Größter See Europas · Russland'},
+              {'id': 'Q5525',     'name': 'Vänern',                             'lat': 58.90000, 'lon': 13.30000,  'area': 5650,   'type': 'lake',      'swim': 'yes', 'swimNote': '🏊 Baden erlaubt (Jedermannsrecht)',      'range': 'Größter See der EU · Schweden'},
+              {'id': 'Q6383',     'name': 'Plattensee (Balaton)',               'lat': 46.85000, 'lon': 17.75000,  'area': 594,    'type': 'lake',      'swim': 'yes', 'swimNote': '🏊 Beliebter Badesee (zahlreiche Strandbäder)', 'range': 'Größter See Mitteleuropas · Ungarn'},
+              {'id': 'Q6403',     'name': 'Genfersee',                          'lat': 46.43333, 'lon': 6.55000,   'area': 580,    'type': 'lake',      'swim': 'yes', 'swimNote': '🏊 Baden an zahlreichen Strandbädern erlaubt', 'range': 'Alpenrandsee · Schweiz / Frankreich'},
+              {'id': 'Q4127',     'name': 'Bodensee',                           'lat': 47.63333, 'lon': 9.36667,   'area': 536,    'type': 'lake',      'swim': 'yes', 'swimNote': '🏊 Baden an Strandbädern und freien Ufern erlaubt', 'range': 'Größter See im DACH-Raum'},
+              {'id': 'Q6414',     'name': 'Gardasee',                           'lat': 45.63333, 'lon': 10.66667,  'area': 370,    'type': 'lake',      'swim': 'yes', 'swimNote': '🏊 Baden an allen Stränden erlaubt',      'range': 'Größter See Italiens · Oberitalien'},
+              {'id': 'Q160602',   'name': 'Müritz',                             'lat': 53.41667, 'lon': 12.68333,  'area': 117,    'type': 'lake',      'swim': 'yes', 'swimNote': '🏊 Baden an den Badestellen erlaubt',     'range': 'Größter Binnensee Deutschlands · MV'},
+              {'id': 'Q4138',     'name': 'Chiemsee',                           'lat': 47.88333, 'lon': 12.45000,  'area': 79.9,   'type': 'lake',      'swim': 'yes', 'swimNote': '🏊 Baden an zahlreichen Strandbädern erlaubt', 'range': 'Bayerisches Meer · Bayern'},
+              {'id': 'Q193004',   'name': 'Stausee Lipno (Moldaustausee)',      'lat': 48.70000, 'lon': 14.08333,  'area': 48.7,   'type': 'reservoir', 'swim': 'yes', 'swimNote': '🏊 Beliebter Badesee (Sandstrände in Lipno & Horní Planá)', 'range': 'Größter See Tschechiens · Böhmerwald'},
+              {'id': 'Q883002',   'name': 'Geiseltalsee',                       'lat': 51.31250, 'lon': 11.88472,  'area': 18.4,   'type': 'quarry',    'swim': 'yes', 'swimNote': '🏊 Baden an den Strandbädern (z. B. Mücheln, Stöbnitz) erlaubt', 'range': 'Größter künstlicher See Deutschlands'},
+              {'id': 'Q315104',   'name': 'Bärwalder See',                      'lat': 51.37500, 'lon': 14.52500,  'area': 12.99,  'type': 'quarry',    'swim': 'yes', 'swimNote': '🏊 Offizieller Badesee (Strände Boxberg, Klitten, Uhyst)', 'range': 'Größter See Sachsens · Lausitz'},
+              {'id': 'Q876542',   'name': 'Senftenberger See',                  'lat': 51.49861, 'lon': 14.02056,  'area': 13.0,   'type': 'quarry',    'swim': 'yes', 'swimNote': '🏊 Ausgezeichneter Badesee (7 km Badestrände)', 'range': 'Lausitzer Seenland · Brandenburg'},
+              {'id': 'Q884245',   'name': 'Partwitzer See',                     'lat': 51.51944, 'lon': 14.14861,  'area': 11.2,   'type': 'quarry',    'swim': 'yes', 'swimNote': '🏊 Baden am Strand Klein Partwitz erlaubt', 'range': 'Lausitzer Seenland · Sachsen / Brandenburg'},
+              {'id': 'Q877293',   'name': 'Berzdorfer See',                     'lat': 51.09167, 'lon': 14.95694,  'area': 9.6,    'type': 'quarry',    'swim': 'yes', 'swimNote': '🏊 Offizieller Badesee (Blaue Lagune & Nordoststrand)', 'range': 'Tagebausee · Görlitz (Sachsen)'},
+              {'id': 'Q880627',   'name': 'Zwenkauer See',                      'lat': 51.23611, 'lon': 12.30833,  'area': 9.7,    'type': 'quarry',    'swim': 'yes', 'swimNote': '🏊 Baden an den Badestränden erlaubt',    'range': 'Leipziger Neuseenland · Sachsen'},
+              {'id': 'Q876161',   'name': 'Cospudener See',                     'lat': 51.26944, 'lon': 12.33611,  'area': 4.36,   'type': 'quarry',    'swim': 'yes', 'swimNote': '🏊 Beliebter Badesee (längster Sandstrand Sachsens)', 'range': 'Leipziger Neuseenland · Sachsen'},
+              {'id': 'Q315078',   'name': 'Talsperre Bautzen',                  'lat': 51.21667, 'lon': 14.46667,  'area': 5.33,   'type': 'reservoir', 'swim': 'yes', 'swimNote': '🏊 Offizielles Badegewässer (Strandbereiche & Wassersport)', 'range': 'Stausee · Oberlausitz (Sachsen)'},
+              {'id': 'Q315111',   'name': 'Talsperre Quitzdorf',                'lat': 51.27222, 'lon': 14.75556,  'area': 7.5,    'type': 'reservoir', 'swim': 'check','swimNote':'⚠️ Badebetrieb zeitweise wegen Blaualgen eingeschränkt – aktuelle Warnungen beachten', 'range': 'Stausee · Oberlausitz'},
+              {'id': 'Q315095',   'name': 'Talsperre Pöhl',                     'lat': 50.56250, 'lon': 12.19861,  'area': 3.87,   'type': 'reservoir', 'swim': 'yes', 'swimNote': '🏊 Beliebtes Badegewässer im Vogtland (mehrere Liegewiesen)', 'range': 'Vogtländisches Meer · Sachsen'},
+              {'id': 'Q315100',   'name': 'Talsperre Eibenstock',               'lat': 50.52917, 'lon': 12.59722,  'area': 3.7,    'type': 'reservoir', 'swim': 'no',  'swimNote': '🚫 Baden strikt verboten (größte Trinkwassertalsperre Sachsens)', 'range': 'Trinkwassertalsperre · Erzgebirge'},
+              {'id': 'Q879144',   'name': 'Talsperre Lehnmühle',                'lat': 50.81806, 'lon': 13.62639,  'area': 1.39,   'type': 'reservoir', 'swim': 'no',  'swimNote': '🚫 Baden verboten (Trinkwassertalsperre)', 'range': 'Trinkwassertalsperre · Osterzgebirge'},
+              {'id': 'Q879136',   'name': 'Talsperre Klingenberg',              'lat': 50.89667, 'lon': 13.53583,  'area': 1.12,   'type': 'reservoir', 'swim': 'no',  'swimNote': '🚫 Baden verboten (Trinkwassertalsperre)', 'range': 'Trinkwassertalsperre · Osterzgebirge'},
+              {'id': 'Q315089',   'name': 'Talsperre Malter',                   'lat': 50.91389, 'lon': 13.65556,  'area': 0.84,   'type': 'reservoir', 'swim': 'yes', 'swimNote': '🏊 Offizielles Badegewässer (Strandbäder Malter, Paulsdorf & Seifersdorf)', 'range': 'Erholungstalsperre · Dippoldiswalde'},
+              {'id': 'Q315084',   'name': 'Talsperre Gottleuba',                'lat': 50.83889, 'lon': 13.92778,  'area': 0.65,   'type': 'reservoir', 'swim': 'no',  'swimNote': '🚫 Baden strikt verboten (Trinkwasserschutzzone I)', 'range': 'Trinkwassertalsperre · Bad Gottleuba'},
+              {'id': 'Q1741150',  'name': 'Kiessee Birkwitz-Pratzschwitz',      'lat': 50.98083, 'lon': 13.90194,  'area': 0.56,   'type': 'quarry',    'swim': 'yes', 'swimNote': '🏊 Offizieller Badesee direkt bei Pirna/Graupa (Strandbad & FKK)', 'range': 'Badesee · Pirna-Birkwitz'},
+              {'id': 'Q478295',   'name': 'Amselsee Rathen',                    'lat': 50.96694, 'lon': 14.08444,  'area': 0.015,  'type': 'reservoir', 'swim': 'no',  'swimNote': '🚫 Baden verboten (Kahnfahrt-Stausee im Nationalpark)', 'range': 'Stausee · Kurort Rathen'}
+          ]
+
+          lakes_list = list(lakes_by_id.values())
+          for cl in curated_lakes:
+              cl['height'] = cl['area']
+              lakes_list = [
+                  l for l in lakes_list
+                  if l['id'] != cl['id'] and (abs(l['lat'] - cl['lat']) > 0.015 or abs(l['lon'] - cl['lon']) > 0.020)
+              ]
+              lakes_list.append(cl)
+
+          print(f"Berechne exakte Dominanz für {len(lakes_list)} Seen & Talsperren weltweit ...")
+          compute_exact_isolations(lakes_list, 'area', 'Q5484')
+          lakes_list.sort(key=lambda x: x['area'], reverse=True)
+          with open('lakes.json', 'w', encoding='utf-8') as f:
+              json.dump(lakes_list, f, ensure_ascii=False, separators=(',', ':'))
+          print(f"lakes.json geschrieben ({len(lakes_list)} Einträge).")
+
+          # ===================================================================
+          # 5. CASTLES.JSON (Burgen, Schlösser, Festungen & antike Monumente)
+          # ===================================================================
+          print("Baue globale castles.json (Burgen, Schlösser & Monumente nach Alter) ...")
+          castle_batches = [
+              ("Burgen, Höhenburgen & Burgruinen", "wd:Q23413 wd:Q35112127 wd:Q615810 wd:Q17715832", "castle", "Burg / Burganlage"),
+              ("Schlösser, Festungen & Klöster", "wd:Q751876 wd:Q57821 wd:Q44613", "palace", "Schloss / Festung"),
+              ("Antike Monumente, Pyramiden & Tempel", "wd:Q1456099 wd:Q24354 wd:Q839954 wd:Q4989906 wd:Q44539", "monument", "Historisches Monument")
+          ]
+
+          castles_by_id = {}
+          for batch_name, classes_str, default_c, default_label in castle_batches:
+              q = f"""
+              SELECT ?item ?coord ?inception ?label_de ?label_en WHERE {{
+                VALUES ?cls {{ {classes_str} }}
+                ?item wdt:P31 ?cls ;
+                      wdt:P625 ?coord ;
+                      wdt:P571 ?inception .
+                OPTIONAL {{ ?item rdfs:label ?label_de FILTER(LANG(?label_de) = "de") }}
+                OPTIONAL {{ ?item rdfs:label ?label_en FILTER(LANG(?label_en) = "en") }}
+              }} LIMIT 11000
+              """
+              rows = run_sparql(q, batch_name)
+              print(f"  -> {batch_name}: {len(rows)} Roh-Treffer")
+              for b in rows:
+                  qid = (b.get('item', {}).get('value') or '').split('/').pop()
+                  if not qid or qid in castles_by_id:
+                      continue
+                  name = (b.get('label_de', {}).get('value') or b.get('label_en', {}).get('value') or '').strip()
+                  if not name or re.match(r'^Q\d+$', name):
+                      continue
+                  lat, lon = parse_wkt_point(b.get('coord', {}).get('value'))
+                  if lat is None:
+                      continue
+
+                  inc_raw = str(b.get('inception', {}).get('value') or '').strip()
+                  m_yr = re.match(r'^([+-]?\d{1,5})-', inc_raw)
+                  if not m_yr:
+                      continue
+                  yr = int(m_yr.group(1))
+                  if yr > 1960 or yr < -10000:
+                      continue
+                  age = CURRENT_YEAR - yr
+                  if age < 60 or age > 12000:
+                      continue
+
+                  nl = name.lower()
+                  c_type = default_c
+                  c_label = default_label
+                  if any(w in nl for w in ('festung', 'zitadelle', 'fort', 'kastell')):
+                      c_type, c_label = 'fortress', 'Festung / Kastell'
+                  elif any(w in nl for w in ('schloss', 'palast', 'residenz', 'château', 'palace')):
+                      c_type, c_label = 'palace', 'Schloss / Residenz'
+                  elif any(w in nl for w in ('burg', 'ruine', 'castle', 'hrad', 'zámek')):
+                      c_type, c_label = 'castle', 'Burg / Burganlage'
+
+                  castles_by_id[qid] = {
+                      'id': qid,
+                      'name': name,
+                      'lat': lat,
+                      'lon': lon,
+                      'age': age,
+                      'year': yr,
+                      'height': age,
+                      'type': c_type,
+                      'range': c_label
+                  }
+
+          curated_castles = [
+              {'id': 'Q211276', 'name': 'Göbekli Tepe',                    'lat': 37.22306, 'lon': 38.92250, 'year': -9474, 'type': 'monument', 'range': 'Älteste bekannte Tempelanlage · Türkei'},
+              {'id': 'Q180904', 'name': 'Turm von Jericho',                'lat': 31.87194, 'lon': 35.44417, 'year': -8000, 'type': 'monument', 'range': 'Neolithischer Steinturm · Westjordanland'},
+              {'id': 'Q190562', 'name': 'Ġgantija-Tempel (Gozo)',          'lat': 36.04722, 'lon': 14.26917, 'year': -3600, 'type': 'monument', 'range': 'Megalithtempel · Malta'},
+              {'id': 'Q39671',  'name': 'Stonehenge',                      'lat': 51.17889, 'lon': -1.82611, 'year': -3000, 'type': 'monument', 'range': 'Megalith-Steinkreis · England'},
+              {'id': 'Q19751',  'name': 'Djoser-Stufenpyramide (Sakkara)', 'lat': 29.87126, 'lon': 31.21639, 'year': -2650, 'type': 'monument', 'range': 'Älteste Großpyramide · Ägypten'},
+              {'id': 'Q37200',  'name': 'Cheops-Pyramide von Gizeh',       'lat': 29.97917, 'lon': 31.13417, 'year': -2560, 'type': 'monument', 'range': 'Antikes Weltwunder · Ägypten'},
+              {'id': 'Q131192', 'name': 'Zitadelle von Aleppo',            'lat': 36.19917, 'lon': 37.16250, 'year': -2400, 'type': 'fortress', 'range': 'Antike Höhenburg · Syrien'},
+              {'id': 'Q160420', 'name': 'Löwentor von Mykene',             'lat': 37.73083, 'lon': 22.75611, 'year': -1250, 'type': 'fortress', 'range': 'Bronzezeitliche Festung · Griechenland'},
+              {'id': 'Q10288',  'name': 'Parthenon (Akropolis Athen)',     'lat': 37.97153, 'lon': 23.72660, 'year': -447,  'type': 'monument', 'range': 'Antiker Tempel · Griechenland'},
+              {'id': 'Q12501',  'name': 'Chinesische Mauer (Qin-Mauer)',   'lat': 40.43191, 'lon': 116.57037,'year': -221,  'type': 'fortress', 'range': 'Historische Grenzbefestigung · China'},
+              {'id': 'Q10285',  'name': 'Kolosseum Rom',                   'lat': 41.89028, 'lon': 12.49222, 'year': 72,    'type': 'monument', 'range': 'Antikes Amphitheater · Italien'},
+              {'id': 'Q486382', 'name': 'Porta Nigra Trier',               'lat': 49.75965, 'lon': 6.64396,  'year': 170,   'type': 'monument', 'range': 'Römisches Stadttor · Rheinland-Pfalz'},
+              {'id': 'Q193369', 'name': 'Prager Burg (Pražský hrad)',      'lat': 50.09083, 'lon': 14.40083, 'year': 870,   'type': 'castle',   'range': 'Größtes geschlossenes Burgareal · Prag'},
+              {'id': 'Q315218', 'name': 'Albrechtsburg & Burgberg Meißen', 'lat': 51.16611, 'lon': 13.47139, 'year': 929,   'type': 'castle',   'range': 'Wiege Sachsens · Meißen'},
+              {'id': 'Q157503', 'name': 'Reichsburg Cochem',               'lat': 50.14194, 'lon': 7.16667,  'year': 1000,  'type': 'castle',   'range': 'Höhenburg an der Mosel · Rheinland-Pfalz'},
+              {'id': 'Q156463', 'name': 'Festung Hohensalzburg',           'lat': 47.79500, 'lon': 13.04750, 'year': 1077,  'type': 'fortress', 'range': 'Gipfelfestung · Salzburg (Österreich)'},
+              {'id': 'Q151654', 'name': 'Wartburg Eisenach',               'lat': 50.96639, 'lon': 10.30639, 'year': 1067,  'type': 'castle',   'range': 'UNESCO-Welterbe · Thüringen'},
+              {'id': 'Q152842', 'name': 'Burg Eltz',                       'lat': 50.20500, 'lon': 7.33667,  'year': 1157,  'type': 'castle',   'range': 'Höhenburg · Rheinland-Pfalz'},
+              {'id': 'Q883857', 'name': 'Burg Hohnstein',                  'lat': 50.98028, 'lon': 14.10889, 'year': 1200,  'type': 'castle',   'range': 'Felsenburg · Sächsische Schweiz'},
+              {'id': 'Q315003', 'name': 'Burg Stolpen',                    'lat': 51.04833, 'lon': 14.08250, 'year': 1218,  'type': 'castle',   'range': 'Basalt-Höhenburg · Sachsen'},
+              {'id': 'Q157723', 'name': 'Festung Königstein',              'lat': 50.91889, 'lon': 14.05667, 'year': 1241,  'type': 'fortress', 'range': 'Bergfestung · Sächsische Schweiz'},
+              {'id': 'Q882711', 'name': 'Schloss Sonnenstein Pirna',       'lat': 50.96139, 'lon': 13.94694, 'year': 1269,  'type': 'palace',   'range': 'Höhenburg & Schloss über Pirna'},
+              {'id': 'Q316610', 'name': 'Schloss Weesenstein',             'lat': 50.93278, 'lon': 13.85861, 'year': 1275,  'type': 'palace',   'range': 'Felsenschloss im Müglitztal · Sachsen'},
+              {'id': 'Q884089', 'name': 'Burg Kriebstein',                 'lat': 51.04222, 'lon': 12.96194, 'year': 1384,  'type': 'castle',   'range': 'Ritterburg über der Zschopau · Sachsen'},
+              {'id': 'Q193700', 'name': 'Burg Karlštejn (Karlstein)',      'lat': 49.93944, 'lon': 14.18806, 'year': 1348,  'type': 'castle',   'range': 'Königsburg · Mittelböhmen'},
+              {'id': 'Q883923', 'name': 'Burg Schreckenstein (Střekov)',   'lat': 50.63861, 'lon': 14.05139, 'year': 1316,  'type': 'castle',   'range': 'Felsenburg über der Elbe · Ústí nad Labem'},
+              {'id': 'Q560065', 'name': 'Schloss Moritzburg',              'lat': 51.16722, 'lon': 13.67944, 'year': 1542,  'type': 'palace',   'range': 'Barockschloss · Sachsen'},
+              {'id': 'Q564935', 'name': 'Schloss Pillnitz',                'lat': 51.00889, 'lon': 13.87028, 'year': 1720,  'type': 'palace',   'range': 'Schlossanlage an der Elbe · Dresden'},
+              {'id': 'Q154996', 'name': 'Dresdner Zwinger',                'lat': 51.05306, 'lon': 13.73389, 'year': 1709,  'type': 'palace',   'range': 'Barockes Gesamtkunstwerk · Dresden'},
+              {'id': 'Q4152',   'name': 'Schloss Neuschwanstein',          'lat': 47.55750, 'lon': 10.74972, 'year': 1869,  'type': 'palace',   'range': 'Märchenschloss · Allgäu (Bayern)'}
+          ]
+
+          castles_list = list(castles_by_id.values())
+          for cc in curated_castles:
+              cc['age'] = CURRENT_YEAR - cc['year']
+              cc['height'] = cc['age']
+              castles_list = [
+                  c for c in castles_list
+                  if c['id'] != cc['id'] and (abs(c['lat'] - cc['lat']) > 0.008 or abs(c['lon'] - cc['lon']) > 0.010)
+              ]
+              castles_list.append(cc)
+
+          print(f"Berechne exakte Dominanz für {len(castles_list)} Burgen & Monumente weltweit ...")
+          compute_exact_isolations(castles_list, 'age', 'Q211276')
+          castles_list.sort(key=lambda x: x['age'], reverse=True)
+          with open('castles.json', 'w', encoding='utf-8') as f:
+              json.dump(castles_list, f, ensure_ascii=False, separators=(',', ':'))
+          print(f"castles.json geschrieben ({len(castles_list)} Einträge).")
           EOF
 
       - name: Commit and Push generated JSON files
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add powerplants.json towns.json
+          git add powerplants.json towns.json towers.json lakes.json castles.json
           if git diff --staged --quiet; then
-            echo "Keine Änderungen an powerplants.json oder towns.json."
+            echo "Keine Änderungen an den JSON-Dateien."
           else
-            git commit -m "chore: generate global powerplants.json and towns.json with geodesic isolation"
+            git commit -m "chore: generate global towers.json, lakes.json and castles.json with geodesic isolation"
             git push
           fi
