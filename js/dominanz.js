@@ -1,5 +1,5 @@
 // ===================================================================
-// DOMINANZ-ATLAS (7 KONTEXTE INKL. LIVE-WETTERSTATIONEN & GPS-RADAR)
+// DOMINANZ-ATLAS (7 KONTEXTE INKL. 10-MIN-WETTER-SNAPSHOT & GPS-RADAR)
 // Kontexte: peaks | powerplants | towns | towers | lakes | castles | weather
 // ===================================================================
 
@@ -15,8 +15,15 @@ let domLayerKey = 'topo';
 const DOM_MODES_ORDER = ['peaks', 'powerplants', 'towns', 'towers', 'lakes', 'castles', 'weather'];
 let domMode = 'peaks';
 let domListMode = 'gps'; // 'gps' (10 Nächste) | 'view' (Top 10 im Sichtfeld)
+
+// --- Wetter-Spezial-State (Strikter 10-Minuten-Snapshot) ---
+const DOM_WEATHER_SNAPSHOT_MS = 10 * 60 * 1000; // 10 Minuten statisches Fenster
 let domWeatherPolarity = 'hot'; // 'hot' (Wärmer -> Hitzepol) | 'cold' (Kälter -> Kältepol)
 let domLastWeatherSyncTs = 0;
+let domWeatherSyncInFlight = false;
+let domWeatherTimerId = null;
+let domWeatherHotPole = null;
+let domWeatherColdPole = null;
 
 let domDatasets = {
     peaks: [],
@@ -77,7 +84,7 @@ const DOM_MODE_CFG = {
         higherLabel: 'Nächsthöherer Berg',
         refLabel: 'Bezugsgipfel',
         supremeId: 'Q513',
-        supremeHint: '🏔️ Endpunkt: Mount Everest (8.849 m)',
+        supremeHint: '🏔️ Endpunkt: Mount Everest (8.849 m) 🎯',
         supremeNote: '🏔️ Mount Everest – höchster Berg der Erde (8.849 m). Kein höherer Bezugsgipfel.',
         fallbackId: 'Q3375',
         fallbackName: 'Zugspitze',
@@ -95,7 +102,7 @@ const DOM_MODE_CFG = {
         higherLabel: 'Nächststärkeres Kraftwerk',
         refLabel: 'Bezugskraftwerk',
         supremeId: 'Q12514',
-        supremeHint: '⚡ Endpunkt: Drei-Schluchten-Staudamm (22.500 MW)',
+        supremeHint: '⚡ Endpunkt: Drei-Schluchten-Staudamm (22.500 MW) 🎯',
         supremeNote: '⚡ Drei-Schluchten-Staudamm (China) – leistungsstärkstes Kraftwerk der Erde (22.500 MW).',
         fallbackId: 'Q835660',
         fallbackName: 'Kraftwerk Boxberg',
@@ -113,7 +120,7 @@ const DOM_MODE_CFG = {
         higherLabel: 'Nächstgrößere Stadt',
         refLabel: 'Bezugsstadt',
         supremeId: 'Q1490',
-        supremeHint: '🏙️ Endpunkt: Tokio (37,4 Mio. Einwohner)',
+        supremeHint: '🏙️ Endpunkt: Tokio (37,4 Mio. Einwohner) 🎯',
         supremeNote: '🏙️ Tokio – bevölkerungsreichste Metropole der Erde. Keine größere Bezugsstadt.',
         fallbackId: 'Q1731',
         fallbackName: 'Dresden',
@@ -131,7 +138,7 @@ const DOM_MODE_CFG = {
         higherLabel: 'Nächsthöheres Bauwerk',
         refLabel: 'Bezugsbauwerk',
         supremeId: 'Q12495',
-        supremeHint: '📡 Endpunkt: Burj Khalifa (828 m)',
+        supremeHint: '📡 Endpunkt: Burj Khalifa (828 m) 🎯',
         supremeNote: '📡 Burj Khalifa (Dubai) – höchstes Bauwerk der Erde (828 m). Kein höheres Bezugsbauwerk.',
         fallbackId: 'Q572551',
         fallbackName: 'Fernsehturm Dresden',
@@ -149,7 +156,7 @@ const DOM_MODE_CFG = {
         higherLabel: 'Nächstgrößerer See',
         refLabel: 'Bezugssee',
         supremeId: 'Q5484',
-        supremeHint: '🌊 Endpunkt: Kaspisches Meer (371.000 km²)',
+        supremeHint: '🌊 Endpunkt: Kaspisches Meer (371.000 km²) 🎯',
         supremeNote: '🌊 Kaspisches Meer – größtes Binnengewässer der Erde (371.000 km²). Kein größerer Bezugssee.',
         fallbackId: 'Q1741150',
         fallbackName: 'Kiessee Birkwitz-Pratzschwitz',
@@ -167,7 +174,7 @@ const DOM_MODE_CFG = {
         higherLabel: 'Nächstälteres Bauwerk',
         refLabel: 'Bezugsmonument',
         supremeId: 'Q211276',
-        supremeHint: '🏰 Endpunkt: Göbekli Tepe (~11.500 Jahre)',
+        supremeHint: '🏰 Endpunkt: Göbekli Tepe (~11.500 Jahre) 🎯',
         supremeNote: '🏰 Göbekli Tepe – älteste bekannte Monumentalanlage der Menschheit (~9500 v. Chr.).',
         fallbackId: 'Q157723',
         fallbackName: 'Festung Königstein',
@@ -181,12 +188,12 @@ const DOM_MODE_CFG = {
         nounSingular: 'Wetterstation',
         nounPlural: 'Wetterstationen',
         unit: '°C',
-        valueLabel: '2m-Lufttemperatur (Live)',
+        valueLabel: '2m-Temperatur (10-Min-Snapshot)',
         higherLabel: 'Nächste wärmere Station',
         refLabel: 'Bezugsstation',
         supremeId: 'WS_DEATH_VALLEY',
         supremeHint: '🔥 Ermittle aktuellen Hitzepol der Erde …',
-        supremeNote: '🌡️ Globales Temperatur-Extremum im aktuellen Live-Messnetz erreicht!',
+        supremeNote: '🌡️ Globales Temperatur-Extremum im aktuellen 10-Minuten-Messnetz erreicht!',
         fallbackId: 'WMO_10488',
         fallbackName: 'Wetterwarte Dresden-Klotzsche (DWD)',
         searchPlaceholder: '🔍 Wetterstation suchen (z. B. Dresden, Zinnwald, Sněžka, Zugspitze, Wostok …)',
@@ -252,7 +259,7 @@ function domVal(p) {
     if (!p) return null;
     if (domMode === 'weather') {
         const v = p.temp ?? p.height;
-        return (typeof v === 'number' && isFinite(v)) ? v : null;
+        return (typeof v === 'number' && isFinite(v)) ? Math.round(v * 10) / 10 : null;
     }
     if (domMode === 'powerplants') {
         const v = p.capacity ?? p.mw ?? p.height;
@@ -277,8 +284,9 @@ function domVal(p) {
 function domFormatVal(v, withUnit = true) {
     if (v == null || !isFinite(v)) return '–';
     if (domMode === 'weather') {
-        const sign = v > 0 ? '+' : '';
-        return sign + domNum(v, 1) + (withUnit ? ' °C' : '');
+        const rounded = Math.round(v * 10) / 10;
+        const sign = rounded > 0 ? '+' : '';
+        return sign + domNum(rounded, 1) + (withUnit ? ' °C' : '');
     }
     if (domMode === 'powerplants') {
         const d = (v < 100 && Math.round(v) !== v) ? 1 : 0;
@@ -438,6 +446,18 @@ function initDominanzMapIfNeeded() {
         };
     }
 
+    // 1-Minuten-Ticker aktualisiert die Anzeige des 10-Minuten-Wetter-Timers
+    if (!domWeatherTimerId) {
+        domWeatherTimerId = setInterval(() => {
+            if (domMode === 'weather' && domLoaded.weather) {
+                updateWeatherSyncStatusUI();
+                if (Date.now() - domLastWeatherSyncTs >= DOM_WEATHER_SNAPSHOT_MS) {
+                    refreshLiveWeatherField(false);
+                }
+            }
+        }, 30000);
+    }
+
     renderDomLegend();
     updateDomModeUI();
     startDomGeolocation(false);
@@ -500,6 +520,40 @@ function setWeatherPolarity(pol) {
             domSelect(domActive, null, { isAutoNearest: true, clearSearchInput: true });
         }
         domSearch();
+    }
+}
+
+// Klick auf die rote Hitzepol- oder blaue Kältepol-Kachel -> Direkt auf der Karte anzeigen
+function domJumpToWeatherPole(pol) {
+    if (domMode !== 'weather') {
+        setDominanzMode('weather');
+    }
+    const targetPol = pol === 'cold' ? 'cold' : 'hot';
+    domWeatherPolarity = targetPol;
+    const hotBtn = document.getElementById('dom-pol-hot');
+    const coldBtn = document.getElementById('dom-pol-cold');
+    if (hotBtn) hotBtn.className = 'dom-pol-btn' + (domWeatherPolarity === 'hot' ? ' active-hot' : '');
+    if (coldBtn) coldBtn.className = 'dom-pol-btn' + (domWeatherPolarity === 'cold' ? ' active-cold' : '');
+
+    recomputeWeatherDominance();
+    const poleStation = targetPol === 'cold' ? domWeatherColdPole : domWeatherHotPole;
+    if (poleStation) {
+        domManualOverride = true;
+        domSelect(poleStation, null, { clearSearchInput: true, zoomToTarget: 7 });
+    }
+}
+
+// Klick auf das Endpunkt-Badge oben rechts -> Springt in jeder der 7 Welten direkt zum Weltrekord-Punkt
+function domJumpToSupreme() {
+    if (domMode === 'weather') {
+        domJumpToWeatherPole(domWeatherPolarity);
+        return;
+    }
+    const cfg = domCfg();
+    const sup = domPeaks.find(p => p.id === cfg.supremeId);
+    if (sup) {
+        domManualOverride = true;
+        domSelect(sup, null, { clearSearchInput: true, zoomToTarget: 8 });
     }
 }
 
@@ -617,39 +671,85 @@ function renderDomLegend() {
 }
 
 // ===================================================================
-// LIVE-WETTERSTATIONEN: GLOBALES TEMPERATURFELD & BIPOLARE DOMINANZ
+// LIVE-WETTERSTATIONEN: STRIKTER 10-MINUTEN-SNAPSHOT & KLICKBARE POLE
 // ===================================================================
+function updateWeatherSyncStatusUI() {
+    const syncEl = document.getElementById('dom-weather-sync-info');
+    if (!syncEl) return;
+    if (!domLastWeatherSyncTs) {
+        syncEl.textContent = '⏳ Synchronisiere 10-Minuten-Snapshot …';
+        return;
+    }
+    const elapsedMs = Date.now() - domLastWeatherSyncTs;
+    const remainMin = Math.max(1, Math.ceil((DOM_WEATHER_SNAPSHOT_MS - elapsedMs) / 60000));
+    const syncTimeStr = new Date(domLastWeatherSyncTs).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    syncEl.textContent = `🔒 10-Min-Snapshot (${syncTimeStr} Uhr · nächstes Update in ${remainMin} Min.)`;
+}
+
 function recomputeWeatherDominance() {
     const list = domDatasets.weather || [];
     if (!list.length) return;
 
-    let hottest = list[0];
-    let coldest = list[0];
+    let hottest = null;
+    let coldest = null;
     for (const s of list) {
+        if (s.temp != null && isFinite(s.temp)) {
+            s.temp = Math.round(s.temp * 10) / 10;
+            s.height = s.temp;
+        }
         const t = domVal(s);
         if (t == null) continue;
-        if (domVal(hottest) == null || t > domVal(hottest)) hottest = s;
-        if (domVal(coldest) == null || t < domVal(coldest)) coldest = s;
+        if (!hottest || t > domVal(hottest)) hottest = s;
+        if (!coldest || t < domVal(coldest)) coldest = s;
         s.isoCalc = true;
-        s.isolation = null;
+    }
+
+    domWeatherHotPole = hottest;
+    domWeatherColdPole = coldest;
+
+    // Klickbare Kacheln für Hitzepol & Kältepol aktualisieren
+    const hotNameEl = document.getElementById('dom-hot-pole-name');
+    const hotTempEl = document.getElementById('dom-hot-pole-temp');
+    if (hottest && hotNameEl && hotTempEl) {
+        const locH = getInitialPlaceLabel(hottest);
+        hotNameEl.textContent = hottest.name + (locH ? ` (${locH})` : '');
+        hotTempEl.textContent = domFormatVal(domVal(hottest));
+        resolvePlaceLabel(hottest).then(lbl => {
+            if (lbl && document.getElementById('dom-hot-pole-name')) {
+                document.getElementById('dom-hot-pole-name').textContent = `${hottest.name} (${lbl})`;
+            }
+        });
+    }
+
+    const coldNameEl = document.getElementById('dom-cold-pole-name');
+    const coldTempEl = document.getElementById('dom-cold-pole-temp');
+    if (coldest && coldNameEl && coldTempEl) {
+        const locC = getInitialPlaceLabel(coldest);
+        coldNameEl.textContent = coldest.name + (locC ? ` (${locC})` : '');
+        coldTempEl.textContent = domFormatVal(domVal(coldest));
+        resolvePlaceLabel(coldest).then(lbl => {
+            if (lbl && document.getElementById('dom-cold-pole-name')) {
+                document.getElementById('dom-cold-pole-name').textContent = `${coldest.name} (${lbl})`;
+            }
+        });
     }
 
     const cfg = DOM_MODE_CFG.weather;
     if (domWeatherPolarity === 'cold') {
         cfg.supremeId = coldest ? coldest.id : 'WS_VOSTOK';
         cfg.supremeHint = coldest
-            ? `❄️ Aktueller Kältepol: ${coldest.name} (${domFormatVal(domVal(coldest))})`
-            : '❄️ Endpunkt: Aktueller Kältepol der Erde';
+            ? `❄️ Kältepol: ${coldest.name} (${domFormatVal(domVal(coldest))}) 🎯`
+            : '❄️ Endpunkt: Aktueller Kältepol 🎯';
         cfg.supremeNote = coldest
-            ? `❄️ ${coldest.name} (${domFormatVal(domVal(coldest))}) – aktuell kälteste Wetterstation im globalen Messnetz!`
+            ? `❄️ ${coldest.name} (${domFormatVal(domVal(coldest))}) – aktuell kälteste Wetterstation der Erde!`
             : '❄️ Kältepol der Erde erreicht.';
     } else {
         cfg.supremeId = hottest ? hottest.id : 'WS_DEATH_VALLEY';
         cfg.supremeHint = hottest
-            ? `🔥 Aktueller Hitzepol: ${hottest.name} (${domFormatVal(domVal(hottest))})`
-            : '🔥 Endpunkt: Aktueller Hitzepol der Erde';
+            ? `🔥 Hitzepol: ${hottest.name} (${domFormatVal(domVal(hottest))}) 🎯`
+            : '🔥 Endpunkt: Aktueller Hitzepol 🎯';
         cfg.supremeNote = hottest
-            ? `🔥 ${hottest.name} (${domFormatVal(domVal(hottest))}) – aktuell heißeste Wetterstation im globalen Messnetz!`
+            ? `🔥 ${hottest.name} (${domFormatVal(domVal(hottest))}) – aktuell heißeste Wetterstation der Erde!`
             : '🔥 Hitzepol der Erde erreicht.';
     }
 
@@ -659,117 +759,199 @@ function recomputeWeatherDominance() {
 
 async function refreshLiveWeatherField(force = false) {
     const list = domDatasets.weather || [];
-    if (!list.length) return;
+    if (!list.length || domWeatherSyncInFlight) return;
+
     const now = Date.now();
-    if (!force && now - domLastWeatherSyncTs < 300000) {
+    // Strikte 10-Minuten-Sperre: Innerhalb von 10 Minuten bleiben alle Stationswerte 100 % statisch!
+    if (!force && domLastWeatherSyncTs > 0 && (now - domLastWeatherSyncTs < DOM_WEATHER_SNAPSHOT_MS)) {
         recomputeWeatherDominance();
+        updateWeatherSyncStatusUI();
         return;
     }
 
-    const syncEl = document.getElementById('dom-weather-sync-info');
-    if (syncEl) syncEl.textContent = '⏳ Hole Live-Temperaturen (Open-Meteo Batch) …';
-
-    // 1. Die 75 nächstgelegenen Stationen rund um den Nutzer (bzw. Kartenmitte)
-    const refPt = domUserLoc || (dominanzMap ? { lat: dominanzMap.getCenter().lat, lon: dominanzMap.getCenter().lng } : { lat: 50.95, lon: 13.95 });
-    const nearestStations = [...list]
-        .map(s => ({ s, d: domDistanceKm(refPt, s) }))
-        .sort((a, b) => a.d - b.d)
-        .slice(0, 75)
-        .map(x => x.s);
-
-    // 2. Globale Hitze-/Kältepol-Kandidaten & Bergstationen
-    const extremeIds = new Set([
-        'WS_VOSTOK', 'WS_DOME_A', 'WS_DOME_C', 'WS_SOUTH_POLE', 'WS_SUMMIT_GL',
-        'WS_OYMYAKON', 'WS_VERKHOYANSK', 'WS_DEATH_VALLEY', 'WS_MITRIBAH',
-        'WS_AHWAZ', 'WS_ASWAN', 'WS_JACOBABAD', 'WS_MARBLE_BAR',
-        'WMO_10961', 'WMO_06730', 'WMO_11146', 'WMO_11653', 'WMO_10578',
-        'WMO_10453', 'WMO_10582', 'WMO_11464', 'WMO_10488'
-    ]);
-    // Zusätzlich die aktuell 15 heißesten und 15 kältesten Stationen aus dem Snapshot prüfen
-    const sortedByT = [...list].filter(s => domVal(s) != null).sort((a, b) => domVal(b) - domVal(a));
-    sortedByT.slice(0, 15).forEach(s => extremeIds.add(s.id));
-    sortedByT.slice(-15).forEach(s => extremeIds.add(s.id));
-
-    const targetMap = new Map();
-    nearestStations.forEach(s => targetMap.set(s.id, s));
-    list.forEach(s => { if (extremeIds.has(s.id)) targetMap.set(s.id, s); });
-    const batchTargets = Array.from(targetMap.values());
-
-    let updatedCount = 0;
-    for (let i = 0; i < batchTargets.length; i += 80) {
-        const chunk = batchTargets.slice(i, i + 80);
-        const lats = chunk.map(s => s.lat.toFixed(3)).join(',');
-        const lons = chunk.map(s => s.lon.toFixed(3)).join(',');
+    // Prüfen, ob im sessionStorage bereits ein frischer (< 10 Min.) Snapshot liegt
+    if (!force && domLastWeatherSyncTs === 0) {
         try {
-            const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&current=temperature_2m`;
-            const r = await fetch(url, { signal: AbortSignal.timeout(9000) });
-            if (r.ok) {
-                let data = await r.json();
-                if (!Array.isArray(data)) data = [data];
-                data.forEach((item, idx) => {
-                    const t = item?.current?.temperature_2m;
-                    if (t != null && isFinite(t) && chunk[idx]) {
-                        chunk[idx].temp = Math.round(t * 10) / 10;
-                        chunk[idx].height = chunk[idx].temp;
-                        chunk[idx].liveVerified = true;
-                        updatedCount++;
-                    }
-                });
+            const rawSnap = sessionStorage.getItem('dom_weather_snap_v2');
+            if (rawSnap) {
+                const parsed = JSON.parse(rawSnap);
+                if (parsed && parsed.ts && (now - parsed.ts < DOM_WEATHER_SNAPSHOT_MS) && parsed.map) {
+                    list.forEach(s => {
+                        if (parsed.map[s.id] !== undefined) {
+                            s.temp = parsed.map[s.id];
+                            s.height = s.temp;
+                        }
+                    });
+                    domLastWeatherSyncTs = parsed.ts;
+                    recomputeWeatherDominance();
+                    updateWeatherSyncStatusUI();
+                    return;
+                }
             }
         } catch (e) {}
     }
 
-    domLastWeatherSyncTs = Date.now();
-    recomputeWeatherDominance();
+    domWeatherSyncInFlight = true;
+    const syncEl = document.getElementById('dom-weather-sync-info');
+    if (syncEl) syncEl.textContent = '⏳ Aktualisiere globalen 10-Minuten-Snapshot …';
 
-    if (syncEl) {
-        const timeStr = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-        syncEl.textContent = `✓ Live-Stand ${timeStr} Uhr (${domNum(list.length)} Stationen)`;
-    }
-
-    if (domMode === 'weather') {
-        domPaint();
-        if (domActive) {
-            domOfferHigher(domActive, domNearestHigher(domActive), domGen);
+    try {
+        // 1. Globales Stützstellen-Gitter (~220 gleichmäßig verteilte Stationen weltweit)
+        const step = Math.max(1, Math.floor(list.length / 220));
+        const anchorSet = new Map();
+        for (let i = 0; i < list.length; i += step) {
+            anchorSet.set(list[i].id, list[i]);
         }
-        domSearch();
+
+        // 2. Die 80 nächstgelegenen Stationen rund um den Nutzer (bzw. Kartenmitte) für 100% Präzision vor Ort
+        const refPt = domUserLoc || (dominanzMap ? { lat: dominanzMap.getCenter().lat, lon: dominanzMap.getCenter().lng } : { lat: 50.95, lon: 13.95 });
+        [...list]
+            .map(s => ({ s, d: domDistanceKm(refPt, s) }))
+            .sort((a, b) => a.d - b.d)
+            .slice(0, 80)
+            .forEach(x => anchorSet.set(x.s.id, x.s));
+
+        // 3. Alle globalen Hitze-/Kältepol-Kandidaten & Bergobservatorien
+        const extremeIds = new Set([
+            'WS_VOSTOK', 'WS_DOME_A', 'WS_DOME_C', 'WS_SOUTH_POLE', 'WS_SUMMIT_GL',
+            'WS_OYMYAKON', 'WS_VERKHOYANSK', 'WS_DEATH_VALLEY', 'WS_MITRIBAH',
+            'WS_AHWAZ', 'WS_ASWAN', 'WS_JACOBABAD', 'WS_MARBLE_BAR',
+            'WMO_10961', 'WMO_06730', 'WMO_11146', 'WMO_11653', 'WMO_10578',
+            'WMO_10453', 'WMO_10582', 'WMO_11464', 'WMO_10488'
+        ]);
+        const sortedByT = [...list].filter(s => domVal(s) != null).sort((a, b) => domVal(b) - domVal(a));
+        sortedByT.slice(0, 20).forEach(s => extremeIds.add(s.id));
+        sortedByT.slice(-20).forEach(s => extremeIds.add(s.id));
+        list.forEach(s => { if (extremeIds.has(s.id)) anchorSet.set(s.id, s); });
+
+        const batchTargets = Array.from(anchorSet.values());
+        const liveAnchors = [];
+
+        for (let i = 0; i < batchTargets.length; i += 85) {
+            const chunk = batchTargets.slice(i, i + 85);
+            const lats = chunk.map(s => s.lat.toFixed(3)).join(',');
+            const lons = chunk.map(s => s.lon.toFixed(3)).join(',');
+            try {
+                const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&current=temperature_2m`;
+                const r = await fetch(url, { signal: AbortSignal.timeout(9000) });
+                if (r.ok) {
+                    let data = await r.json();
+                    if (!Array.isArray(data)) data = [data];
+                    data.forEach((item, idx) => {
+                        const t = item?.current?.temperature_2m;
+                        const st = chunk[idx];
+                        if (t != null && isFinite(t) && st) {
+                            const tRound = Math.round(t * 10) / 10;
+                            st.temp = tRound;
+                            st.height = tRound;
+                            st._directLive = true;
+                            // Potenzielle Meeresspiegel-Temperatur dieses Ankerpunkts (Standard-Gradient 0.0065 K/m)
+                            const rad = Math.PI / 180;
+                            const cosLat = Math.cos(st.lat * rad);
+                            liveAnchors.push({
+                                x: cosLat * Math.cos(st.lon * rad),
+                                y: cosLat * Math.sin(st.lon * rad),
+                                z: Math.sin(st.lat * rad),
+                                seaT: tRound + (st.elev || 0) * 0.0065
+                            });
+                        }
+                    });
+                }
+            } catch (e) {}
+        }
+
+        // Konsistente globale Höhen-Assimilation für alle übrigen Stationen, damit es nirgendwo
+        // auf der Erde Bruchstellen zwischen direkt abgefragten und übrigen Stationen gibt!
+        if (liveAnchors.length >= 25) {
+            const rad = Math.PI / 180;
+            const nA = liveAnchors.length;
+            for (const s of list) {
+                if (s._directLive) {
+                    delete s._directLive;
+                    continue;
+                }
+                const cosLat = Math.cos(s.lat * rad);
+                const sx = cosLat * Math.cos(s.lon * rad);
+                const sy = cosLat * Math.sin(s.lon * rad);
+                const sz = Math.sin(s.lat * rad);
+
+                // Finde die 3 nächstgelegenen Live-Ankerpunkte im 3D-Raum
+                let d1 = Infinity, d2 = Infinity, d3 = Infinity;
+                let t1 = 15, t2 = 15, t3 = 15;
+                for (let j = 0; j < nA; j++) {
+                    const a = liveAnchors[j];
+                    const dx = sx - a.x, dy = sy - a.y, dz = sz - a.z;
+                    const dSq = dx * dx + dy * dy + dz * dz;
+                    if (dSq < d1) {
+                        d3 = d2; t3 = t2;
+                        d2 = d1; t2 = t1;
+                        d1 = dSq; t1 = a.seaT;
+                    } else if (dSq < d2) {
+                        d3 = d2; t3 = t2;
+                        d2 = dSq; t2 = a.seaT;
+                    } else if (dSq < d3) {
+                        d3 = dSq; t3 = a.seaT;
+                    }
+                }
+                const w1 = 1 / Math.max(d1, 1e-7);
+                const w2 = 1 / Math.max(d2, 1e-7);
+                const w3 = 1 / Math.max(d3, 1e-7);
+                const seaInterp = (t1 * w1 + t2 * w2 + t3 * w3) / (w1 + w2 + w3);
+                const estT = Math.round((seaInterp - (s.elev || 0) * 0.0065) * 10) / 10;
+                s.temp = estT;
+                s.height = estT;
+            }
+        }
+
+        domLastWeatherSyncTs = Date.now();
+
+        // Snapshot für 10 Minuten im sessionStorage sichern
+        try {
+            const snapMap = {};
+            list.forEach(s => { snapMap[s.id] = s.temp; });
+            sessionStorage.setItem('dom_weather_snap_v2', JSON.stringify({ ts: domLastWeatherSyncTs, map: snapMap }));
+        } catch (e) {}
+
+        recomputeWeatherDominance();
+        updateWeatherSyncStatusUI();
+
+        if (domMode === 'weather') {
+            domPaint();
+            if (domActive) {
+                const mainValEl = document.getElementById('dom-main-val-display');
+                if (mainValEl) mainValEl.textContent = domFormatVal(domVal(domActive));
+                domOfferHigher(domActive, domNearestHigher(domActive), domGen);
+            }
+            domSearch();
+        }
+    } finally {
+        domWeatherSyncInFlight = false;
     }
 }
 
+// WICHTIG: Lädt NUR Zusatz-Synoptik (Gefühlte Temp., Luftfeuchte, Wind, Druck) für die Infobox,
+// überschreibt aber NIEMALS p.temp, damit die 10-Minuten-Dominanzkette zu 100 % monoton bleibt!
 async function fetchLiveStationTelemetry(p, token) {
     const box = document.getElementById('dom-weather-station-box');
     if (!box || domMode !== 'weather') return;
 
     try {
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${p.lat.toFixed(4)}&longitude=${p.lon.toFixed(4)}&current=temperature_2m,apparent_temperature,relative_humidity_2m,surface_pressure,wind_speed_10m`;
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${p.lat.toFixed(4)}&longitude=${p.lon.toFixed(4)}&current=apparent_temperature,relative_humidity_2m,surface_pressure,wind_speed_10m`;
         const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
         if (!r.ok) throw new Error('HTTP ' + r.status);
         const data = await r.json();
         if (token !== domGen || !document.getElementById('dom-weather-station-box')) return;
 
         const cur = data.current || {};
-        const t2m = cur.temperature_2m;
         const appT = cur.apparent_temperature;
         const rh = cur.relative_humidity_2m;
         const pres = cur.surface_pressure;
         const wind = cur.wind_speed_10m;
 
-        if (t2m != null && isFinite(t2m)) {
-            const newT = Math.round(t2m * 10) / 10;
-            if (p.temp !== newT) {
-                p.temp = newT;
-                p.height = newT;
-                const valEl = document.getElementById('dom-main-val-display');
-                if (valEl) valEl.textContent = domFormatVal(newT);
-                recomputeWeatherDominance();
-                domOfferHigher(p, domNearestHigher(p), token);
-            }
-        }
-
         const elevTxt = p.elev != null ? `${domNum(p.elev, 0)} m ü. NHN` : 'k. A.';
         box.innerHTML = `
             <div style="font-weight:800; font-size:12.5px; color:#0f172a; margin-bottom:6px; display:flex; justify-content:space-between;">
-                <span>📡 Live-Synoptik an der Messstation:</span>
+                <span>📡 Zusatz-Synoptik an der Messstation:</span>
                 <span style="color:#047857;">⛰️ Stationshöhe: ${domEsc(elevTxt)}</span>
             </div>
             <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:6px; font-size:12px;">
@@ -1895,7 +2077,7 @@ function domGeodesic(p, r, target) {
 }
 
 // ===================================================================
-// DOMINANZKETTE: NÄCHSTHÖHERES (BZW. WÄRMERES/KÄLTERES) ZIEL BESTIMMEN
+// DOMINANZKETTE: GARANTIERT MONOTONE SUCHE (OHNE RÜCKWÄRTSSPRÜNGE!)
 // ===================================================================
 function domNearestHigher(p) {
     const cfg = domCfg();
@@ -1907,8 +2089,13 @@ function domNearestHigher(p) {
     for (const c of domPeaks) {
         const valC = domVal(c);
         if (c.id === p.id || !Number.isFinite(valC)) continue;
-        if (isColdSearch) {
-            if (valC >= valP) continue;
+        // Strikter Vergleich auf den gerundeten Snapshot-Werten (mindestens 0.1 °C Differenz bei Wetter)
+        if (domMode === 'weather') {
+            if (isColdSearch) {
+                if (valC > valP - 0.09) continue;
+            } else {
+                if (valC < valP + 0.09) continue;
+            }
         } else {
             if (valC <= valP) continue;
         }
@@ -1918,7 +2105,7 @@ function domNearestHigher(p) {
     return best;
 }
 
-function domOfferHigher(p, next, token) {
+function domOfferHigher(p, next, token, customZoom) {
     if (token !== domGen) return;
     const cfg = domCfg();
     const box = document.getElementById('dom-higher');
@@ -1930,6 +2117,9 @@ function domOfferHigher(p, next, token) {
             (p.id === cfg.supremeId ? cfg.supremeNote :
             domVal(p) == null ? `Für die Dominanzsuche wird ein bekannter Wert (${cfg.unit}) benötigt.` :
             cfg.supremeNote) + '</p>';
+        if (customZoom && dominanzMap) {
+            dominanzMap.setView([p.lat, p.lon], customZoom);
+        }
         return;
     }
     domReference = next;
@@ -2023,7 +2213,9 @@ function domSelect(p, known, opts = {}) {
         title: p.name, zIndexOffset: 1100
     }).addTo(dominanzMap);
 
-    if (domCircle) {
+    if (opts.zoomToTarget) {
+        dominanzMap.setView([p.lat, p.lon], opts.zoomToTarget);
+    } else if (domCircle) {
         const b = domCircle.getBounds();
         if (domUserLoc && domDistanceKm(domUserLoc, p) < 50) b.extend([domUserLoc.lat, domUserLoc.lon]);
         dominanzMap.fitBounds(b.pad(0.4), { maxZoom: 12, animate: false });
@@ -2049,7 +2241,7 @@ function domSelect(p, known, opts = {}) {
     if (domMode === 'weather') {
         extraContextHtml = `
             <div id="dom-weather-station-box" style="background:#f8fafc; border:1.5px solid #cbd5e1; border-radius:12px; padding:10px 12px; margin-bottom:10px; font-size:12.5px;">
-                ⏳ Lade Live-Synoptik (Gefühlte Temp., Luftfeuchte, Wind &amp; Stationsdruck) …
+                ⏳ Lade Zusatz-Synoptik (Gefühlte Temp., Luftfeuchte, Wind &amp; Stationsdruck) …
             </div>
         `;
     } else if (domMode === 'powerplants') {
@@ -2115,7 +2307,7 @@ function domSelect(p, known, opts = {}) {
         if (el) el.textContent = lbl ? `📍 ${lbl}` : `📍 ${p.lat.toFixed(4)}° N, ${p.lon.toFixed(4)}° O`;
     });
 
-    domOfferHigher(p, domNearestHigher(p), token);
+    domOfferHigher(p, domNearestHigher(p), token, opts.zoomToTarget);
     if (domMode === 'weather') fetchLiveStationTelemetry(p, token);
     if (domMode === 'powerplants') fetchLivePowerplantOutput(p, token);
     if (domMode === 'lakes') fetchLiveLakeBathingInfo(p, token);
