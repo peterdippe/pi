@@ -3,13 +3,13 @@
      =============================================================== -->
 <section id="page-dominanz" class="page-section">
     <style>
-        /* Kompakte Kontext-Leiste: Dropdown + Vor/Zurück-Stepper + Endpunkt-Badge */
+        /* Kontext-Leiste: Responsiv für Smartphone, Tablet & Desktop */
         .dom-context-bar {
             display: flex;
             flex-wrap: wrap;
             align-items: center;
             justify-content: space-between;
-            gap: 10px;
+            gap: 10px 14px;
             background: linear-gradient(135deg, #ecfdf5 0%, #f1f5f9 100%);
             border: 1.5px solid #6ee7b7;
             border-radius: 14px;
@@ -20,22 +20,42 @@
             display: flex;
             flex-wrap: wrap;
             align-items: center;
-            gap: 8px;
-            flex: 1;
-            min-width: 260px;
+            gap: 8px 10px;
+            flex: 1 1 320px;
+            min-width: 0;
+        }
+        .dom-context-label {
+            font-size: 13px;
+            font-weight: 800;
+            color: #065f46;
+            white-space: nowrap;
+        }
+        /* Hält ◀ + Dropdown + ▶ auf ALLEN Bildschirmgrößen garantiert in einer Zeile */
+        .dom-stepper-row {
+            display: flex;
+            align-items: center;
+            flex-wrap: nowrap;
+            gap: 6px;
+            flex: 1 1 240px;
+            min-width: 0;
+            max-width: 460px;
         }
         .dom-context-select {
             font-weight: 800;
-            font-size: 14px;
+            font-size: 13.5px;
             color: #064e3b;
             background-color: #ffffff;
             border: 2px solid #059669;
             border-radius: 10px;
-            padding: 8px 12px;
+            padding: 7px 10px;
             cursor: pointer;
-            flex: 1;
-            min-width: 210px;
-            max-width: 390px;
+            flex: 1 1 auto;
+            width: 100%;
+            min-width: 0;
+            height: 38px;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            overflow: hidden;
             box-shadow: 0 2px 6px rgba(5, 150, 105, 0.12);
         }
         .dom-context-select:focus {
@@ -47,8 +67,9 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 36px;
-            height: 36px;
+            flex: 0 0 38px;
+            width: 38px;
+            height: 38px;
             border-radius: 10px;
             border: 1.5px solid #cbd5e1;
             background: #ffffff;
@@ -57,8 +78,10 @@
             font-weight: 800;
             cursor: pointer;
             transition: all 0.15s ease;
+            user-select: none;
         }
-        .dom-step-btn:hover {
+        .dom-step-btn:hover,
+        .dom-step-btn:active {
             border-color: #059669;
             background: #ecfdf5;
             color: #047857;
@@ -72,6 +95,26 @@
             border-radius: 999px;
             padding: 6px 12px;
             white-space: nowrap;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        @media (max-width: 640px) {
+            .dom-context-Controls {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 6px;
+                width: 100%;
+            }
+            .dom-stepper-row {
+                flex: 0 0 auto;
+                max-width: 100%;
+                width: 100%;
+            }
+            .dom-supreme-pill {
+                width: 100%;
+                text-align: center;
+            }
         }
 
         /* Eleganter blauer Standort-Pfeil mit blinkender Umrandung + Höhen/Speed-Badges */
@@ -175,20 +218,22 @@
     </div>
 
     <div class="sand-card">
-        <!-- KONTEXT-AUSWAHL: DROPDOWN + 1-TAP VOR/ZURÜCK-SCHALTER -->
+        <!-- KONTEXT-AUSWAHL: DROPDOWN EINGEBETTET ZWISCHEN ◀ UND ▶ -->
         <div class="dom-context-bar">
             <div class="dom-context-Controls">
-                <strong style="font-size:13px; color:#065f46; white-space:nowrap;">🎛️ Themenwelt:</strong>
-                <button type="button" class="dom-step-btn" onclick="cycleDominanzMode(-1)" title="Vorheriger Kontext">◀</button>
-                <select id="dom-mode-select" class="dom-context-select" onchange="setDominanzMode(this.value)">
-                    <option value="peaks" selected>⛰️ Berge (Höhe ü. NHN in m)</option>
-                    <option value="powerplants">⚡ Kraftwerke (Nennleistung in MW &amp; Live)</option>
-                    <option value="towns">🏙️ Städte &amp; Orte (Einwohnerzahl)</option>
-                    <option value="towers">📡 Türme &amp; Bauwerke (Höhe über Grund in m)</option>
-                    <option value="lakes">🌊 Seen &amp; Talsperren (Fläche km² &amp; Bade-Info)</option>
-                    <option value="castles">🏰 Burgen &amp; Monumente (Alter in Jahren)</option>
-                </select>
-                <button type="button" class="dom-step-btn" onclick="cycleDominanzMode(1)" title="Nächster Kontext">▶</button>
+                <span class="dom-context-label">🎛️ Themenwelt:</span>
+                <div class="dom-stepper-row">
+                    <button type="button" class="dom-step-btn" onclick="cycleDominanzMode(-1)" title="Vorherige Themenwelt">◀</button>
+                    <select id="dom-mode-select" class="dom-context-select" onchange="setDominanzMode(this.value)">
+                        <option value="peaks" selected>⛰️ Berge (Höhe ü. NHN in m)</option>
+                        <option value="powerplants">⚡ Kraftwerke (MW &amp; Live)</option>
+                        <option value="towns">🏙️ Städte &amp; Orte (Einwohner)</option>
+                        <option value="towers">📡 Türme &amp; Bauwerke (Höhe in m)</option>
+                        <option value="lakes">🌊 Seen &amp; Talsperren (km² &amp; Baden)</option>
+                        <option value="castles">🏰 Burgen &amp; Monumente (Alter)</option>
+                    </select>
+                    <button type="button" class="dom-step-btn" onclick="cycleDominanzMode(1)" title="Nächste Themenwelt">▶</button>
+                </div>
             </div>
             <div id="dom-mode-supreme-hint" class="dom-supreme-pill">
                 🏔️ Endpunkt: Mount Everest (8.849 m)
@@ -212,7 +257,7 @@
                 </button>
                 <button id="dom-pick-btn" class="btn btn-amber" style="padding:8px 12px; font-size:12.5px;" onclick="toggleDomPickMode()">📍 Eigenen Punkt setzen: AUS</button>
                 <button class="btn btn-sand" style="padding:8px 14px; font-size:12.5px;" onclick="openDominanzInfo()">❓ Was ist Dominanz?</button>
-                <button class="btn btn-dark" style="padding:8px 12px; font-size:12px;" onclick="dominanzWorldView()">🌍 Weltansicht</button>
+                <button class="btn btn-dark" style="padding:8px 12px; font-size:12.5px;" onclick="dominanzWorldView()">🌍 Weltansicht</button>
             </div>
         </div>
 
@@ -254,13 +299,13 @@
             <p>
                 Die <strong>Dominanz</strong> beschreibt den Radius rund um einen Punkt, innerhalb
                 dessen er unübertroffen ist – also die Luftlinien-Distanz zum nächstgelegenen
-                Punkt mit einem <strong>höheren Wert</strong>[span_1](start_span)[span_1](end_span).
+                Punkt mit einem <strong>höheren Wert</strong>.
             </p>
             <p>
                 Über das Themenwelt-Dropdown oben kannst du das Prinzip auf <strong>6 globale Kontexte</strong> anwenden:
             </p>
             <ul style="font-size:13.2px; line-height:1.55; color:#334155; padding-left:20px; margin:8px 0 12px;">
-                <li><strong>⛰️ Berge (Höhe ü. NHN in m):</strong> Distanz zum nächsthöheren Gipfel – bis zum <em>Mount Everest (8.849 m)</em>[span_2](start_span)[span_2](end_span).</li>
+                <li><strong>⛰️ Berge (Höhe ü. NHN in m):</strong> Distanz zum nächsthöheren Gipfel – bis zum <em>Mount Everest (8.849 m)</em>.</li>
                 <li><strong>⚡ Kraftwerke (Nennleistung in MW):</strong> Distanz zum nächststärkeren Kraftwerk inkl. Live-Einspeiseschätzung – bis zum <em>Drei-Schluchten-Staudamm (22.500 MW)</em>.</li>
                 <li><strong>🏙️ Städte &amp; Orte (Einwohnerzahl):</strong> Distanz zur nächstgrößeren Stadt – bis nach <em>Tokio (37,4 Mio.)</em>.</li>
                 <li><strong>📡 Türme &amp; Bauwerke (Höhe über Grund in m):</strong> Vom Aussichtsturm oder Fernsehturm bis zum <em>Burj Khalifa (828 m)</em>.</li>
