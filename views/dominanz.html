@@ -91,30 +91,41 @@
             font-weight: 800;
             color: #065f46;
             background: #ffffff;
-            border: 1px solid #a7f3d0;
+            border: 1.5px solid #059669;
             border-radius: 999px;
-            padding: 6px 12px;
+            padding: 6px 13px;
             white-space: nowrap;
             max-width: 100%;
             overflow: hidden;
             text-overflow: ellipsis;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .dom-supreme-pill:hover {
+            background: #059669;
+            color: #ffffff;
         }
 
-        /* Spezial-Leiste für Wetterstationen: Hitze-Dominanz vs. Kälte-Dominanz */
+        /* Spezial-Leiste für Wetterstationen: Richtungs-Wahl + Klickbare Welt-Pole */
         .dom-weather-bar {
             display: none;
-            flex-wrap: wrap;
-            align-items: center;
-            justify-content: space-between;
+            flex-direction: column;
             gap: 10px;
             background: linear-gradient(135deg, #fff7ed 0%, #eff6ff 100%);
             border: 1.5px solid #93c5fd;
             border-radius: 13px;
-            padding: 9px 13px;
+            padding: 11px 14px;
             margin-bottom: 14px;
         }
         .dom-weather-bar.open {
             display: flex;
+        }
+        .dom-weather-top-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
         }
         .dom-pol-group {
             display: flex;
@@ -147,6 +158,61 @@
             color: #ffffff;
             border-color: #1e40af;
             box-shadow: 0 2px 8px rgba(29, 78, 216, 0.35);
+        }
+
+        /* Klickbare Direkt-Buttons für Hitzepol & Kältepol der Erde */
+        .dom-poles-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 8px;
+        }
+        .dom-pole-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 10px;
+            font-size: 12.5px;
+            font-weight: 800;
+            cursor: pointer;
+            text-align: left;
+            transition: transform 0.14s ease, box-shadow 0.14s ease;
+        }
+        .dom-pole-card:hover {
+            transform: translateY(-1px);
+        }
+        .dom-pole-hot {
+            background: #fef2f2;
+            border: 1.5px solid #fca5a5;
+            color: #991b1b;
+        }
+        .dom-pole-hot:hover {
+            box-shadow: 0 4px 12px rgba(220, 38, 38, 0.18);
+        }
+        .dom-pole-cold {
+            background: #eff6ff;
+            border: 1.5px solid #93c5fd;
+            color: #1e3a8a;
+        }
+        .dom-pole-cold:hover {
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.18);
+        }
+        .dom-pole-temp {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13.5px;
+            font-weight: 800;
+            padding: 3px 8px;
+            border-radius: 999px;
+            white-space: nowrap;
+        }
+        .dom-pole-hot .dom-pole-temp {
+            background: #dc2626;
+            color: #ffffff;
+        }
+        .dom-pole-cold .dom-pole-temp {
+            background: #1d4ed8;
+            color: #ffffff;
         }
 
         @media (max-width: 640px) {
@@ -323,26 +389,44 @@
                     <button type="button" class="dom-step-btn" onclick="cycleDominanzMode(1)" title="Nächste Themenwelt">▶</button>
                 </div>
             </div>
-            <div id="dom-mode-supreme-hint" class="dom-supreme-pill">
-                🏔️ Endpunkt: Mount Everest (8.849 m)
-            </div>
+            <button type="button" id="dom-mode-supreme-hint" class="dom-supreme-pill" onclick="domJumpToSupreme()" title="Klicken, um den globalen Endpunkt direkt auf der Karte anzuzeigen">
+                🏔️ Endpunkt: Mount Everest (8.849 m) 🎯
+            </button>
         </div>
 
-        <!-- BIPOLARER WETTER-UMSCHALTER (Nur sichtbar im Modus "🌡️ Wetterstationen") -->
+        <!-- BIPOLARER WETTER-UMSCHALTER + KLICKBARE HITZE- & KÄLTEPOLE -->
         <div id="dom-weather-polarity-bar" class="dom-weather-bar">
-            <div class="dom-pol-group">
-                <strong style="font-size:12.5px; color:#1e293b; margin-right:2px;">🌡️ Temperatur-Richtung:</strong>
-                <button type="button" id="dom-pol-hot" class="dom-pol-btn active-hot" onclick="setWeatherPolarity('hot')">
-                    🔥 Hitze-Dominanz (Wärmer → Hitzepol)
-                </button>
-                <button type="button" id="dom-pol-cold" class="dom-pol-btn" onclick="setWeatherPolarity('cold')">
-                    ❄️ Kälte-Dominanz (Kälter → Kältepol)
-                </button>
+            <div class="dom-weather-top-row">
+                <div class="dom-pol-group">
+                    <strong style="font-size:12.5px; color:#1e293b; margin-right:2px;">🌡️ Ketten-Richtung:</strong>
+                    <button type="button" id="dom-pol-hot" class="dom-pol-btn active-hot" onclick="setWeatherPolarity('hot')">
+                        🔥 Hitze-Kette (immer wärmer)
+                    </button>
+                    <button type="button" id="dom-pol-cold" class="dom-pol-btn" onclick="setWeatherPolarity('cold')">
+                        ❄️ Kälte-Kette (immer kälter)
+                    </button>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                    <span id="dom-weather-sync-info" style="font-size:11.5px; font-weight:700; color:#0f766e;">⏳ Lade 10-Minuten-Snapshot …</span>
+                </div>
             </div>
-            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                <span id="dom-weather-sync-info" style="font-size:11.5px; font-weight:700; color:#0f766e;">⏳ Synchronisiere Live-Messnetz …</span>
-                <button type="button" class="btn btn-sand" style="padding:5px 10px; font-size:11.5px;" onclick="refreshLiveWeatherField(true)">
-                    🔄 Live-Update
+
+            <!-- Direkt anklickbare Pole (zeigen den Hitzepol bzw. Kältepol sofort auf der Karte) -->
+            <div class="dom-poles-grid">
+                <button type="button" id="dom-btn-hot-pole" class="dom-pole-card dom-pole-hot" onclick="domJumpToWeatherPole('hot')" title="Klicken, um den aktuellen Hitzepol der Erde direkt auf der Karte anzuzeigen">
+                    <div>
+                        <div style="font-size:10.5px; text-transform:uppercase; letter-spacing:0.04em; opacity:0.85;">🔥 Aktueller Hitzepol der Erde (klicken)</div>
+                        <div id="dom-hot-pole-name" style="font-size:13px; font-weight:800; margin-top:1px;">wird ermittelt …</div>
+                    </div>
+                    <span id="dom-hot-pole-temp" class="dom-pole-temp">– °C</span>
+                </button>
+
+                <button type="button" id="dom-btn-cold-pole" class="dom-pole-card dom-pole-cold" onclick="domJumpToWeatherPole('cold')" title="Klicken, um den aktuellen Kältepol der Erde direkt auf der Karte anzuzeigen">
+                    <div>
+                        <div style="font-size:10.5px; text-transform:uppercase; letter-spacing:0.04em; opacity:0.85;">❄️ Aktueller Kältepol der Erde (klicken)</div>
+                        <div id="dom-cold-pole-name" style="font-size:13px; font-weight:800; margin-top:1px;">wird ermittelt …</div>
+                    </div>
+                    <span id="dom-cold-pole-temp" class="dom-pole-temp">– °C</span>
                 </button>
             </div>
         </div>
@@ -372,7 +456,7 @@
         <div class="dom-legend" id="dom-legend"></div>
 
         <div style="font-size:11.5px; color:#64748b; margin-bottom:12px;">
-            <span id="dom-count">lade Daten …</span> · <span id="dom-visible"></span> Daten aus globalen JSONs &amp; Live-APIs · <span id="dom-start-info">Start: Ermittle Position per GPS …</span>
+            <span id="dom-count">lade Daten …</span> · <span id="dom-visible"></span> Daten aus globalen JSONs &amp; 10-Min-Snapshots · <span id="dom-start-info">Start: Ermittle Position per GPS …</span>
         </div>
 
         <!-- Hauptbereich: Links Karte, Rechts direkt die Info-Box zum gewählten Objekt -->
@@ -431,7 +515,7 @@
                 <li><strong>📡 Türme &amp; Bauwerke (Höhe über Grund in m):</strong> Vom Aussichtsturm oder Fernsehturm bis zum <em>Burj Khalifa (828 m)</em>.</li>
                 <li><strong>🌊 Seen &amp; Talsperren (Wasserfläche in km²):</strong> Vom lokalen Badesee oder Stausee (inkl. Info, ob <strong>Baden erlaubt</strong> ist!) bis zum <em>Kaspischen Meer (371.000 km²)</em>.</li>
                 <li><strong>🏰 Burgen &amp; Monumente (Alter in Jahren):</strong> Von regionalen Schlössern und Ritterburgen bis zu den Pyramiden und <em>Göbekli Tepe (~11.500 Jahre)</em>.</li>
-                <li><strong>🌡️ Wetterstationen (Live-Temperatur in °C):</strong> Über 13.500 WMO-/ICAO-Wetterstationen weltweit (inkl. Bergwarten). Du kannst live zwischen <strong>🔥 Hitze-Dominanz</strong> (nächste wärmere Station bis zum aktuellen Hitzepol der Erde) und <strong>❄️ Kälte-Dominanz</strong> (nächste kältere Station bis zum aktuellen Kältepol der Erde) umschalten!</li>
+                <li><strong>🌡️ Wetterstationen (Live-Temperatur in °C):</strong> Über 14.000 WMO-/ICAO-Wetterstationen weltweit im konsistenten 10-Minuten-Snapshot. Du kannst zwischen <strong>🔥 Hitze-Kette</strong> und <strong>❄️ Kälte-Kette</strong> wechseln und den aktuellen Hitze- oder Kältepol direkt anklicken!</li>
             </ul>
             <p style="margin-bottom:4px;">
                 🔗 Grundprinzip bei Wikipedia:
