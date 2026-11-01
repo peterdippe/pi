@@ -117,6 +117,43 @@
             }
         }
 
+        /* Untere Such- & Umgebungsliste (unterhalb der Infobox) */
+        .dom-bottom-list-card {
+            margin-top: 16px;
+            background: var(--bg-sand-light);
+            border: 1.5px solid var(--border-sand);
+            border-radius: 16px;
+            padding: 14px;
+        }
+        .dom-list-mode-bar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-top: 10px;
+            margin-bottom: 6px;
+        }
+        .dom-list-mode-btns {
+            display: inline-flex;
+            gap: 6px;
+        }
+        .dom-list-pill {
+            font-size: 11.5px;
+            font-weight: 800;
+            padding: 5px 10px;
+            border-radius: 999px;
+            border: 1px solid #cbd5e1;
+            background: #ffffff;
+            color: #334155;
+            cursor: pointer;
+        }
+        .dom-list-pill.active {
+            background: #059669;
+            color: #ffffff;
+            border-color: #047857;
+        }
+
         /* Eleganter blauer Standort-Pfeil mit blinkender Umrandung + Höhen/Speed-Badges */
         .dom-user-loc-wrap {
             display: flex;
@@ -268,7 +305,7 @@
             <span id="dom-count">lade Daten …</span> · <span id="dom-visible"></span> Daten aus globalen JSONs &amp; Wikidata · <span id="dom-start-info">Start: Ermittle Position per GPS …</span>
         </div>
 
-        <!-- Hauptbereich: Links Karte, Rechts Suche & Details -->
+        <!-- Hauptbereich: Links Karte, Rechts direkt die Info-Box zum gewählten Objekt -->
         <div class="dominanz-layout">
             <!-- Karte -->
             <div>
@@ -276,16 +313,29 @@
                 <div id="dom-status" style="font-size:12px; color:#b45309; margin-top:8px; min-height:16px;"></div>
             </div>
 
-            <!-- Rechte Spalte: Suche / Umgebungs-Radar + aktives Objekt -->
+            <!-- Rechte Spalte: Direkt die Info-Box zum ausgewählten Objekt -->
             <div style="display:flex; flex-direction:column; gap:14px;">
-                <div style="background:var(--bg-sand-light); border:1px solid var(--border-sand); border-radius:16px; padding:14px;">
-                    <input type="text" id="dom-search-input" class="form-input" placeholder="🔍 Suchen (oder leer lassen für Umkreis-Radar)" autocomplete="off">
-                    <div id="dom-results-Caption" style="font-size:11px; font-weight:800; color:var(--emerald-dark); text-transform:uppercase; letter-spacing:0.05em; margin-top:8px;"></div>
-                    <div id="dom-results" class="peak-list" style="margin-top:6px;"></div>
-                </div>
-                <!-- Info-Box zum ausgewählten Objekt -->
                 <div id="dom-detail" style="background:#fff; border:2px solid var(--emerald-dark); border-radius:16px; padding:16px;"></div>
             </div>
+        </div>
+
+        <!-- GANZ UNTEN (unterhalb der Infobox): Suche & Liste der 10 nächsten / sichtbaren Objekte -->
+        <div class="dom-bottom-list-card">
+            <input type="text" id="dom-search-input" class="form-input" placeholder="🔍 Suchen (oder leer lassen für Umkreis- &amp; Sichtfeld-Liste)" autocomplete="off">
+            <div class="dom-list-mode-bar">
+                <div id="dom-results-Caption" style="font-size:11px; font-weight:800; color:var(--emerald-dark); text-transform:uppercase; letter-spacing:0.05em;"></div>
+                <div class="dom-list-mode-btns">
+                    <button type="button" id="dom-list-btn-gps" class="dom-list-pill active"
+                            onclick="this.classList.add('active'); document.getElementById('dom-list-btn-view')?.classList.remove('active'); document.getElementById('dom-search-input').value=''; domSearch();">
+                        🧭 10 Nächste (GPS)
+                    </button>
+                    <button type="button" id="dom-list-btn-view" class="dom-list-pill"
+                            onclick="this.classList.add('active'); document.getElementById('dom-list-btn-gps')?.classList.remove('active'); if(typeof dominanzMap!=='undefined' && dominanzMap){ const b=dominanzMap.getBounds(); const c=dominanzMap.getCenter(); const inView=domPeaks.filter(p=>b.contains([p.lat,p.lon])).sort((a,z)=>(domVal(z)||0)-(domVal(a)||0)).slice(0,10); document.getElementById('dom-results-Caption').textContent='👁️ Top 10 im aktuellen Kartenausschnitt:'; domRenderResults(inView, false, Boolean(domUserLoc)); }">
+                        👁️ Im Sichtfeld (Top 10)
+                    </button>
+                </div>
+            </div>
+            <div id="dom-results" class="peak-list" style="margin-top:6px;"></div>
         </div>
     </div>
 
@@ -299,13 +349,13 @@
             <p>
                 Die <strong>Dominanz</strong> beschreibt den Radius rund um einen Punkt, innerhalb
                 dessen er unübertroffen ist – also die Luftlinien-Distanz zum nächstgelegenen
-                Punkt mit einem <strong>höheren Wert</strong>.
+                Punkt mit einem <strong>höheren Wert</strong>[span_4](start_span)[span_4](end_span).
             </p>
             <p>
                 Über das Themenwelt-Dropdown oben kannst du das Prinzip auf <strong>6 globale Kontexte</strong> anwenden:
             </p>
             <ul style="font-size:13.2px; line-height:1.55; color:#334155; padding-left:20px; margin:8px 0 12px;">
-                <li><strong>⛰️ Berge (Höhe ü. NHN in m):</strong> Distanz zum nächsthöheren Gipfel – bis zum <em>Mount Everest (8.849 m)</em>.</li>
+                <li><strong>⛰️ Berge (Höhe ü. NHN in m):</strong> Distanz zum nächsthöheren Gipfel – bis zum <em>Mount Everest (8.849 m)</em>[span_5](start_span)[span_5](end_span).</li>
                 <li><strong>⚡ Kraftwerke (Nennleistung in MW):</strong> Distanz zum nächststärkeren Kraftwerk inkl. Live-Einspeiseschätzung – bis zum <em>Drei-Schluchten-Staudamm (22.500 MW)</em>.</li>
                 <li><strong>🏙️ Städte &amp; Orte (Einwohnerzahl):</strong> Distanz zur nächstgrößeren Stadt – bis nach <em>Tokio (37,4 Mio.)</em>.</li>
                 <li><strong>📡 Türme &amp; Bauwerke (Höhe über Grund in m):</strong> Vom Aussichtsturm oder Fernsehturm bis zum <em>Burj Khalifa (828 m)</em>.</li>
