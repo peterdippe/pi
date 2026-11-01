@@ -1,15 +1,14 @@
 // ===================================================================
 // CORE: VIEW-LOADER, DEEP-LINK ROUTER, PASSWORT-MODAL & HELFER
-// (js/core.js für pi.dippe-sippe.de – mit persönlicher Tischtennis-Seite)
 // ===================================================================
 
 const domEsc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const domNum = (n, d = 0) => n == null ? '–' : new Intl.NumberFormat('de-DE', { maximumFractionDigits: d }).format(n);
 const domNorm = s => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-// Nur die reinen Vereins-Tools leiten auf www.tsvgraupa-tischtennis.de weiter;
-// "tischtennis" bleibt als Pi's persönliche Statistik- & Liga-Seite lokal erhalten!
+// Ausgelagerte Vereins-Seiten leiten automatisch auf www.tsvgraupa-tischtennis.de weiter
 const MOVED_TT_PAGES = {
+    'tischtennis':   'https://www.tsvgraupa-tischtennis.de/#spielbetrieb',
     'spielbetrieb':  'https://www.tsvgraupa-tischtennis.de/#spielbetrieb',
     'tt-news':       'https://www.tsvgraupa-tischtennis.de/#tt-news',
     'tt-ranking':    'https://www.tsvgraupa-tischtennis.de/#tt-ranking',
@@ -19,7 +18,7 @@ const MOVED_TT_PAGES = {
 
 const NAV_GROUPS = {
     familie:     ['fotos', 'pinnwand'],
-    sport:       ['tischtennis', 'radfahren', 'wandern', 'kicker'],
+    sport:       ['radfahren', 'wandern'],
     maptools:    ['area-maps', 'dominanz', 'luftlinie', 'area-pur'],
     spiele:      ['tetris', 'minesweeper', 'snake'],
     rechtliches: ['impressum']
@@ -27,7 +26,7 @@ const NAV_GROUPS = {
 
 const ALL_VIEWS = [
     'home', 'pinnwand', 'fotos',
-    'tischtennis', 'radfahren', 'wandern', 'kicker',
+    'radfahren', 'wandern',
     'area-maps', 'dominanz', 'luftlinie', 'area-pur',
     'tetris', 'minesweeper', 'snake',
     'impressum'
@@ -37,12 +36,10 @@ const PAGE_TITLES = {
     'home':        'π | Peters Page',
     'pinnwand':    "📌 π's Pinnwand | Peters Page",
     'fotos':       '📸 Fotos & Cloud | Peters Page',
-    'tischtennis': "🏓 π's Tischtennis-Cockpit | Peters Page",
     'radfahren':   '🚴 Fahrradfahren | Peters Page',
     'wandern':     '🥾 Wanderungen | Peters Page',
-    'kicker':      '⚽ Kickerabend | Peters Page',
     'area-maps':   '🌍 Maps Math | Peters Page',
-    'dominanz':    '⛰️ Berg-Dominanz-Atlas | Peters Page',
+    'dominanz':    '🌐 Dominanz-Atlas | Peters Page',
     'luftlinie':   '✈️ Luftlinien-Entfernung | Peters Page',
     'area-pur':    '📏 Pure Math | Peters Page',
     'tetris':      '🧱 Tetris | Peters Page',
@@ -52,10 +49,15 @@ const PAGE_TITLES = {
 };
 
 const SPORT_HEADER_ITEMS = [
-    { id: 'tischtennis', label: '🏓 Tischtennis' },
-    { id: 'radfahren',   label: '🚴 Fahrradfahren' },
-    { id: 'wandern',     label: '🥾 Wanderungen' },
-    { id: 'kicker',      label: '⚽ Kickerabend' }
+    { id: 'radfahren', label: '🚴 Fahrradfahren' },
+    { id: 'wandern',   label: '🥾 Wanderungen' }
+];
+
+const MAPTOOLS_HEADER_ITEMS = [
+    { id: 'area-maps', label: '🌍 Maps Math' },
+    { id: 'dominanz',  label: '🌐 Dominanz-Atlas' },
+    { id: 'luftlinie', label: '✈️ Luftlinie' },
+    { id: 'area-pur',  label: '📏 Pure Math' }
 ];
 
 let currentActivePageId = 'home';
@@ -259,7 +261,7 @@ function openNavGroup(group) {
     if (btn) btn.classList.add('group-open');
 }
 
-// Synchronisiert die obere Button-Leiste auf den 4 Sport-Seiten (+ Link zur Vereins-Homepage)
+// Synchronisiert die obere Button-Leiste auf den Sport-Seiten
 function syncSportHeaderButtons() {
     SPORT_HEADER_ITEMS.forEach(activeItem => {
         const sec = document.getElementById('page-' + activeItem.id);
@@ -275,8 +277,37 @@ function syncSportHeaderButtons() {
         btnContainer.innerHTML = SPORT_HEADER_ITEMS.map(item => `
             <button class="btn ${item.id === activeItem.id ? 'btn-emerald' : 'btn-sand'}" onclick="switchPage('${item.id}')">${item.label}</button>
         `).join('') + `
-            <a href="https://www.tsvgraupa-tischtennis.de" target="_blank" rel="noopener" class="btn btn-amber" style="text-decoration:none;">🌐 Vereins-Hub (TSV Graupa) ↗</a>
+            <a href="https://www.tsvgraupa-tischtennis.de" target="_blank" rel="noopener" class="btn btn-amber" style="text-decoration:none;">🏓 TSV Graupa TT ↗</a>
         `;
+    });
+}
+
+// Synchronisiert die obere Button-Leiste auf allen 4 Map-Tools-Seiten + Querverweise
+function syncMapToolsHeaderButtons() {
+    MAPTOOLS_HEADER_ITEMS.forEach(activeItem => {
+        const sec = document.getElementById('page-' + activeItem.id);
+        if (!sec) return;
+        const header = sec.querySelector('.section-header');
+        if (!header) return;
+        let btnContainer = header.querySelectorAll('div')[1];
+        if (!btnContainer) {
+            btnContainer = document.createElement('div');
+            btnContainer.style.cssText = 'display:flex; flex-wrap:wrap; gap:8px;';
+            header.appendChild(btnContainer);
+        }
+        btnContainer.innerHTML = MAPTOOLS_HEADER_ITEMS.map(item => `
+            <button class="btn ${item.id === activeItem.id ? 'btn-emerald' : 'btn-sand'}" onclick="switchPage('${item.id}')">${item.label}</button>
+        `).join('');
+    });
+
+    // Alle übrigen Buttons/Links auf Home & Wanderungen von "Berg-Dominanz-Atlas" auf "Dominanz-Atlas" aktualisieren
+    document.querySelectorAll('[onclick*="dominanz"]').forEach(el => {
+        if (el.innerHTML.includes('Berg-Dominanz-Atlas')) {
+            el.innerHTML = el.innerHTML
+                .replace(/⛰️\s*Zum Berg-Dominanz-Atlas/g, '🌐 Zum Dominanz-Atlas')
+                .replace(/⛰️\s*Berg-Dominanz-Atlas/g, '🌐 Dominanz-Atlas')
+                .replace(/Berg-Dominanz-Atlas/g, 'Dominanz-Atlas');
+        }
     });
 }
 
@@ -299,6 +330,7 @@ async function ensureAllViewsLoaded() {
         }));
         main.innerHTML = snippets.join('\n');
         syncSportHeaderButtons();
+        syncMapToolsHeaderButtons();
 
         if (typeof initHomeMap === 'function') initHomeMap();
         if (typeof initPinnwand === 'function') initPinnwand();
@@ -306,8 +338,6 @@ async function ensureAllViewsLoaded() {
         if (typeof calcHikeTime === 'function') calcHikeTime();
         if (typeof initAreaPur === 'function') initAreaPur();
         if (typeof renderAllHighscores === 'function') renderAllHighscores();
-        if (typeof initPersonalTTHubIfNeeded === 'function') initPersonalTTHubIfNeeded();
-        if (typeof initKickerIfNeeded === 'function') initKickerIfNeeded();
     })();
     return viewsLoadedPromise;
 }
@@ -364,9 +394,6 @@ async function switchPage(pageId, skipHistoryPush = false) {
     if (pageId === 'pinnwand' && typeof loadPinnwandFromCloud === 'function') {
         loadPinnwandFromCloud(false);
     }
-    if (pageId === 'tischtennis' && typeof initPersonalTTHubIfNeeded === 'function') {
-        setTimeout(() => initPersonalTTHubIfNeeded(), 80);
-    }
     if (pageId === 'area-maps' && typeof initMapsMathIfNeeded === 'function') {
         setTimeout(() => {
             initMapsMathIfNeeded();
@@ -397,9 +424,6 @@ async function switchPage(pageId, skipHistoryPush = false) {
     }
     if (pageId === 'snake' && typeof initSnakeIfNeeded === 'function') {
         setTimeout(() => initSnakeIfNeeded(), 80);
-    }
-    if (pageId === 'kicker' && typeof initKickerIfNeeded === 'function') {
-        setTimeout(() => initKickerIfNeeded(), 80);
     }
 }
 
