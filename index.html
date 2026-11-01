@@ -25,22 +25,19 @@
 
     <!-- MOBILE HEADER -->
     <div class="mobile-bar">
-        <div style="display:flex; align-items:center; gap:10px; cursor:pointer;" onclick="switchPage('home')">
+        <div style="display:flex; align-items:center; gap:10px;">
             <div class="brand-logo" style="width:34px; height:34px;">
                 <img src="Pi-vektor.jpg" alt="π" onerror="if(!this.dataset.low){this.dataset.low='1';this.src='pi-vektor.jpg';}else{this.outerHTML='<span style=\'color:#122620;font-weight:800;\'>π</span>';}">
             </div>
             <strong class="font-display" style="font-size:17px;">Pi @ Dippe-Sippe</strong>
         </div>
-        <div style="display:flex; gap:6px;">
-            <button class="btn btn-dark" style="padding:7px 11px; font-size:12.5px; border:1px solid var(--border-green);" onclick="shareCurrentPage()" title="Direktlink zu dieser Unterseite teilen">🔗</button>
-            <button class="btn btn-sand" style="padding:7px 13px; font-size:13px;" onclick="toggleSidebar()">Menü ☰</button>
-        </div>
+        <button class="btn btn-sand" style="padding:7px 13px; font-size:13px;" onclick="toggleSidebar()">Menü ☰</button>
     </div>
 
     <!-- SEITENLEISTE (SIDEBAR) -->
     <aside id="sidebar" class="sidebar">
         <div>
-            <div class="brand-box" style="cursor:pointer;" onclick="switchPage('home')">
+            <div class="brand-box">
                 <div class="brand-logo">
                     <img src="Pi-vektor.jpg" alt="π" onerror="if(!this.dataset.low){this.dataset.low='1';this.src='pi-vektor.jpg';}else{this.outerHTML='<span style=\'color:#122620;font-weight:800;font-size:22px;\'>π</span>';}">
                 </div>
@@ -56,7 +53,7 @@
                 </button>
 
                 <button onclick="toggleNavGroup('familie')" id="nav-familie" class="nav-btn">
-                    <span>⚡ π's Kosmos & Cloud</span>
+                    <span>⚡ π's Kosmos &amp; Cloud</span>
                     <span id="caret-familie" class="nav-caret">▸</span>
                 </button>
                 <div class="sub-nav" id="subnav-group-familie">
@@ -64,7 +61,7 @@
                         <span>📌 π's Pinnwand</span>
                     </button>
                     <button onclick="switchPage('fotos')" id="subnav-fotos" class="sub-nav-btn">
-                        <span>📸 Fotos & Cloud</span>
+                        <span>📸 Fotos &amp; Cloud</span>
                         <span id="lock-indicator">🔒</span>
                     </button>
                 </div>
@@ -74,18 +71,15 @@
                     <span id="caret-sport" class="nav-caret">▸</span>
                 </button>
                 <div class="sub-nav" id="subnav-group-sport">
-                    <button onclick="switchPage('tischtennis')" id="subnav-tischtennis" class="sub-nav-btn">
-                        <span>🏓 Tischtennis</span>
-                    </button>
                     <button onclick="switchPage('radfahren')" id="subnav-radfahren" class="sub-nav-btn">
                         <span>🚴 Fahrradfahren</span>
                     </button>
                     <button onclick="switchPage('wandern')" id="subnav-wandern" class="sub-nav-btn">
                         <span>🥾 Wanderungen</span>
                     </button>
-                    <button onclick="switchPage('kicker')" id="subnav-kicker" class="sub-nav-btn">
-                        <span>⚽ Kickerabend</span>
-                    </button>
+                    <a href="https://www.tsvgraupa-tischtennis.de" target="_blank" rel="noopener" class="sub-nav-btn" style="text-decoration:none;">
+                        <span>🏓 TSV Graupa TT ↗</span>
+                    </a>
                 </div>
 
                 <button onclick="toggleNavGroup('maptools')" id="nav-maptools" class="nav-btn">
@@ -97,7 +91,7 @@
                         <span>🌍 Maps Math</span>
                     </button>
                     <button onclick="switchPage('dominanz')" id="subnav-dominanz" class="sub-nav-btn">
-                        <span>⛰️ Berg-Dominanz-Atlas</span>
+                        <span>🌐 Dominanz-Atlas</span>
                     </button>
                     <button onclick="switchPage('luftlinie')" id="subnav-luftlinie" class="sub-nav-btn">
                         <span>✈️ Luftlinien-Entfernung</span>
@@ -136,15 +130,12 @@
         </div>
 
         <div class="sidebar-footer">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <span style="font-weight:700; color:#34d399;">● pi.dippe-sippe.de</span>
-                <button onclick="shareCurrentPage()" style="background:rgba(52,211,153,0.15); border:1px solid rgba(52,211,153,0.35); color:#34d399; border-radius:8px; padding:3px 8px; font-size:11px; font-weight:700; cursor:pointer;" title="Direktlink zur aktuellen Seite kopieren">🔗 Link</button>
-            </div>
+            <div style="font-weight:700; color:#34d399;">● pi.dippe-sippe.de</div>
             <div style="color:var(--text-muted); margin-top:4px;">Basecamp Graupa · Pirna</div>
         </div>
     </aside>
 
-    <!-- DYNAMISCHER HAUPTBEREICH -->
+    <!-- DYNAMISCHER HAUPTBEREICH (Wird automatisch aus dem Ordner views/ befüllt) -->
     <main id="app-main" class="main-content"></main>
 
     <!-- Gemeinsames Highscore Top-10 Modal für die Spiele-Ecke -->
@@ -163,11 +154,11 @@
         </div>
     </div>
 
-    <!-- Globales, maskiertes Passwort-Modal -->
+    <!-- Globales, maskiertes Passwort-Modal (Verhindert Klartext-Eingabe in Browser-Prompts!) -->
     <div class="modal-overlay" id="pwd-modal" onclick="if(event.target===this) closePasswordModal(null)">
         <div class="modal-box" style="max-width:400px; text-align:center;">
             <div style="font-size:36px; margin-bottom:6px;">🔐</div>
-            <h3 id="pwd-modal-title" style="font-size:21px; font-weight:800; margin-bottom:6px;">Passwort-Eingabe</h3>
+            <h3 id="pwd-modal-title" style="font-size:21px; font-weight:800; margin-bottom:6px;">Admin-Passwort</h3>
             <p id="pwd-modal-sub" style="font-size:13.5px; color:#475569; margin-bottom:14px;">Bitte gib das Passwort ein (Eingabe erfolgt verdeckt):</p>
             <form onsubmit="submitPasswordModal(event)" style="display:flex; flex-direction:column; gap:10px;">
                 <input type="password" id="pwd-modal-input" class="form-input" placeholder="••••••••" autocomplete="current-password"
@@ -181,16 +172,14 @@
     </div>
 
     <!-- ===================================================================
-         MODULARE JAVASCRIPT-EINBINDUNG (INKL. PI'S PERSÖNLICHEM TT-COCKPIT)
+         MODULARE JAVASCRIPT-EINBINDUNG (1:1 SEITEN-ARCHITEKTUR)
          =================================================================== -->
     <script src="js/core.js"></script>
     <script src="js/home.js"></script>
     <script src="js/pinnwand.js"></script>
     <script src="js/fotos.js"></script>
-    <script src="js/tischtennis.js"></script>
     <script src="js/radfahren.js"></script>
     <script src="js/wandern.js"></script>
-    <script src="js/kicker.js"></script>
     <script src="js/area-maps.js"></script>
     <script src="js/dominanz.js"></script>
     <script src="js/luftlinie.js"></script>
