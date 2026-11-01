@@ -1,5 +1,5 @@
 <!-- ===============================================================
-     MAP-TOOLS (2): "DOMINANZ-ATLAS" (6 KONTEXTE + LIVE-GPS-RADAR)
+     MAP-TOOLS (2): "DOMINANZ-ATLAS" (7 KONTEXTE + LIVE-WETTER & GPS)
      =============================================================== -->
 <section id="page-dominanz" class="page-section">
     <style>
@@ -14,7 +14,7 @@
             border: 1.5px solid #6ee7b7;
             border-radius: 14px;
             padding: 10px 14px;
-            margin-bottom: 14px;
+            margin-bottom: 12px;
         }
         .dom-context-Controls {
             display: flex;
@@ -38,7 +38,7 @@
             gap: 6px;
             flex: 1 1 240px;
             min-width: 0;
-            max-width: 460px;
+            max-width: 480px;
         }
         .dom-context-select {
             font-weight: 800;
@@ -99,6 +99,56 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
+
+        /* Spezial-Leiste für Wetterstationen: Hitze-Dominanz vs. Kälte-Dominanz */
+        .dom-weather-bar {
+            display: none;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            background: linear-gradient(135deg, #fff7ed 0%, #eff6ff 100%);
+            border: 1.5px solid #93c5fd;
+            border-radius: 13px;
+            padding: 9px 13px;
+            margin-bottom: 14px;
+        }
+        .dom-weather-bar.open {
+            display: flex;
+        }
+        .dom-pol-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+        }
+        .dom-pol-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 7px 12px;
+            border-radius: 9px;
+            font-size: 12.5px;
+            font-weight: 800;
+            border: 1.5px solid #cbd5e1;
+            background: #ffffff;
+            color: #334155;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .dom-pol-btn.active-hot {
+            background: linear-gradient(135deg, #dc2626, #ea580c);
+            color: #ffffff;
+            border-color: #b91c1c;
+            box-shadow: 0 2px 8px rgba(220, 38, 38, 0.35);
+        }
+        .dom-pol-btn.active-cold {
+            background: linear-gradient(135deg, #1d4ed8, #0284c7);
+            color: #ffffff;
+            border-color: #1e40af;
+            box-shadow: 0 2px 8px rgba(29, 78, 216, 0.35);
+        }
+
         @media (max-width: 640px) {
             .dom-context-Controls {
                 flex-direction: column;
@@ -243,7 +293,7 @@
 
     <div class="section-header">
         <div>
-            <span class="eyebrow" id="dom-page-eyebrow">Map-Tools · Berge, Kraftwerke, Städte, Türme, Seen &amp; Burgen</span>
+            <span class="eyebrow" id="dom-page-eyebrow">Map-Tools · Berge, Kraftwerke, Städte, Türme, Seen, Burgen &amp; Live-Wetter</span>
             <h2 style="font-size:32px; font-weight:800;" id="dom-page-title">🌐 Dominanz-Atlas</h2>
         </div>
         <div style="display:flex; flex-wrap:wrap; gap:8px;">
@@ -268,12 +318,32 @@
                         <option value="towers">📡 Türme &amp; Bauwerke (Höhe in m)</option>
                         <option value="lakes">🌊 Seen &amp; Talsperren (km² &amp; Baden)</option>
                         <option value="castles">🏰 Burgen &amp; Monumente (Alter)</option>
+                        <option value="weather">🌡️ Wetterstationen (Live-Temperatur °C)</option>
                     </select>
                     <button type="button" class="dom-step-btn" onclick="cycleDominanzMode(1)" title="Nächste Themenwelt">▶</button>
                 </div>
             </div>
             <div id="dom-mode-supreme-hint" class="dom-supreme-pill">
                 🏔️ Endpunkt: Mount Everest (8.849 m)
+            </div>
+        </div>
+
+        <!-- BIPOLARER WETTER-UMSCHALTER (Nur sichtbar im Modus "🌡️ Wetterstationen") -->
+        <div id="dom-weather-polarity-bar" class="dom-weather-bar">
+            <div class="dom-pol-group">
+                <strong style="font-size:12.5px; color:#1e293b; margin-right:2px;">🌡️ Temperatur-Richtung:</strong>
+                <button type="button" id="dom-pol-hot" class="dom-pol-btn active-hot" onclick="setWeatherPolarity('hot')">
+                    🔥 Hitze-Dominanz (Wärmer → Hitzepol)
+                </button>
+                <button type="button" id="dom-pol-cold" class="dom-pol-btn" onclick="setWeatherPolarity('cold')">
+                    ❄️ Kälte-Dominanz (Kälter → Kältepol)
+                </button>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <span id="dom-weather-sync-info" style="font-size:11.5px; font-weight:700; color:#0f766e;">⏳ Synchronisiere Live-Messnetz …</span>
+                <button type="button" class="btn btn-sand" style="padding:5px 10px; font-size:11.5px;" onclick="refreshLiveWeatherField(true)">
+                    🔄 Live-Update
+                </button>
             </div>
         </div>
 
@@ -302,7 +372,7 @@
         <div class="dom-legend" id="dom-legend"></div>
 
         <div style="font-size:11.5px; color:#64748b; margin-bottom:12px;">
-            <span id="dom-count">lade Daten …</span> · <span id="dom-visible"></span> Daten aus globalen JSONs &amp; Wikidata · <span id="dom-start-info">Start: Ermittle Position per GPS …</span>
+            <span id="dom-count">lade Daten …</span> · <span id="dom-visible"></span> Daten aus globalen JSONs &amp; Live-APIs · <span id="dom-start-info">Start: Ermittle Position per GPS …</span>
         </div>
 
         <!-- Hauptbereich: Links Karte, Rechts direkt die Info-Box zum gewählten Objekt -->
@@ -326,11 +396,11 @@
                 <div id="dom-results-Caption" style="font-size:11px; font-weight:800; color:var(--emerald-dark); text-transform:uppercase; letter-spacing:0.05em;"></div>
                 <div class="dom-list-mode-btns">
                     <button type="button" id="dom-list-btn-gps" class="dom-list-pill active"
-                            onclick="this.classList.add('active'); document.getElementById('dom-list-btn-view')?.classList.remove('active'); document.getElementById('dom-search-input').value=''; domSearch();">
+                            onclick="setDomListMode('gps')">
                         🧭 10 Nächste (GPS)
                     </button>
                     <button type="button" id="dom-list-btn-view" class="dom-list-pill"
-                            onclick="this.classList.add('active'); document.getElementById('dom-list-btn-gps')?.classList.remove('active'); if(typeof dominanzMap!=='undefined' && dominanzMap){ const b=dominanzMap.getBounds(); const c=dominanzMap.getCenter(); const inView=domPeaks.filter(p=>b.contains([p.lat,p.lon])).sort((a,z)=>(domVal(z)||0)-(domVal(a)||0)).slice(0,10); document.getElementById('dom-results-Caption').textContent='👁️ Top 10 im aktuellen Kartenausschnitt:'; domRenderResults(inView, false, Boolean(domUserLoc)); }">
+                            onclick="setDomListMode('view')">
                         👁️ Im Sichtfeld (Top 10)
                     </button>
                 </div>
@@ -339,7 +409,7 @@
         </div>
     </div>
 
-    <!-- Info-Modal: Was ist Dominanz? (für alle 6 Kontexte erklärt) -->
+    <!-- Info-Modal: Was ist Dominanz? (für alle 7 Kontexte erklärt) -->
     <div class="modal-overlay" id="dom-info-modal" onclick="if(event.target===this) closeDominanzInfo()">
         <div class="modal-box">
             <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">
@@ -349,18 +419,19 @@
             <p>
                 Die <strong>Dominanz</strong> beschreibt den Radius rund um einen Punkt, innerhalb
                 dessen er unübertroffen ist – also die Luftlinien-Distanz zum nächstgelegenen
-                Punkt mit einem <strong>höheren Wert</strong>[span_4](start_span)[span_4](end_span).
+                Punkt mit einem <strong>höheren (bzw. extremeren) Wert</strong>.
             </p>
             <p>
-                Über das Themenwelt-Dropdown oben kannst du das Prinzip auf <strong>6 globale Kontexte</strong> anwenden:
+                Über das Themenwelt-Dropdown oben kannst du das Prinzip auf <strong>7 globale Kontexte</strong> anwenden:
             </p>
             <ul style="font-size:13.2px; line-height:1.55; color:#334155; padding-left:20px; margin:8px 0 12px;">
-                <li><strong>⛰️ Berge (Höhe ü. NHN in m):</strong> Distanz zum nächsthöheren Gipfel – bis zum <em>Mount Everest (8.849 m)</em>[span_5](start_span)[span_5](end_span).</li>
+                <li><strong>⛰️ Berge (Höhe ü. NHN in m):</strong> Distanz zum nächsthöheren Gipfel – bis zum <em>Mount Everest (8.849 m)</em>.</li>
                 <li><strong>⚡ Kraftwerke (Nennleistung in MW):</strong> Distanz zum nächststärkeren Kraftwerk inkl. Live-Einspeiseschätzung – bis zum <em>Drei-Schluchten-Staudamm (22.500 MW)</em>.</li>
                 <li><strong>🏙️ Städte &amp; Orte (Einwohnerzahl):</strong> Distanz zur nächstgrößeren Stadt – bis nach <em>Tokio (37,4 Mio.)</em>.</li>
                 <li><strong>📡 Türme &amp; Bauwerke (Höhe über Grund in m):</strong> Vom Aussichtsturm oder Fernsehturm bis zum <em>Burj Khalifa (828 m)</em>.</li>
                 <li><strong>🌊 Seen &amp; Talsperren (Wasserfläche in km²):</strong> Vom lokalen Badesee oder Stausee (inkl. Info, ob <strong>Baden erlaubt</strong> ist!) bis zum <em>Kaspischen Meer (371.000 km²)</em>.</li>
                 <li><strong>🏰 Burgen &amp; Monumente (Alter in Jahren):</strong> Von regionalen Schlössern und Ritterburgen bis zu den Pyramiden und <em>Göbekli Tepe (~11.500 Jahre)</em>.</li>
+                <li><strong>🌡️ Wetterstationen (Live-Temperatur in °C):</strong> Über 13.500 WMO-/ICAO-Wetterstationen weltweit (inkl. Bergwarten). Du kannst live zwischen <strong>🔥 Hitze-Dominanz</strong> (nächste wärmere Station bis zum aktuellen Hitzepol der Erde) und <strong>❄️ Kälte-Dominanz</strong> (nächste kältere Station bis zum aktuellen Kältepol der Erde) umschalten!</li>
             </ul>
             <p style="margin-bottom:4px;">
                 🔗 Grundprinzip bei Wikipedia:
