@@ -1,0 +1,327 @@
+name: Build Global Dominanz JSONs (Powerplants & Towns)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/build-dominanz-json.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build-datasets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install --quiet numpy scipy requests
+
+      - name: Generate global powerplants.json and towns.json
+        run: |
+          python3 - << 'EOF'
+          import csv
+          import io
+          import json
+          import math
+          import zipfile
+          from collections import defaultdict
+          import numpy as np
+          from scipy.spatial import cKDTree
+          import requests
+
+          EARTH_R = 6371.0088
+
+          def latlon_to_xyz(lats, lons):
+              lat_r = np.radians(lats)
+              lon_r = np.radians(lons)
+              cos_lat = np.cos(lat_r)
+              return np.column_stack((
+                  cos_lat * np.cos(lon_r),
+                  cos_lat * np.sin(lon_r),
+                  np.sin(lat_r)
+              ))
+
+          def compute_exact_isolations(items, val_key, supreme_id):
+              """
+              Berechnet für jeden Punkt weltweit die exakte geodätische Distanz (km)
+              zum nächstgelegenen Punkt mit strikt höherem Wert via 3D-cKDTree.
+              """
+              valid = [it for it in items if it.get(val_key) is not None and it[val_key] > 0]
+              groups = defaultdict(list)
+              for it in valid:
+                  # Supreme-Eintrag garantiert ganz oben halten
+                  v = float(it[val_key])
+                  if it.get('id') == supreme_id:
+                      v += 1e9
+                  groups[v].append(it)
+
+              sorted_vals = sorted(groups.keys(), reverse=True)
+              tree = None
+              tree_xyz = []
+              buf_xyz = []
+
+              for idx, v in enumerate(sorted_vals):
+                  grp = groups[v]
+                  lats = np.array([p['lat'] for p in grp], dtype=np.float64)
+                  lons = np.array([p['lon'] for p in grp], dtype=np.float64)
+                  grp_xyz = latlon_to_xyz(lats, lons)
+
+                  if idx == 0:
+                      for p in grp:
+                          p['isolation'] = None
+                  else:
+                      min_chord = np.full(len(grp), np.inf, dtype=np.float64)
+                      if tree is not None:
+                          d_tree, _ = tree.query(grp_xyz, k=1)
+                          min_chord = np.minimum(min_chord, d_tree)
+                      if buf_xyz:
+                          buf_arr = np.vstack(buf_xyz)
+                          # Paarweise euklidische Distanz im 3D-Einheitskugelraum
+                          diff = grp_xyz[:, None, :] - buf_arr[None, :, :]
+                          d_buf = np.linalg.norm(diff, axis=2).min(axis=1)
+                          min_chord = np.minimum(min_chord, d_buf)
+
+                      # Umrechnung Sehnenlänge -> Großkreisdistanz (Orthodrome in km)
+                      km_arr = EARTH_R * 2.0 * np.arcsin(np.clip(min_chord / 2.0, 0.0, 1.0))
+                      for p, km in zip(grp, km_arr):
+                          if p.get('id') == supreme_id or not np.isfinite(km):
+                              p['isolation'] = None
+                          else:
+                              p['isolation'] = round(float(km), 2)
+
+                  buf_xyz.append(grp_xyz)
+                  total_buf = sum(len(x) for x in buf_xyz)
+                  if total_buf >= 500:
+                      tree_xyz.extend(buf_xyz)
+                      buf_xyz = []
+                      tree = cKDTree(np.vstack(tree_xyz))
+
+          # ===================================================================
+          # 1. POWERPLANTS.JSON (WRI Global Power Plant Database + Wikidata)
+          # ===================================================================
+          print("Lade WRI Global Power Plant Database (~35.000 Kraftwerke weltweit) ...")
+          wri_url = "https://raw.githubusercontent.com/wri/global-power-plant-database/master/output_database/global_power_plant_database.csv"
+          r = requests.get(wri_url, timeout=60)
+          r.raise_for_status()
+
+          fuel_map = {
+              'Solar': 'solar',
+              'Wind': 'wind',
+              'Hydro': 'hydro',
+              'Wave and Tidal': 'hydro',
+              'Pumped Storage': 'hydro',
+              'Coal': 'coal',
+              'Gas': 'gas',
+              'Oil': 'gas',
+              'Nuclear': 'nuclear',
+              'Biomass': 'biomass',
+              'Waste': 'biomass',
+              'Biogas': 'biomass',
+              'Geothermal': 'other',
+              'Cogeneration': 'gas',
+              'Storage': 'other'
+          }
+          type_label_de = {
+              'solar': 'Solarpark',
+              'wind': 'Windpark',
+              'hydro': 'Wasserkraftwerk',
+              'coal': 'Kohlekraftwerk',
+              'gas': 'Gaskraftwerk',
+              'nuclear': 'Kernkraftwerk',
+              'biomass': 'Biomasse / Müllheizkraftwerk',
+              'other': 'Kraftwerk'
+          }
+
+          plants = []
+          reader = csv.DictReader(io.StringIO(r.text))
+          for row in reader:
+              try:
+                  cap = float(row.get('capacity_mw') or 0)
+                  lat = float(row.get('latitude'))
+                  lon = float(row.get('longitude'))
+              except (ValueError, TypeError):
+                  continue
+              if cap < 1.0 or not (-90 <= lat <= 90 and -180 <= lon <= 180):
+                  continue
+              fuel = (row.get('primary_fuel') or '').strip()
+              ptype = fuel_map.get(fuel, 'other')
+              country = (row.get('country_long') or row.get('country') or '').strip()
+              gppd_id = (row.get('gppd_idnr') or f"P_{len(plants)}").strip()
+              name = (row.get('name') or gppd_id).strip()
+              cap_round = round(cap, 1) if cap < 100 else round(cap)
+
+              plants.append({
+                  'id': gppd_id,
+                  'name': name,
+                  'lat': round(lat, 5),
+                  'lon': round(lon, 5),
+                  'capacity': cap_round,
+                  'height': cap_round,
+                  'type': ptype,
+                  'country': country,
+                  'range': f"{type_label_de[ptype]} · {country}" if country else type_label_de[ptype]
+              })
+
+          # Wichtige Referenzkraftwerke mit offiziellen deutschen Namen & Wikidata-IDs
+          curated_plants = [
+              {'id': 'Q12514',  'name': 'Drei-Schluchten-Staudamm',         'lat': 30.82306, 'lon': 111.00333, 'capacity': 22500, 'type': 'hydro',   'country': 'China'},
+              {'id': 'Q741664', 'name': 'Baihetan-Staudamm',                'lat': 27.22250, 'lon': 102.90306, 'capacity': 16000, 'type': 'hydro',   'country': 'China'},
+              {'id': 'Q172640', 'name': 'Itaipú-Staudamm',                  'lat': -25.40806,'lon': -54.58889, 'capacity': 14000, 'type': 'hydro',   'country': 'Brasilien / Paraguay'},
+              {'id': 'Q1075079','name': 'Xiluodu-Staudamm',                 'lat': 28.25833, 'lon': 103.65000, 'capacity': 13860, 'type': 'hydro',   'country': 'China'},
+              {'id': 'Q1191624','name': 'Belo-Monte-Staudamm',              'lat': -3.12639, 'lon': -51.77500, 'capacity': 11233, 'type': 'hydro',   'country': 'Brasilien'},
+              {'id': 'Q249899', 'name': 'Guri-Staudamm',                    'lat': 7.76611,  'lon': -62.99806, 'capacity': 10235, 'type': 'hydro',   'country': 'Venezuela'},
+              {'id': 'Q1054877','name': 'Kraftwerk Kashiwazaki-Kariwa',     'lat': 37.42833, 'lon': 138.60167, 'capacity': 7965,  'type': 'nuclear', 'country': 'Japan'},
+              {'id': 'Q488446', 'name': 'Kernkraftwerk Saporischschja',     'lat': 47.51222, 'lon': 34.58639,  'capacity': 5700,  'type': 'nuclear', 'country': 'Ukraine'},
+              {'id': 'Q671204', 'name': 'Kernkraftwerk Gravelines',         'lat': 51.01528, 'lon': 2.13611,   'capacity': 5460,  'type': 'nuclear', 'country': 'Frankreich'},
+              {'id': 'Q572985', 'name': 'Kraftwerk Bełchatów',              'lat': 51.26722, 'lon': 19.32667,  'capacity': 5102,  'type': 'coal',    'country': 'Polen'},
+              {'id': 'Q314114', 'name': 'Kraftwerk Neurath',                'lat': 51.03750, 'lon': 6.61528,   'capacity': 4400,  'type': 'coal',    'country': 'Deutschland'},
+              {'id': 'Q568507', 'name': 'Kraftwerk Niederaußem',            'lat': 50.99611, 'lon': 6.67139,   'capacity': 3646,  'type': 'coal',    'country': 'Deutschland'},
+              {'id': 'Q694615', 'name': 'Kraftwerk Jänschwalde',            'lat': 51.83444, 'lon': 14.46083,  'capacity': 3000,  'type': 'coal',    'country': 'Deutschland'},
+              {'id': 'Q835660', 'name': 'Kraftwerk Boxberg',                'lat': 51.41583, 'lon': 14.56472,  'capacity': 2575,  'type': 'coal',    'country': 'Deutschland'},
+              {'id': 'Q835654', 'name': 'Pumpspeicherwerk Goldisthal',      'lat': 50.50833, 'lon': 11.00611,  'capacity': 1060,  'type': 'hydro',   'country': 'Deutschland'},
+              {'id': 'Q314702', 'name': 'Pumpspeicherwerk Markersbach',     'lat': 50.52694, 'lon': 12.87111,  'capacity': 1050,  'type': 'hydro',   'country': 'Deutschland'},
+              {'id': 'Q835675', 'name': 'Kraftwerk Lippendorf',             'lat': 51.17944, 'lon': 12.37361,  'capacity': 1840,  'type': 'coal',    'country': 'Deutschland'},
+              {'id': 'Q835680', 'name': 'Kraftwerk Schwarze Pumpe',         'lat': 51.53583, 'lon': 14.35500,  'capacity': 1600,  'type': 'coal',    'country': 'Deutschland'},
+              {'id': 'Q1490801','name': 'Energiepark Witznitz (Solarpark)', 'lat': 51.15700, 'lon': 12.46300,  'capacity': 650,   'type': 'solar',   'country': 'Deutschland'},
+              {'id': 'Q2301598','name': 'Solarpark Weesow-Willmersdorf',    'lat': 52.66000, 'lon': 13.71500,  'capacity': 187,   'type': 'solar',   'country': 'Deutschland'},
+              {'id': 'Q1512677','name': 'Pumpspeicherwerk Niederwartha',    'lat': 51.09194, 'lon': 13.60194,  'capacity': 40,    'type': 'hydro',   'country': 'Deutschland'}
+          ]
+
+          # Dubletten in direkter Nachbarschaft (3 km) zu kuratierten Einträgen entfernen
+          for cp in curated_plants:
+              cp['height'] = cp['capacity']
+              cp['range'] = f"{type_label_de[cp['type']]} · {cp['country']}"
+              plants = [
+                  p for p in plants
+                  if abs(p['lat'] - cp['lat']) > 0.035 or abs(p['lon'] - cp['lon']) > 0.045
+              ]
+              plants.append(cp)
+
+          print(f"Berechne exakte Dominanz für {len(plants)} Kraftwerke weltweit ...")
+          compute_exact_isolations(plants, 'capacity', 'Q12514')
+          plants.sort(key=lambda x: x['capacity'], reverse=True)
+
+          with open('powerplants.json', 'w', encoding='utf-8') as f:
+              json.dump(plants, f, ensure_ascii=False, separators=(',', ':'))
+          print(f"powerplants.json erfolgreich geschrieben ({len(plants)} Einträge).")
+
+          # ===================================================================
+          # 2. TOWNS.JSON (GeoNames Worldwide Cities & DACH-Gemeinden)
+          # ===================================================================
+          print("Lade globale Städtedatenbank von GeoNames (cities1000.zip) ...")
+          geo_url = "https://download.geonames.org/export/dump/cities1000.zip"
+          r_geo = requests.get(geo_url, timeout=90)
+          r_geo.raise_for_status()
+
+          towns = []
+          with zipfile.ZipFile(io.BytesIO(r_geo.content)) as z:
+              with z.open('cities1000.txt') as txt_file:
+                  for raw_line in io.TextIOWrapper(txt_file, encoding='utf-8'):
+                      parts = raw_line.rstrip('\n').split('\t')
+                      if len(parts) < 15:
+                          continue
+                      try:
+                          geoname_id = parts[0]
+                          name = parts[1].strip()
+                          lat = float(parts[4])
+                          lon = float(parts[5])
+                          fcode = parts[7].strip()
+                          cc = parts[8].strip()
+                          pop = int(parts[14] or 0)
+                      except (ValueError, TypeError):
+                          continue
+
+                      # Vororte/Stadtteile (PPLX) überspringen, damit echte Städte dominieren
+                      if fcode in ('PPLX', 'PPLH', 'PPLW', 'PPLQ'):
+                          continue
+
+                      # Weltweit alle Städte >= 10.000 Einw., Europa >= 5.000 Einw., DACH alle Orte >= 1.000 Einw.
+                      if cc in ('DE', 'AT', 'CH'):
+                          if pop < 1000:
+                              continue
+                      elif cc in ('FR', 'IT', 'ES', 'PL', 'CZ', 'NL', 'BE', 'DK', 'SE', 'NO', 'FI', 'GB', 'PT', 'HU', 'SK', 'SI', 'HR', 'GR', 'RO', 'BG'):
+                          if pop < 5000:
+                              continue
+                      else:
+                          if pop < 12000:
+                              continue
+
+                      towns.append({
+                          'id': f"GN_{geoname_id}",
+                          'name': name,
+                          'lat': round(lat, 5),
+                          'lon': round(lon, 5),
+                          'population': pop,
+                          'height': pop,
+                          'range': f"Stadt · {cc}"
+                      })
+
+          # Wichtige Referenzstädte & Metropolen mit deutschen Namen und offiziellen Wikidata-IDs
+          curated_towns = [
+              {'id': 'Q1490',  'name': 'Tokio',              'lat': 35.68949, 'lon': 139.69171, 'population': 37400000, 'range': 'Metropole · Japan'},
+              {'id': 'Q1353',  'name': 'Delhi',              'lat': 28.65195, 'lon': 77.23149,  'population': 32941000, 'range': 'Metropole · Indien'},
+              {'id': 'Q8686',  'name': 'Shanghai',           'lat': 31.22222, 'lon': 121.45806, 'population': 29211000, 'range': 'Metropole · China'},
+              {'id': 'Q1354',  'name': 'Dhaka',              'lat': 23.71040, 'lon': 90.40744,  'population': 23210000, 'range': 'Metropole · Bangladesch'},
+              {'id': 'Q174',   'name': 'São Paulo',          'lat': -23.54750,'lon': -46.63611, 'population': 22620000, 'range': 'Metropole · Brasilien'},
+              {'id': 'Q1489',  'name': 'Mexiko-Stadt',       'lat': 19.42847, 'lon': -99.12766, 'population': 22281000, 'range': 'Metropole · Mexiko'},
+              {'id': 'Q85',    'name': 'Kairo',              'lat': 30.06263, 'lon': 31.24967,  'population': 22183000, 'range': 'Metropole · Ägypten'},
+              {'id': 'Q956',   'name': 'Peking',             'lat': 39.90750, 'lon': 116.39723, 'population': 21766000, 'range': 'Metropole · China'},
+              {'id': 'Q1156',  'name': 'Mumbai',             'lat': 19.07283, 'lon': 72.88261,  'population': 21297000, 'range': 'Metropole · Indien'},
+              {'id': 'Q406',   'name': 'Istanbul',           'lat': 41.01384, 'lon': 28.94966,  'population': 15655924, 'range': 'Metropole · Türkei'},
+              {'id': 'Q649',   'name': 'Moskau',             'lat': 55.75222, 'lon': 37.61556,  'population': 13104177, 'range': 'Hauptstadt · Russland'},
+              {'id': 'Q84',    'name': 'London',             'lat': 51.50853, 'lon': -0.12574,  'population': 8982000,  'range': 'Hauptstadt · Großbritannien'},
+              {'id': 'Q60',    'name': 'New York City',      'lat': 40.71427, 'lon': -74.00597, 'population': 8804190,  'range': 'Metropole · USA'},
+              {'id': 'Q64',    'name': 'Berlin',             'lat': 52.52437, 'lon': 13.41053,  'population': 3782202,  'range': 'Bundeshauptstadt · Deutschland'},
+              {'id': 'Q2807',  'name': 'Madrid',             'lat': 40.41650, 'lon': -3.70256,  'population': 3332035,  'range': 'Hauptstadt · Spanien'},
+              {'id': 'Q220',   'name': 'Rom',                'lat': 41.89193, 'lon': 12.51133,  'population': 2751747,  'range': 'Hauptstadt · Italien'},
+              {'id': 'Q90',    'name': 'Paris',              'lat': 48.85341, 'lon': 2.34880,   'population': 2102650,  'range': 'Hauptstadt · Frankreich'},
+              {'id': 'Q1741',  'name': 'Wien',               'lat': 48.20849, 'lon': 16.37208,  'population': 2005760,  'range': 'Bundeshauptstadt · Österreich'},
+              {'id': 'Q1055',  'name': 'Hamburg',            'lat': 53.55073, 'lon': 9.99302,   'population': 1910160,  'range': 'Freie und Hansestadt · Deutschland'},
+              {'id': 'Q270',   'name': 'Warschau',           'lat': 52.22977, 'lon': 21.01178,  'population': 1861644,  'range': 'Hauptstadt · Polen'},
+              {'id': 'Q1726',  'name': 'München',            'lat': 48.13743, 'lon': 11.57549,  'population': 1510378,  'range': 'Landeshauptstadt · Bayern'},
+              {'id': 'Q1085',  'name': 'Prag',               'lat': 50.08804, 'lon': 14.42076,  'population': 1384732,  'range': 'Hauptstadt · Tschechien'},
+              {'id': 'Q365',   'name': 'Köln',               'lat': 50.93333, 'lon': 6.95000,   'population': 1087353,  'range': 'Großstadt · Nordrhein-Westfalen'},
+              {'id': 'Q1794',  'name': 'Frankfurt am Main',  'lat': 50.11552, 'lon': 8.68417,   'population': 775790,   'range': 'Großstadt · Hessen'},
+              {'id': 'Q2079',  'name': 'Leipzig',            'lat': 51.33962, 'lon': 12.37129,  'population': 619879,   'range': 'Großstadt · Sachsen'},
+              {'id': 'Q1731',  'name': 'Dresden',            'lat': 51.05089, 'lon': 13.73832,  'population': 566222,   'range': 'Landeshauptstadt · Sachsen'},
+              {'id': 'Q2795',  'name': 'Chemnitz',           'lat': 50.83570, 'lon': 12.92922,  'population': 250681,   'range': 'Großstadt · Sachsen'},
+              {'id': 'Q14839', 'name': 'Pirna',              'lat': 50.96200, 'lon': 13.94100,  'population': 39300,    'range': 'Große Kreisstadt · Sachsen'}
+          ]
+
+          for ct in curated_towns:
+              ct['height'] = ct['population']
+              towns = [
+                  t for t in towns
+                  if abs(t['lat'] - ct['lat']) > 0.08 or abs(t['lon'] - ct['lon']) > 0.10
+              ]
+              towns.append(ct)
+
+          print(f"Berechne exakte Dominanz für {len(towns)} Städte weltweit ...")
+          compute_exact_isolations(towns, 'population', 'Q1490')
+          towns.sort(key=lambda x: x['population'], reverse=True)
+
+          with open('towns.json', 'w', encoding='utf-8') as f:
+              json.dump(towns, f, ensure_ascii=False, separators=(',', ':'))
+          print(f"towns.json erfolgreich geschrieben ({len(towns)} Einträge).")
+          EOF
+
+      - name: Commit and Push generated JSON files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add powerplants.json towns.json
+          if git diff --staged --quiet; then
+            echo "Keine Änderungen an powerplants.json oder towns.json."
+          else
+            git commit -m "chore: generate global powerplants.json and towns.json with geodesic isolation"
+            git push
+          fi
