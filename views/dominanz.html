@@ -1,9 +1,57 @@
 <!-- ===============================================================
-     MAP-TOOLS (2): "BERG-DOMINANZ-ATLAS" (LIVE-GPS, HÖHE, SPEED & RADAR)
+     MAP-TOOLS (2): "DOMINANZ-ATLAS" (BERGE · KRAFTWERKE · STÄDTE + LIVE-GPS)
      =============================================================== -->
 <section id="page-dominanz" class="page-section">
     <style>
-        /* Eleganter blauer Standort-Pfeil mit blinkender Umrandung + Höhen- & Speed-Badges */
+        /* Kontext-Umschalter (Berge | Kraftwerke | Städte) */
+        .dom-context-bar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border: 1.5px solid #cbd5e1;
+            border-radius: 14px;
+            padding: 10px 14px;
+            margin-bottom: 14px;
+        }
+        .dom-context- pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .dom-ctx-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 15px;
+            border-radius: 10px;
+            font-size: 13.5px;
+            font-weight: 800;
+            border: 1.5px solid #cbd5e1;
+            background: #ffffff;
+            color: #334155;
+            cursor: pointer;
+            transition: all 0.18s ease;
+        }
+        .dom-ctx-btn:hover {
+            border-color: #059669;
+            transform: translateY(-1px);
+        }
+        .dom-ctx-btn.active {
+            background: #059669;
+            color: #ffffff;
+            border-color: #047857;
+            box-shadow: 0 3px 10px rgba(5, 150, 105, 0.28);
+        }
+        .dom-ctx-sub {
+            font-size: 11px;
+            font-weight: 600;
+            opacity: 0.85;
+        }
+
+        /* Eleganter blauer Standort-Pfeil mit blinkender Umrandung + Höhen/Speed-Badges */
         .dom-user-loc-wrap {
             display: flex;
             align-items: center;
@@ -41,28 +89,26 @@
             transform: translateX(-50%);
             white-space: nowrap;
             font-family: 'JetBrains Mono', monospace;
-            font-size: 10.5px;
+            font-size: 10px;
             font-weight: 800;
             line-height: 1.1;
             padding: 2px 6px;
             border-radius: 999px;
             pointer-events: none;
-            z-index: 3;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+            z-index: 4;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
         }
         .dom-user-badge-top {
-            bottom: 100%;
-            margin-bottom: 3px;
-            background: rgba(9, 21, 18, 0.92);
-            color: #34d399;
-            border: 1.5px solid #10b981;
+            bottom: 31px;
+            background: #065f46;
+            color: #ecfdf5;
+            border: 1.5px solid #6ee7b7;
         }
         .dom-user-badge-bottom {
-            top: 100%;
-            margin-top: 3px;
-            background: rgba(30, 58, 138, 0.94);
-            color: #ffffff;
-            border: 1.5px solid #60a5fa;
+            top: 31px;
+            background: #1e3a8a;
+            color: #eff6ff;
+            border: 1.5px solid #93c5fd;
         }
         .dom-legend-user-arrow {
             display: inline-flex;
@@ -94,18 +140,37 @@
 
     <div class="section-header">
         <div>
-            <span class="eyebrow">Map-Tools · Topografie, Isolation &amp; Live-Standort</span>
-            <h2 style="font-size:32px; font-weight:800;">⛰️ Berg-Dominanz-Atlas</h2>
+            <span class="eyebrow" id="dom-page-eyebrow">Map-Tools · Berge, Kraftwerke, Städte &amp; Live-Standort</span>
+            <h2 style="font-size:32px; font-weight:800;" id="dom-page-title">🌐 Dominanz-Atlas</h2>
         </div>
         <div style="display:flex; flex-wrap:wrap; gap:8px;">
             <button class="btn btn-sand" onclick="switchPage('area-maps')">🌍 Maps Math</button>
-            <button class="btn btn-emerald" onclick="switchPage('dominanz')">⛰️ Berg-Dominanz-Atlas</button>
-            <button class="btn btn-sand" onclick="switchPage('luftlinie')">✈️ Luftlinien-Entfernung</button>
+            <button class="btn btn-emerald" onclick="switchPage('dominanz')">🌐 Dominanz-Atlas</button>
+            <button class="btn btn-sand" onclick="switchPage('luftlinie')">✈️ Luftlinie</button>
             <button class="btn btn-sand" onclick="switchPage('area-pur')">📏 Pure Math</button>
         </div>
     </div>
 
     <div class="sand-card">
+        <!-- KONTEXT-UMSCHALTER: BERGE | KRAFTWERKE | STÄDTE -->
+        <div class="dom-context-bar">
+            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
+                <strong style="font-size:12.5px; color:#475569; margin-right:4px;">🎛️ Kontext:</strong>
+                <button type="button" id="dom-mode-peaks" class="dom-ctx-btn active" onclick="setDominanzMode('peaks')">
+                    ⛰️ Berge <span class="dom-ctx-sub">(Höhe m)</span>
+                </button>
+                <button type="button" id="dom-mode-powerplants" class="dom-ctx-btn" onclick="setDominanzMode('powerplants')">
+                    ⚡ Kraftwerke <span class="dom-ctx-sub">(MW &amp; Live)</span>
+                </button>
+                <button type="button" id="dom-mode-towns" class="dom-ctx-btn" onclick="setDominanzMode('towns')">
+                    🏙️ Städte <span class="dom-ctx-sub">(Einwohner)</span>
+                </button>
+            </div>
+            <div id="dom-mode- supreme-hint" style="font-size:12px; font-weight:700; color:#047857;">
+                🏔️ Endpunkt: Mount Everest (8.849 m)
+            </div>
+        </div>
+
         <!-- Obere Steuerleiste -->
         <div class="toolbar-box" style="margin-bottom:16px;">
             <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
@@ -118,8 +183,8 @@
                 </label>
             </div>
             <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
-                <button id="dom-locate-btn" class="btn btn-emerald" style="padding:8px 13px; font-size:12.5px;" onclick="domLocateUserAndSelectNearest(true)" title="Meinen GPS-Standort bestimmen und nächstgelegenen Berg auswählen">
-                    🧭 Nächster Berg (GPS)
+                <button id="dom-locate-btn" class="btn btn-emerald" style="padding:8px 13px; font-size:12.5px;" onclick="domLocateUserAndSelectNearest(true)" title="Meinen GPS-Standort bestimmen und nächstgelegenes Objekt auswählen">
+                    🧭 Nächster Punkt (GPS)
                 </button>
                 <button id="dom-pick-btn" class="btn btn-amber" style="padding:8px 12px; font-size:12.5px;" onclick="toggleDomPickMode()">📍 Eigenen Punkt setzen: AUS</button>
                 <button class="btn btn-sand" style="padding:8px 14px; font-size:12.5px;" onclick="openDominanzInfo()">❓ Was ist Dominanz?</button>
@@ -127,35 +192,14 @@
             </div>
         </div>
 
-        <!-- Farblegende (Höhenklassen + eigener Standort) über der Karte -->
-        <div class="dom-legend" id="dom-legend">
-            <strong style="font-size:12px; margin-right:2px;">Höhe ü. NN:</strong>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#1a6b2e;"></span> &lt; 1000 m</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#5bd16a;"></span> 1000–2000 m</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#f2d307;"></span> 2000–3000 m</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#d9a406;"></span> 3000–4000 m</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#f27405;"></span> 4000–5000 m</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#f2766e;"></span> 5000–6000 m</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#e01b1b;"></span> 6000–7000 m</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#8b2fc9;"></span> &gt; 7000 m</span>
-            <span class="dom-legend-sep">|</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#111;"></span> gewählter Berg</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#fff; border-color:#111;"></span> Bezugsberg</span>
-            <span class="dom-legend-item">
-                <span class="dom-legend-user-arrow" title="Deine aktuelle GPS-Position (oben: Höhe, unten: Geschwindigkeit)">
-                    <svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true">
-                        <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z" fill="#2563eb" stroke="#ffffff" stroke-width="2" stroke-linejoin="round"/>
-                    </svg>
-                </span>
-                eigener Standort (⛰️ Höhe / km/h)
-            </span>
-        </div>
+        <!-- Dynamische Farblegende über der Karte (passt sich an Berge / Kraftwerke / Städte an) -->
+        <div class="dom-legend" id="dom-legend"></div>
 
         <div style="font-size:11.5px; color:#64748b; margin-bottom:12px;">
-            <span id="dom-count">lade Gipfel …</span> · <span id="dom-visible"></span> Daten aus Wikidata/Wikipedia · <span id="dom-start-info">Start: Ermittle nächsten Berg per GPS …</span>
+            <span id="dom-count">lade Daten …</span> · <span id="dom-visible"></span> Daten aus JSON &amp; Wikidata · <span id="dom-start-info">Start: Ermittle Position per GPS …</span>
         </div>
 
-        <!-- Hauptbereich: Links Karte, Rechts Suche & Gipfel-Details -->
+        <!-- Hauptbereich: Links Karte, Rechts Suche & Details -->
         <div class="dominanz-layout">
             <!-- Karte -->
             <div>
@@ -163,48 +207,41 @@
                 <div id="dom-status" style="font-size:12px; color:#b45309; margin-top:8px; min-height:16px;"></div>
             </div>
 
-            <!-- Rechte Spalte: Suche / Umgebungs-Berge + aktiver Gipfel -->
+            <!-- Rechte Spalte: Suche / Umgebungs-Radar + aktives Objekt -->
             <div style="display:flex; flex-direction:column; gap:14px;">
                 <div style="background:var(--bg-sand-light); border:1px solid var(--border-sand); border-radius:16px; padding:14px;">
-                    <input type="text" id="dom-search-input" class="form-input" placeholder="🔍 Berg suchen (oder leer lassen für Berge im Umkreis)" autocomplete="off">
+                    <input type="text" id="dom-search-input" class="form-input" placeholder="🔍 Suchen (oder leer lassen für Umkreis-Radar)" autocomplete="off">
                     <div id="dom-results-Caption" style="font-size:11px; font-weight:800; color:var(--emerald-dark); text-transform:uppercase; letter-spacing:0.05em; margin-top:8px;"></div>
                     <div id="dom-results" class="peak-list" style="margin-top:6px;"></div>
                 </div>
-                <!-- Info-Box zum ausgewählten Berg -->
+                <!-- Info-Box zum ausgewählten Berg / Kraftwerk / Stadt -->
                 <div id="dom-detail" style="background:#fff; border:2px solid var(--emerald-dark); border-radius:16px; padding:16px;"></div>
             </div>
         </div>
     </div>
 
-    <!-- Info-Modal: Was ist Dominanz? -->
+    <!-- Info-Modal: Was ist Dominanz? (für alle 3 Kontexte erklärt) -->
     <div class="modal-overlay" id="dom-info-modal" onclick="if(event.target===this) closeDominanzInfo()">
         <div class="modal-box">
             <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">
-                <h3>⛰️ Was bedeutet „Dominanz“?</h3>
+                <h3>🌐 Was bedeutet „Dominanz“ im Atlas?</h3>
                 <button class="modal-x" onclick="closeDominanzInfo()" title="Schließen">✕</button>
             </div>
             <p>
-                Die <strong>Dominanz</strong> (auch <em>Isolation</em>) eines Berggipfels ist die
-                Entfernung zum nächstgelegenen Punkt gleicher Höhe – also die Distanz
-                zum nächsten höheren Gipfel bzw. Höhenzug. Sie beschreibt, wie
-                „eigenständig“ ein Berg seine Umgebung überragt: Je größer die
-                Dominanz, desto weiter muss man reisen, bis man etwas Höheres erreicht.
+                Die <strong>Dominanz</strong> beschreibt den Radius rund um einen Punkt, innerhalb
+                dessen er unübertroffen ist – also die Luftlinien-Distanz zum nächstgelegenen
+                Punkt mit einem <strong>höheren Wert</strong>.
             </p>
             <p>
-                Ein Beispiel: Der Mont Blanc hat eine Dominanz von mehreren tausend
-                Kilometern, weil erst weit entfernt im Kaukasus wieder höhere Gipfel
-                stehen. Ein kleiner Tafelberg der Sächsischen Schweiz dagegen wird
-                schon vom Nachbarfelsen übertroffen – seine Dominanz beträgt nur
-                wenige Kilometer.
+                Über den Kontext-Umschalter oben kannst du das Prinzip auf drei Welten anwenden:
             </p>
-            <p style="font-size:13px; color:#475569;">
-                In dieser Karte reicht der Kreis genau bis zum <strong>Bezugsgipfel</strong>
-                (dem nächsthöheren Berg) – sein Radius ist der Abstand zwischen den
-                beiden Gipfeln. Über das rote Feld „Nächsthöherer Berg“ kannst du dich
-                Schritt für Schritt nach oben klicken – am Ende landest du beim Mount Everest.
-            </p>
+            <ul style="font-size:13.5px; line-height:1.55; color:#334155; padding-left:20px; margin:8px 0 12px;">
+                <li><strong>⛰️ Berge (Höhe in m):</strong> Distanz zum nächsthöheren Gipfel – die Kette endet beim <em>Mount Everest (8.849 m)</em>.</li>
+                <li><strong>⚡ Kraftwerke (Nennleistung in MW):</strong> Distanz zum nächsten Kraftwerk mit größerer maximaler Nennleistung (ohne private Dach-PV). Für Wind- und Solarparks wird zudem live aus den aktuellen Wetterdaten am Standort die momentane Einspeisung geschätzt. Die Kette endet beim <em>Drei-Schluchten-Staudamm (22.500 MW)</em>.</li>
+                <li><strong>🏙️ Städte (Einwohnerzahl):</strong> Distanz zur nächsten Stadt mit mehr Einwohnern – vom Dorf über die Kreis- und Landeshauptstadt bis nach <em>Tokio</em>.</li>
+            </ul>
             <p style="margin-bottom:4px;">
-                🔗 Mehr dazu bei Wikipedia:
+                🔗 Mehr zum Grundprinzip bei Wikipedia:
                 <a href="https://de.wikipedia.org/wiki/Dominanz_(Geographie)" target="_blank" rel="noopener" style="color:var(--emerald-dark); font-weight:700;">Dominanz (Geographie)</a>
             </p>
             <div class="modal-close-row">
