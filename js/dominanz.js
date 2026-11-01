@@ -1,5 +1,5 @@
 // ===================================================================
-// DOMINANZ-ATLAS (6 KONTEXTE + LIVE-GPS-RADAR & WETTER-/BADE-TELEMETRIE)
+// DOMINANZ-ATLAS (6 KONTEXTE + LIVE-GPS-RADAR, ORTSAUFLÖSUNG & ROUTING)
 // Kontexte: peaks | powerplants | towns | towers | lakes | castles
 // ===================================================================
 
@@ -39,6 +39,9 @@ let domSelMarker = null;
 let domRefMarker = null;
 let domMarkers = null;
 let domGen = 0, domSearchGen = 0, domSearchTimer = null;
+
+// Cache für Stadt/Land-Auflösung (Koordinaten -> "Stadt, Land")
+const domPlaceCache = {};
 
 // --- GPS-Standort- & Telemetrie-State ---
 let domUserLoc = null;          // { lat, lon, heading, speedKmh, altitude, accuracy, ts }
@@ -200,6 +203,17 @@ const CASTLE_TYPE_META = {
     monument: { label: 'Antikes Monument',       icon: '🏛️', color: '#9333ea' }
 };
 
+const ISO_COUNTRY_DE = {
+    DE: 'Deutschland', AT: 'Österreich', CH: 'Schweiz', CZ: 'Tschechien', PL: 'Polen',
+    FR: 'Frankreich', IT: 'Italien', ES: 'Spanien', PT: 'Portugal', NL: 'Niederlande',
+    BE: 'Belgien', LU: 'Luxemburg', DK: 'Dänemark', SE: 'Schweden', NO: 'Norwegen',
+    FI: 'Finnland', GB: 'Großbritannien', IE: 'Irland', HU: 'Ungarn', SK: 'Slowakei',
+    SI: 'Slowenien', HR: 'Kroatien', GR: 'Griechenland', RO: 'Rumänien', BG: 'Bulgarien',
+    TR: 'Türkei', RU: 'Russland', UA: 'Ukraine', US: 'USA', CA: 'Kanada', MX: 'Mexiko',
+    BR: 'Brasilien', AR: 'Argentinien', CN: 'China', JP: 'Japan', IN: 'Indien',
+    AU: 'Australien', NZ: 'Neuseeland', ZA: 'Südafrika', EG: 'Ägypten'
+};
+
 function domCfg() { return DOM_MODE_CFG[domMode] || DOM_MODE_CFG.peaks; }
 
 function domVal(p) {
@@ -263,6 +277,71 @@ function domItemIcon(p) {
 }
 
 // ===================================================================
+// AUTOMATISCHE ORTS- & LANDESAUFLÖSUNG (STADT + LAND ZU JEDEM OBJEKT)
+// ===================================================================
+function getInitialPlaceLabel(p) {
+    if (!p) return '';
+    if (p.placeLabel) return p.placeLabel;
+    const key = `${Number(p.lat).toFixed(3)},${Number(p.lon).toFixed(3)}`;
+    if (domPlaceCache[key]) {
+        p.placeLabel = domPlaceCache[key];
+        return p.placeLabel;
+    }
+    if (p.city && p.country) return `${p.city}, ${p.country}`;
+    if (p.country) return p.country;
+    if (p.range && p.range.includes('·')) {
+        const rhs = p.range.split('·').pop().trim();
+        if (ISO_COUNTRY_DE[rhs]) return ISO_COUNTRY_DE[rhs];
+        if (rhs.length > 2) return rhs;
+    }
+    return '';
+}
+
+async function resolvePlaceLabel(p) {
+    if (!p || !isFinite(p.lat) || !isFinite(p.lon)) return '';
+    if (p.placeLabel) return p.placeLabel;
+    const key = `${Number(p.lat).toFixed(3)},${Number(p.lon).toFixed(3)}`;
+    if (domPlaceCache[key]) {
+        p.placeLabel = domPlaceCache[key];
+        return p.placeLabel;
+    }
+
+    try {
+        const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${p.lat.toFixed(5)}&lon=${p.lon.toFixed(5)}&zoom=12&accept-language=de`;
+        const r = await fetch(url, { signal: AbortSignal.timeout(6500) });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const data = await r.json();
+        const addr = data?.address || {};
+        const city = addr.city || addr.town || addr.village || addr.municipality || addr.hamlet || addr.county || addr.state || '';
+        const country = addr.country || p.country || '';
+
+        let label = '';
+        if (city && country && domNorm(city) !== domNorm(p.name)) {
+            label = `${city}, ${country}`;
+        } else if (addr.county && country && domNorm(city) === domNorm(p.name)) {
+            label = `${addr.county}, ${country}`;
+        } else if (city && country) {
+            label = `${city}, ${country}`;
+        } else {
+            label = country || city || getInitialPlaceLabel(p);
+        }
+
+        if (label) {
+            domPlaceCache[key] = label;
+            p.placeLabel = label;
+        }
+        return label;
+    } catch (e) {
+        return getInitialPlaceLabel(p);
+    }
+}
+
+function buildGoogleMapsRouteUrl(p) {
+    if (!p || !isFinite(p.lat) || !isFinite(p.lon)) return 'https://www.google.com/maps';
+    return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(p.lat + ',' + p.lon)}&travelmode=driving`;
+}
+
+// ===================================================================
 // INITIALISIERUNG & KONTEXT-UMSCHALTER (DROPDOWN + VOR/ZURÜCK)
 // ===================================================================
 function initDominanzMapIfNeeded() {
@@ -321,7 +400,6 @@ function setDominanzMode(mode) {
     const sel = document.getElementById('dom-mode-select');
     if (sel && sel.value !== mode) sel.value = mode;
 
-    // Falls noch Buttons vorhanden sind, ebenfalls synchronisieren
     DOM_MODES_ORDER.forEach(m => {
         const btn = document.getElementById('dom-mode-' + m);
         if (btn) btn.classList.toggle('active', m === mode);
@@ -855,8 +933,7 @@ async function fetchLiveLakeBathingInfo(p, token) {
         const windKmh = cur.wind_speed_10m;
         const uv = cur.uv_index;
         if (airT != null) {
-            // Jahreszeitliche Schätzung der Oberflächentemperatur von Binnengewässern
-            const month = new Date().getMonth(); // 0..11
+            const month = new Date().getMonth();
             const seasonalBase = [3, 3.5, 6, 10, 15, 19, 21.5, 22, 18, 13, 8, 4.5][month] || 12;
             const estWaterT = Math.max(2, Math.min(26, Math.round((seasonalBase * 0.7 + airT * 0.3) * 10) / 10));
             subEl.innerHTML =
@@ -1126,6 +1203,7 @@ function round2(x) { return Math.round(x * 100) / 100; }
 
 function renderPickResult(p, ref) {
     const cfg = domCfg();
+    const token = ++domGen;
     domActive = p; domReference = ref || null;
     if (domSelMarker) { dominanzMap.removeLayer(domSelMarker); domSelMarker = null; }
     if (domRefMarker) { dominanzMap.removeLayer(domRefMarker); domRefMarker = null; }
@@ -1143,15 +1221,27 @@ function renderPickResult(p, ref) {
         const b = domCircle.getBounds(); b.extend([ref.lat, lon]);
         dominanzMap.fitBounds(b.pad(0.25), { maxZoom: 13, animate: false });
     }
+    const gmapsDirUrl = buildGoogleMapsRouteUrl(p);
     document.getElementById('dom-detail').innerHTML =
         `<div class="eyebrow-dark" style="display:block; margin-bottom:4px;">📍 ${domEsc(p.range)}</div>` +
-        '<h3 style="font-size:22px; font-weight:800; margin:0 0 12px;">Gewählter Kartenpunkt</h3>' +
+        '<h3 style="font-size:22px; font-weight:800; margin:0 0 4px;">Gewählter Kartenpunkt</h3>' +
+        '<div id="dom-loc-subtitle" style="font-size:13px; font-weight:700; color:#047857; margin-bottom:10px;">📍 Ermittle Ort &amp; Land …</div>' +
         '<div class="person-grid-2" style="margin:0 0 10px;">' +
         `<div class="person-box" style="background:#ecfdf5; border-color:#a7f3d0;"><span class="person-role">${domEsc(cfg.valueLabel)}</span><div class="person-name" style="font-size:18px;">${domFormatVal(domVal(p))}</div></div>` +
         '<div class="person-box" style="background:#fffbeb; border-color:#fde68a;"><span class="person-role" style="color:var(--amber);">Dominanz ≈</span><div class="person-name" style="font-size:18px;">' + (p.isolation != null ? domNum(p.isolation, 2) + ' km' : '–') + '</div></div>' +
         '</div>' +
-        (ref ? `<p class="dom-note">${domEsc(cfg.higherLabel)}: <b>${domEsc(ref.name)}</b> (${domFormatVal(domVal(ref))}) – ${domNum(p.isolation, 2)} km entfernt.</p>` : '<p class="dom-note">Kein höherer Punkt im Datensatz gefunden.</p>') +
-        '<p class="dom-note">Koordinaten: ' + p.lat.toFixed(4) + '°, ' + p.lon.toFixed(4) + '°.</p>';
+        '<p class="dom-note" style="margin-bottom:10px;">Koordinaten: ' + p.lat.toFixed(4) + '°, ' + p.lon.toFixed(4) + '°.</p>' +
+        '<div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:4px;">' +
+        `<a class="btn btn-emerald" href="${gmapsDirUrl}" target="_blank" rel="noopener" style="font-size:12.5px; padding:8px 13px; text-decoration:none;">🧭 Route (Google Maps) ↗</a>` +
+        '</div>' +
+        `<div id="dom-higher" style="margin-top:14px; padding-top:12px; border-top:1px solid #e2e8f0;"></div>`;
+
+    domOfferHigher(p, ref, token);
+    resolvePlaceLabel(p).then(lbl => {
+        if (token !== domGen) return;
+        const el = document.getElementById('dom-loc-subtitle');
+        if (el) el.textContent = lbl ? `📍 ${lbl}` : `📍 ${p.lat.toFixed(4)}° N, ${p.lon.toFixed(4)}° O`;
+    });
 }
 
 // ===================================================================
@@ -1465,7 +1555,7 @@ function domGeodesic(p, r, target) {
 }
 
 // ===================================================================
-// DOMINANZKETTE: NÄCHSTHÖHERES OBJEKT BESTIMMEN & ANZEIGEN
+// DOMINANZKETTE: NÄCHSTHÖHERES OBJEKT BESTIMMEN & UNTEN ANZEIGEN
 // ===================================================================
 function domNearestHigher(p) {
     const cfg = domCfg();
@@ -1487,7 +1577,7 @@ function domOfferHigher(p, next, token) {
     const box = document.getElementById('dom-higher');
     if (!box) return;
     if (!next) {
-        box.innerHTML = '<p class="dom-note">' +
+        box.innerHTML = '<p class="dom-note" style="margin:0;">' +
             (p.id === cfg.supremeId ? cfg.supremeNote :
             domVal(p) == null ? `Für die Dominanzsuche wird ein bekannter Wert (${cfg.unit}) benötigt.` :
             cfg.supremeNote) + '</p>';
@@ -1518,15 +1608,27 @@ function domOfferHigher(p, next, token) {
     }).bindTooltip(domEsc(next.name), { permanent: true, direction: 'top', className: 'domHigherTip', offset: [0, -10] })
         .on('click', () => domSelect(next)).addTo(dominanzMap);
 
+    const nextInitialLoc = getInitialPlaceLabel(next);
+    const nextLocSpan = nextInitialLoc ? ` (${domEsc(nextInitialLoc)})` : '';
+
     box.innerHTML =
-        `<button type="button" class="dom-higher-btn">⬆️ ${domEsc(cfg.higherLabel)}: ${domEsc(next.name)} ` +
-        `<span class="dom-higher-h">${domFormatVal(domVal(next))}</span> →</button>` +
-        '<p class="dom-note">' + domNum(domDistKm, 2) +
+        `<button type="button" class="dom-higher-btn">` +
+        `<span>⬆️ ${domEsc(cfg.higherLabel)}: <b>${domEsc(next.name)}</b><span id="dom-higher-loc-label" style="font-weight:600; font-size:12px; opacity:0.9;">${nextLocSpan}</span></span> ` +
+        `<span class="dom-higher-h">${domFormatVal(domVal(next))}</span> →` +
+        `</button>` +
+        '<p class="dom-note" style="margin-bottom:0;">' + domNum(domDistKm, 2) +
         (asLine
             ? ` km Luftlinie bis zum ${cfg.refLabel} (direkte Geodäte).`
             : ` km Luftlinie bis zum ${cfg.refLabel} (Kreisradius).`) +
         ' Klick dich Schritt für Schritt weiter nach oben!</p>';
     box.querySelector('button').onclick = () => domSelect(next);
+
+    // Stadt & Land des nächsthöheren Ziels im Button nachladen
+    resolvePlaceLabel(next).then(lbl => {
+        if (token !== domGen || !lbl) return;
+        const el = document.getElementById('dom-higher-loc-label');
+        if (el) el.textContent = ` (${lbl})`;
+    });
 
     const bounds = domCircle ? domCircle.getBounds() : L.latLngBounds([[p.lat, p.lon]]);
     bounds.extend([next.lat, lon]);
@@ -1631,28 +1733,40 @@ function domSelect(p, known, opts = {}) {
     }
 
     const subtitleDefault = domMode === 'powerplants'
-        ? (PLANT_TYPE_META[p.type]?.label || p.range || 'Kraftwerk') + (p.country ? ' · ' + p.country : '')
+        ? (PLANT_TYPE_META[p.type]?.label || p.range || 'Kraftwerk')
         : domMode === 'peaks'
             ? (p.range || 'Gebirge wird geprüft …')
             : (p.range || cfg.nounSingular);
 
+    const initialLoc = getInitialPlaceLabel(p);
+    const gmapsDirUrl = buildGoogleMapsRouteUrl(p);
     const wikiSearch = 'https://de.wikipedia.org/wiki/Special:Search?search=' + encodeURIComponent(p.name);
+
     document.getElementById('dom-detail').innerHTML =
         '<div id="dom-photo"></div>' +
-        '<div id="dom-range" class="eyebrow-dark" style="display:block; margin-bottom:4px;">' + domEsc(subtitleDefault) + '</div>' +
-        `<h3 style="font-size:24px; font-weight:800; margin:0 0 10px;">${domItemIcon(p)} ${domEsc(p.name)}</h3>` +
+        '<div id="dom-range" class="eyebrow-dark" style="display:block; margin-bottom:3px;">' + domEsc(subtitleDefault) + '</div>' +
+        `<h3 style="font-size:24px; font-weight:800; margin:0 0 4px;">${domItemIcon(p)} ${domEsc(p.name)}</h3>` +
+        `<div id="dom-loc-subtitle" style="font-size:13px; font-weight:700; color:#047857; margin-bottom:10px;">📍 ${domEsc(initialLoc || 'Ermittle Stadt & Land …')}</div>` +
         userDistHtml +
         '<div class="person-grid-2" style="margin:0 0 10px;">' +
         `<div class="person-box" style="background:#ecfdf5; border-color:#a7f3d0;"><span class="person-role">${domEsc(cfg.valueLabel)}</span><div class="person-name" style="font-size:18px;">${domFormatVal(domVal(p))}</div></div>` +
         '<div class="person-box" style="background:#fffbeb; border-color:#fde68a;"><span class="person-role" style="color:var(--amber);">Dominanz' + (p.isoCalc ? ' ≈' : '') + '</span><div id="dom-iso-val" class="person-name" style="font-size:18px;">' + (p.isolation != null ? domNum(p.isolation, 2) + ' km' : '–') + '</div></div>' +
         '</div>' +
         extraContextHtml +
-        `<div id="dom-higher" style="margin:4px 0 10px;"><p class="dom-note">${domEsc(cfg.refLabel)} wird geprüft …</p></div>` +
         '<p id="dom-summary" style="font-size:12.8px; line-height:1.55; color:#334155; margin:0 0 10px;"></p>' +
         '<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:4px;">' +
-        '<a class="btn btn-dark" id="dom-wiki" href="' + wikiSearch + '" target="_blank" rel="noopener" style="font-size:12px; padding:7px 12px;">Auf Wikipedia weiterlesen ↗</a>' +
+        `<a class="btn btn-emerald" href="${gmapsDirUrl}" target="_blank" rel="noopener" style="font-size:12px; padding:7px 12px; text-decoration:none;">🧭 Route (Google Maps) ↗</a>` +
+        '<a class="btn btn-dark" id="dom-wiki" href="' + wikiSearch + '" target="_blank" rel="noopener" style="font-size:12px; padding:7px 12px;">Wikipedia ↗</a>' +
         (String(p.id).startsWith('Q') ? '<a class="btn btn-sand" href="https://www.wikidata.org/wiki/' + domEsc(p.id) + '" target="_blank" rel="noopener" style="font-size:12px; padding:7px 12px;">Wikidata ↗</a>' : '') +
-        '</div>';
+        '</div>' +
+        `<div id="dom-higher" style="margin-top:14px; padding-top:12px; border-top:1px solid #e2e8f0;"><p class="dom-note" style="margin:0;">${domEsc(cfg.refLabel)} wird geprüft …</p></div>`;
+
+    // Stadt & Land für das ausgewählte Objekt auflösen und oben eintragen
+    resolvePlaceLabel(p).then(lbl => {
+        if (token !== domGen) return;
+        const el = document.getElementById('dom-loc-subtitle');
+        if (el) el.textContent = lbl ? `📍 ${lbl}` : `📍 ${p.lat.toFixed(4)}° N, ${p.lon.toFixed(4)}° O`;
+    });
 
     domOfferHigher(p, domNearestHigher(p), token);
     if (domMode === 'powerplants') fetchLivePowerplantOutput(p, token);
@@ -1809,10 +1923,12 @@ function domRenderResults(items, remote = false, showDistance = false) {
         } else if (domMode === 'castles' && (p.year != null || p.age != null)) {
             extraRight = `<div style="font-size:10.5px; color:#64748b;">${domEsc(domFormatCastleYear(p))}</div>`;
         }
+        const locHint = getInitialPlaceLabel(p);
         return `
             <div class="peak-item ${isCurrent ? 'active' : ''}" data-i="${i}" data-peak-id="${domEsc(p.id || '')}">
                 <div>
                     <div style="font-weight:800; font-size:14px; color:var(--text-dark);">${domItemIcon(p)} ${domEsc(p.name)}</div>
+                    ${locHint ? `<div style="font-size:11px; color:#64748b;">📍 ${domEsc(locHint)}</div>` : ''}
                     ${subLine}
                 </div>
                 <div style="text-align:right;">
