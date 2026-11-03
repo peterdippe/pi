@@ -1,49 +1,43 @@
 // ===================================================================
-// DOMINANZ-ATLAS (7 KONTEXTE INKL. 10-MIN-WETTER-SNAPSHOT & GPS-RADAR)
-// Kontexte: peaks | powerplants | towns | towers | lakes | castles | weather
+// DOMINANZ-ATLAS – TEIL 3: KARTEN-KERN, GPS-RADAR & DOMINANZKETTE
+// Lädt automatisch js/dominanz-configs.js und js/dominanz-weather.js
 // ===================================================================
 
-window.domEsc = window.domEsc || (s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])));
-window.domNum = window.domNum || ((n, d = 0) => (n == null || !isFinite(n)) ? '–' : Number(n).toLocaleString('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d }));
-window.domNorm = window.domNorm || (s => String(s ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+let _domModulesPromise = null;
+function ensureDominanzModules() {
+    if (typeof DOM_MODE_CFG !== 'undefined' && typeof sanitizeWeatherDataset === 'function') {
+        return Promise.resolve();
+    }
+    if (_domModulesPromise) return _domModulesPromise;
+    const loadScript = (src) => new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = src;
+        s.onload = res;
+        s.onerror = rej;
+        document.head.appendChild(s);
+    });
+    _domModulesPromise = loadScript('js/dominanz-configs.js')
+        .then(() => loadScript('js/dominanz-weather.js'));
+    return _domModulesPromise;
+}
+ensureDominanzModules();
 
 let dominanzMap = null;
 let dominanzLayers = {};
 let domLayerKey = 'topo';
 
-// --- Multi-Kontext-State (7 Welten) ---
-const DOM_MODES_ORDER = ['peaks', 'powerplants', 'towns', 'towers', 'lakes', 'castles', 'weather'];
 let domMode = 'peaks';
-let domListMode = 'gps'; // 'gps' (10 Nächste) | 'view' (Top 10 im Sichtfeld)
-
-// --- Wetter-Spezial-State (Strikter 10-Minuten-Snapshot) ---
-const DOM_WEATHER_SNAPSHOT_MS = 10 * 60 * 1000; // 10 Minuten statisches Fenster
-let domWeatherPolarity = 'hot'; // 'hot' (Wärmer -> Hitzepol) | 'cold' (Kälter -> Kältepol)
-let domLastWeatherSyncTs = 0;
-let domWeatherSyncInFlight = false;
-let domWeatherTimerId = null;
-let domWeatherHotPole = null;
-let domWeatherColdPole = null;
+let domListMode = 'gps';
 
 let domDatasets = {
-    peaks: [],
-    powerplants: [],
-    towns: [],
-    towers: [],
-    lakes: [],
-    castles: [],
-    weather: []
+    peaks: [], powerplants: [], towns: [],
+    towers: [], lakes: [], castles: [], weather: []
 };
 let domLoaded = {
-    peaks: false,
-    powerplants: false,
-    towns: false,
-    towers: false,
-    lakes: false,
-    castles: false,
-    weather: false
+    peaks: false, powerplants: false, towns: false,
+    towers: false, lakes: false, castles: false, weather: false
 };
-let domPeaks = []; // Zeigt immer auf das aktive Datensatz-Array
+let domPeaks = [];
 
 let domActive = null;
 let domReference = null;
@@ -53,13 +47,10 @@ let domRefMarker = null;
 let domMarkers = null;
 let domGen = 0, domSearchGen = 0, domSearchTimer = null;
 
-// Cache für Stadt/Land-Auflösung (Koordinaten -> "Stadt, Land")
-const domPlaceCache = {};
-
 // --- GPS-Standort- & Telemetrie-State ---
-let domUserLoc = null;          // { lat, lon, heading, speedKmh, altitude, accuracy, ts }
-let domUserMarker = null;       // Blauer Pfeil-Marker mit Höhe (oben) & Speed (unten)
-let domGeoWatchId = null;       // Laufendes GPS-Tracking während der Fahrt
+let domUserLoc = null;
+let domUserMarker = null;
+let domGeoWatchId = null;
 let domInitialAutoSelected = {
     peaks: false, powerplants: false, towns: false,
     towers: false, lakes: false, castles: false, weather: false
@@ -72,341 +63,14 @@ let domNearbyFetched = {
     towers: null, lakes: null, castles: null
 };
 
-// --- Konfiguration aller 7 Kontexte ---
-const DOM_MODE_CFG = {
-    peaks: {
-        file: 'peaks.json',
-        icon: '⛰️',
-        nounSingular: 'Berg',
-        nounPlural: 'Gipfel',
-        unit: 'm',
-        valueLabel: 'Höhe ü. NHN',
-        higherLabel: 'Nächsthöherer Berg',
-        refLabel: 'Bezugsgipfel',
-        supremeId: 'Q513',
-        supremeHint: '🏔️ Endpunkt: Mount Everest (8.849 m) 🎯',
-        supremeNote: '🏔️ Mount Everest – höchster Berg der Erde (8.849 m). Kein höherer Bezugsgipfel.',
-        fallbackId: 'Q3375',
-        fallbackName: 'Zugspitze',
-        searchPlaceholder: '🔍 Berg suchen (oder leer lassen für Umkreis- & Sichtfeld-Liste)',
-        locateBtnText: '🧭 Nächster Berg (GPS)',
-        defaultIds: ['Q3375', 'Q513', 'Q43512', 'Q3926', 'Q46190']
-    },
-    powerplants: {
-        file: 'powerplants.json',
-        icon: '⚡',
-        nounSingular: 'Kraftwerk',
-        nounPlural: 'Kraftwerke',
-        unit: 'MW',
-        valueLabel: 'Max. Nennleistung',
-        higherLabel: 'Nächststärkeres Kraftwerk',
-        refLabel: 'Bezugskraftwerk',
-        supremeId: 'Q12514',
-        supremeHint: '⚡ Endpunkt: Drei-Schluchten-Staudamm (22.500 MW) 🎯',
-        supremeNote: '⚡ Drei-Schluchten-Staudamm (China) – leistungsstärkstes Kraftwerk der Erde (22.500 MW).',
-        fallbackId: 'Q835660',
-        fallbackName: 'Kraftwerk Boxberg',
-        searchPlaceholder: '🔍 Kraftwerk suchen (z. B. Boxberg, Jänschwalde, Goldisthal …)',
-        locateBtnText: '🧭 Nächstes Kraftwerk (GPS)',
-        defaultIds: ['Q835660', 'Q694615', 'Q835654', 'Q314114', 'Q12514']
-    },
-    towns: {
-        file: 'towns.json',
-        icon: '🏙️',
-        nounSingular: 'Stadt',
-        nounPlural: 'Städte',
-        unit: 'Einw.',
-        valueLabel: 'Einwohnerzahl',
-        higherLabel: 'Nächstgrößere Stadt',
-        refLabel: 'Bezugsstadt',
-        supremeId: 'Q1490',
-        supremeHint: '🏙️ Endpunkt: Tokio (37,4 Mio. Einwohner) 🎯',
-        supremeNote: '🏙️ Tokio – bevölkerungsreichste Metropole der Erde. Keine größere Bezugsstadt.',
-        fallbackId: 'Q1731',
-        fallbackName: 'Dresden',
-        searchPlaceholder: '🔍 Stadt/Ort suchen (z. B. Pirna, Dresden, Berlin, Tokio …)',
-        locateBtnText: '🧭 Nächste Stadt (GPS)',
-        defaultIds: ['Q14839', 'Q1731', 'Q64', 'Q84', 'Q1490']
-    },
-    towers: {
-        file: 'towers.json',
-        icon: '📡',
-        nounSingular: 'Turm / Bauwerk',
-        nounPlural: 'Türme & Bauwerke',
-        unit: 'm',
-        valueLabel: 'Höhe über Grund',
-        higherLabel: 'Nächsthöheres Bauwerk',
-        refLabel: 'Bezugsbauwerk',
-        supremeId: 'Q12495',
-        supremeHint: '📡 Endpunkt: Burj Khalifa (828 m) 🎯',
-        supremeNote: '📡 Burj Khalifa (Dubai) – höchstes Bauwerk der Erde (828 m). Kein höheres Bezugsbauwerk.',
-        fallbackId: 'Q572551',
-        fallbackName: 'Fernsehturm Dresden',
-        searchPlaceholder: '🔍 Turm / Bauwerk suchen (z. B. Fernsehturm Dresden, Eiffelturm, Burj Khalifa …)',
-        locateBtnText: '🧭 Nächster Turm (GPS)',
-        defaultIds: ['Q572551', 'Q151356', 'Q243', 'Q57965', 'Q12495']
-    },
-    lakes: {
-        file: 'lakes.json',
-        icon: '🌊',
-        nounSingular: 'See / Talsperre',
-        nounPlural: 'Seen & Talsperren',
-        unit: 'km²',
-        valueLabel: 'Wasserfläche',
-        higherLabel: 'Nächstgrößerer See',
-        refLabel: 'Bezugssee',
-        supremeId: 'Q5484',
-        supremeHint: '🌊 Endpunkt: Kaspisches Meer (371.000 km²) 🎯',
-        supremeNote: '🌊 Kaspisches Meer – größtes Binnengewässer der Erde (371.000 km²). Kein größerer Bezugssee.',
-        fallbackId: 'Q1741150',
-        fallbackName: 'Kiessee Birkwitz-Pratzschwitz',
-        searchPlaceholder: '🔍 See / Talsperre suchen (z. B. Birkwitz, Malter, Bodensee, Müritz …)',
-        locateBtnText: '🧭 Nächster See (GPS)',
-        defaultIds: ['Q1741150', 'Q315089', 'Q315104', 'Q4127', 'Q5484']
-    },
-    castles: {
-        file: 'castles.json',
-        icon: '🏰',
-        nounSingular: 'Burg / Monument',
-        nounPlural: 'Burgen & Monumente',
-        unit: 'Jahre',
-        valueLabel: 'Alter (Historie)',
-        higherLabel: 'Nächstälteres Bauwerk',
-        refLabel: 'Bezugsmonument',
-        supremeId: 'Q211276',
-        supremeHint: '🏰 Endpunkt: Göbekli Tepe (~11.500 Jahre) 🎯',
-        supremeNote: '🏰 Göbekli Tepe – älteste bekannte Monumentalanlage der Menschheit (~9500 v. Chr.).',
-        fallbackId: 'Q157723',
-        fallbackName: 'Festung Königstein',
-        searchPlaceholder: '🔍 Burg, Schloss oder Monument suchen (z. B. Königstein, Stolpen, Gizeh …)',
-        locateBtnText: '🧭 Nächste Burg (GPS)',
-        defaultIds: ['Q157723', 'Q882711', 'Q315218', 'Q37200', 'Q211276']
-    },
-    weather: {
-        file: 'weatherstations.json',
-        icon: '🌡️',
-        nounSingular: 'Wetterstation',
-        nounPlural: 'Wetterstationen',
-        unit: '°C',
-        valueLabel: '2m-Temperatur (10-Min-Snapshot)',
-        higherLabel: 'Nächste wärmere Station',
-        refLabel: 'Bezugsstation',
-        supremeId: 'WS_DEATH_VALLEY',
-        supremeHint: '🔥 Ermittle aktuellen Hitzepol der Erde …',
-        supremeNote: '🌡️ Globales Temperatur-Extremum im aktuellen 10-Minuten-Messnetz erreicht!',
-        fallbackId: 'WMO_10488',
-        fallbackName: 'Wetterwarte Dresden-Klotzsche (DWD)',
-        searchPlaceholder: '🔍 Wetterstation suchen (z. B. Dresden, Zinnwald, Sněžka, Zugspitze, Wostok …)',
-        locateBtnText: '🧭 Nächste Wetterstation (GPS)',
-        defaultIds: ['WMO_10488', 'WMO_10582', 'WMO_11653', 'WMO_10961', 'WS_DEATH_VALLEY', 'WS_VOSTOK']
-    }
-};
-
-const PLANT_TYPE_META = {
-    solar:   { label: 'Solarpark',        icon: '☀️', color: '#eab308' },
-    wind:    { label: 'Windpark',         icon: '🌬️', color: '#06b6d4' },
-    hydro:   { label: 'Wasserkraft',      icon: '💧', color: '#2563eb' },
-    coal:    { label: 'Kohlekraftwerk',   icon: '🏭', color: '#475569' },
-    gas:     { label: 'Gaskraftwerk',     icon: '🔥', color: '#f97316' },
-    nuclear: { label: 'Kernkraftwerk',    icon: '⚛️', color: '#9333ea' },
-    biomass: { label: 'Biomasse / Müll',  icon: '🌿', color: '#16a34a' },
-    other:   { label: 'Kraftwerk',        icon: '⚡', color: '#10b981' }
-};
-
-const TOWER_TYPE_META = {
-    tvtower:    { label: 'Fernseh- / Funkturm',       icon: '📡', color: '#2563eb' },
-    skyscraper: { label: 'Wolkenkratzer / Hochhaus',  icon: '🏙️', color: '#9333ea' },
-    lookout:    { label: 'Aussichts- / Leuchtturm',   icon: '🔭', color: '#16a34a' },
-    church:     { label: 'Kirchturm / Dom',           icon: '⛪', color: '#eab308' },
-    industrial: { label: 'Brücke / Kamin / Mast',     icon: '🌉', color: '#f97316' }
-};
-
-const LAKE_SWIM_META = {
-    yes:   { label: '🏊 Baden erlaubt',                      color: '#0ea5e9', badgeBg: '#ecfdf5', badgeBorder: '#6ee7b7', badgeText: '#065f46' },
-    no:    { label: '🚫 Baden verboten (Trinkwasser/Sperr)', color: '#ef4444', badgeBg: '#fef2f2', badgeBorder: '#fecaca', badgeText: '#991b1b' },
-    check: { label: '⚠️ Stausee / Vor Ort prüfen',           color: '#f59e0b', badgeBg: '#fffbeb', badgeBorder: '#fde68a', badgeText: '#92400e' }
-};
-
-const CASTLE_TYPE_META = {
-    castle:   { label: 'Burg / Burgruine',       icon: '🏰', color: '#d97706' },
-    palace:   { label: 'Schloss / Residenz',     icon: '👑', color: '#2563eb' },
-    fortress: { label: 'Festung / Zitadelle',    icon: '🛡️', color: '#475569' },
-    monument: { label: 'Antikes Monument',       icon: '🏛️', color: '#9333ea' }
-};
-
-const ISO_COUNTRY_DE = {
-    DE: 'Deutschland', AT: 'Österreich', CH: 'Schweiz', CZ: 'Tschechien', PL: 'Polen',
-    FR: 'Frankreich', IT: 'Italien', ES: 'Spanien', PT: 'Portugal', NL: 'Niederlande',
-    BE: 'Belgien', LU: 'Luxemburg', DK: 'Dänemark', SE: 'Schweden', NO: 'Norwegen',
-    FI: 'Finnland', GB: 'Großbritannien', IE: 'Irland', HU: 'Ungarn', SK: 'Slowakei',
-    SI: 'Slowenien', HR: 'Kroatien', GR: 'Griechenland', RO: 'Rumänien', BG: 'Bulgarien',
-    TR: 'Türkei', RU: 'Russland', UA: 'Ukraine', US: 'USA', CA: 'Kanada', MX: 'Mexiko',
-    BR: 'Brasilien', AR: 'Argentinien', CN: 'China', JP: 'Japan', IN: 'Indien',
-    AU: 'Australien', NZ: 'Neuseeland', ZA: 'Südafrika', EG: 'Ägypten', AQ: 'Antarktis',
-    GL: 'Grönland', KW: 'Kuwait', IR: 'Iran', PK: 'Pakistan', SA: 'Saudi-Arabien'
-};
-
-function domCfg() {
-    const base = DOM_MODE_CFG[domMode] || DOM_MODE_CFG.peaks;
-    if (domMode === 'weather') {
-        base.higherLabel = domWeatherPolarity === 'cold' ? 'Nächste kältere Station' : 'Nächste wärmere Station';
-        base.refLabel = domWeatherPolarity === 'cold' ? 'Kältere Bezugsstation' : 'Wärmere Bezugsstation';
-    }
-    return base;
-}
-
-function domVal(p) {
-    if (!p) return null;
-    if (domMode === 'weather') {
-        const v = p.temp ?? p.height;
-        return (typeof v === 'number' && isFinite(v)) ? Math.round(v * 10) / 10 : null;
-    }
-    if (domMode === 'powerplants') {
-        const v = p.capacity ?? p.mw ?? p.height;
-        return (typeof v === 'number' && isFinite(v)) ? v : null;
-    }
-    if (domMode === 'towns') {
-        const v = p.population ?? p.pop ?? p.height;
-        return (typeof v === 'number' && isFinite(v)) ? v : null;
-    }
-    if (domMode === 'lakes') {
-        const v = p.area ?? p.height;
-        return (typeof v === 'number' && isFinite(v)) ? v : null;
-    }
-    if (domMode === 'castles') {
-        const curY = new Date().getFullYear();
-        const v = p.age ?? (p.year != null ? (curY - p.year) : p.height);
-        return (typeof v === 'number' && isFinite(v)) ? v : null;
-    }
-    return (typeof p.height === 'number' && isFinite(p.height)) ? p.height : null;
-}
-
-function domFormatVal(v, withUnit = true) {
-    if (v == null || !isFinite(v)) return '–';
-    if (domMode === 'weather') {
-        const rounded = Math.round(v * 10) / 10;
-        const sign = rounded > 0 ? '+' : '';
-        return sign + domNum(rounded, 1) + (withUnit ? ' °C' : '');
-    }
-    if (domMode === 'powerplants') {
-        const d = (v < 100 && Math.round(v) !== v) ? 1 : 0;
-        return domNum(v, d) + (withUnit ? ' MW' : '');
-    }
-    if (domMode === 'towns') {
-        return domNum(Math.round(v), 0) + (withUnit ? ' Einw.' : '');
-    }
-    if (domMode === 'towers') {
-        const d = (v < 200 && Math.round(v) !== v) ? 1 : 0;
-        return domNum(v, d) + (withUnit ? ' m' : '');
-    }
-    if (domMode === 'lakes') {
-        const d = v < 0.1 ? 3 : (v < 10 ? 2 : (v < 100 ? 1 : 0));
-        return domNum(v, d) + (withUnit ? ' km²' : '');
-    }
-    if (domMode === 'castles') {
-        return domNum(Math.round(v), 0) + (withUnit ? ' Jahre' : '');
-    }
-    return domNum(Math.round(v), 0) + (withUnit ? ' m' : '');
-}
-
-function domFormatCastleYear(p) {
-    if (!p) return '';
-    const yr = p.year != null ? p.year : (p.age != null ? (new Date().getFullYear() - p.age) : null);
-    if (yr == null || !isFinite(yr)) return '';
-    return yr < 0 ? `ca. ${domNum(Math.abs(Math.round(yr)), 0)} v. Chr.` : `um ${Math.round(yr)} n. Chr.`;
-}
-
-function domItemIcon(p) {
-    if (domMode === 'weather') {
-        const t = domVal(p);
-        if (t == null) return '🌡️';
-        if (t <= -15) return '🥶';
-        if (t <= 0)   return '❄️';
-        if (t >= 30)  return '🔥';
-        if (t >= 20)  return '☀️';
-        return '🌡️';
-    }
-    if (domMode === 'powerplants') return (PLANT_TYPE_META[p?.type] || PLANT_TYPE_META.other).icon;
-    if (domMode === 'towers')      return (TOWER_TYPE_META[p?.type] || TOWER_TYPE_META.tvtower).icon;
-    if (domMode === 'lakes')       return p?.swim === 'no' ? '🚫' : (p?.swim === 'yes' ? '🏊' : '🌊');
-    if (domMode === 'castles')     return (CASTLE_TYPE_META[p?.type] || CASTLE_TYPE_META.castle).icon;
-    return domCfg().icon;
-}
-
 // ===================================================================
-// AUTOMATISCHE ORTS- & LANDESAUFLÖSUNG (STADT + LAND ZU JEDEM OBJEKT)
-// ===================================================================
-function getInitialPlaceLabel(p) {
-    if (!p) return '';
-    if (p.placeLabel) return p.placeLabel;
-    const key = `${Number(p.lat).toFixed(3)},${Number(p.lon).toFixed(3)}`;
-    if (domPlaceCache[key]) {
-        p.placeLabel = domPlaceCache[key];
-        return p.placeLabel;
-    }
-    if (p.city && p.country) {
-        const cName = ISO_COUNTRY_DE[p.country] || p.country;
-        return `${p.city}, ${cName}`;
-    }
-    if (p.country) {
-        return ISO_COUNTRY_DE[p.country] || p.country;
-    }
-    if (p.range && p.range.includes('·')) {
-        const rhs = p.range.split('·').pop().trim();
-        if (ISO_COUNTRY_DE[rhs]) return ISO_COUNTRY_DE[rhs];
-        if (rhs.length > 2) return rhs;
-    }
-    return '';
-}
-
-async function resolvePlaceLabel(p) {
-    if (!p || !isFinite(p.lat) || !isFinite(p.lon)) return '';
-    if (p.placeLabel) return p.placeLabel;
-    const key = `${Number(p.lat).toFixed(3)},${Number(p.lon).toFixed(3)}`;
-    if (domPlaceCache[key]) {
-        p.placeLabel = domPlaceCache[key];
-        return p.placeLabel;
-    }
-
-    try {
-        const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${p.lat.toFixed(5)}&lon=${p.lon.toFixed(5)}&zoom=12&accept-language=de`;
-        const r = await fetch(url, { signal: AbortSignal.timeout(6500) });
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        const data = await r.json();
-        const addr = data?.address || {};
-        const city = addr.city || addr.town || addr.village || addr.municipality || addr.hamlet || addr.county || addr.state || '';
-        const country = addr.country || ISO_COUNTRY_DE[p.country] || p.country || '';
-
-        let label = '';
-        if (city && country && domNorm(city) !== domNorm(p.name)) {
-            label = `${city}, ${country}`;
-        } else if (addr.county && country && domNorm(city) === domNorm(p.name)) {
-            label = `${addr.county}, ${country}`;
-        } else if (city && country) {
-            label = `${city}, ${country}`;
-        } else {
-            label = country || city || getInitialPlaceLabel(p);
-        }
-
-        if (label) {
-            domPlaceCache[key] = label;
-            p.placeLabel = label;
-        }
-        return label;
-    } catch (e) {
-        return getInitialPlaceLabel(p);
-    }
-}
-
-function buildGoogleMapsRouteUrl(p) {
-    if (!p || !isFinite(p.lat) || !isFinite(p.lon)) return 'https://www.google.com/maps';
-    return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(p.lat + ',' + p.lon)}&travelmode=driving`;
-}
-
-// ===================================================================
-// INITIALISIERUNG & KONTEXT-UMSCHALTER (DROPDOWN + VOR/ZURÜCK)
+// INITIALISIERUNG & KONTEXT-UMSCHALTER
 // ===================================================================
 function initDominanzMapIfNeeded() {
+    if (typeof DOM_MODE_CFG === 'undefined' || typeof sanitizeWeatherDataset !== 'function') {
+        ensureDominanzModules().then(() => initDominanzMapIfNeeded());
+        return;
+    }
     if (dominanzMap || typeof L === 'undefined') return;
     dominanzMap = L.map('dominanzMapContainer', { zoomControl: true, minZoom: 2, maxZoom: 17 })
         .setView([50.95, 13.95], 9);
@@ -446,7 +110,6 @@ function initDominanzMapIfNeeded() {
         };
     }
 
-    // 1-Minuten-Ticker aktualisiert die Anzeige des 10-Minuten-Wetter-Timers
     if (!domWeatherTimerId) {
         domWeatherTimerId = setInterval(() => {
             if (domMode === 'weather' && domLoaded.weather) {
@@ -480,6 +143,10 @@ function cycleDominanzMode(step) {
 }
 
 function setDominanzMode(mode) {
+    if (typeof DOM_MODE_CFG === 'undefined') {
+        ensureDominanzModules().then(() => setDominanzMode(mode));
+        return;
+    }
     if (!DOM_MODE_CFG[mode]) return;
     initDominanzMapIfNeeded();
     domMode = mode;
@@ -523,11 +190,8 @@ function setWeatherPolarity(pol) {
     }
 }
 
-// Klick auf die rote Hitzepol- oder blaue Kältepol-Kachel -> Direkt auf der Karte anzeigen
 function domJumpToWeatherPole(pol) {
-    if (domMode !== 'weather') {
-        setDominanzMode('weather');
-    }
+    if (domMode !== 'weather') setDominanzMode('weather');
     const targetPol = pol === 'cold' ? 'cold' : 'hot';
     domWeatherPolarity = targetPol;
     const hotBtn = document.getElementById('dom-pol-hot');
@@ -543,7 +207,6 @@ function domJumpToWeatherPole(pol) {
     }
 }
 
-// Klick auf das Endpunkt-Badge oben rechts -> Springt in jeder der 7 Welten direkt zum Weltrekord-Punkt
 function domJumpToSupreme() {
     if (domMode === 'weather') {
         domJumpToWeatherPole(domWeatherPolarity);
@@ -571,437 +234,22 @@ function updateDomModeUI() {
     if (locBtn) locBtn.textContent = cfg.locateBtnText;
 }
 
-function renderDomLegend() {
-    const box = document.getElementById('dom-legend');
-    if (!box) return;
-
-    const userLegendHtml = `
-        <span class="dom-legend-sep">|</span>
-        <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#111;"></span> gewählt</span>
-        <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#fff; border-color:#111;"></span> ${domEsc(domCfg().refLabel)}</span>
-        <span class="dom-legend-item">
-            <span class="dom-legend-user-arrow" title="Deine aktuelle GPS-Position (oben: Höhe, unten: Geschwindigkeit)">
-                <svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true">
-                    <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z" fill="#2563eb" stroke="#ffffff" stroke-width="2" stroke-linejoin="round"/>
-                </svg>
-            </span>
-            Standort (⛰️ Höhe / km/h)
-        </span>
-    `;
-
-    if (domMode === 'weather') {
-        box.innerHTML = `
-            <strong style="font-size:12px; margin-right:2px;">2m-Temperatur:</strong>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#6b21a8;"></span> &lt; −20 °C</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#1d4ed8;"></span> −20…−5 °C</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#06b6d4;"></span> −5…0 °C</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#10b981;"></span> 0…10 °C</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#84cc16;"></span> 10…20 °C</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#f59e0b;"></span> 20…28 °C</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#ef4444;"></span> 28…36 °C</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#991b1b;"></span> &gt; 36 °C</span>
-            ${userLegendHtml}
-        `;
-    } else if (domMode === 'powerplants') {
-        box.innerHTML = `
-            <strong style="font-size:12px; margin-right:2px;">Energieträger:</strong>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#eab308;"></span> ☀️ Solar</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#06b6d4;"></span> 🌬️ Wind</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#2563eb;"></span> 💧 Wasser</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#f97316;"></span> 🔥 Gas</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#475569;"></span> 🏭 Kohle</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#9333ea;"></span> ⚛️ Kernkraft</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#16a34a;"></span> 🌿 Biomasse</span>
-            ${userLegendHtml}
-        `;
-    } else if (domMode === 'towns') {
-        box.innerHTML = `
-            <strong style="font-size:12px; margin-right:2px;">Einwohner:</strong>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#16a34a;"></span> &lt; 10 Tsd.</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#65a30d;"></span> 10–50 Tsd.</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#eab308;"></span> 50–100 Tsd.</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#f97316;"></span> 100–500 Tsd.</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#ef4444;"></span> 0,5–1 Mio.</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#dc2626;"></span> 1–5 Mio.</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#7e22ce;"></span> &gt; 5 Mio.</span>
-            ${userLegendHtml}
-        `;
-    } else if (domMode === 'towers') {
-        box.innerHTML = `
-            <strong style="font-size:12px; margin-right:2px;">Bauwerkstyp:</strong>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#2563eb;"></span> 📡 Fernseh-/Funkturm</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#9333ea;"></span> 🏙️ Wolkenkratzer</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#16a34a;"></span> 🔭 Aussichtsturm</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#eab308;"></span> ⛪ Kirchturm / Dom</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#f97316;"></span> 🌉 Brücke / Kamin</span>
-            ${userLegendHtml}
-        `;
-    } else if (domMode === 'lakes') {
-        box.innerHTML = `
-            <strong style="font-size:12px; margin-right:2px;">Bade-Status:</strong>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#0ea5e9;"></span> 🏊 Baden erlaubt (Badesee / Natursee)</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#f59e0b;"></span> ⚠️ Stausee / Vor Ort prüfen</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#ef4444;"></span> 🚫 Baden verboten (Trinkwasserschutz)</span>
-            ${userLegendHtml}
-        `;
-    } else if (domMode === 'castles') {
-        box.innerHTML = `
-            <strong style="font-size:12px; margin-right:2px;">Epoche / Alter:</strong>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#16a34a;"></span> &lt; 300 J. (Neuzeit)</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#eab308;"></span> 300–600 J.</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#f97316;"></span> 600–1000 J. (Mittelalter)</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#dc2626;"></span> 1000–2500 J. (Antike)</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#7e22ce;"></span> &gt; 2500 J. (Frühzeit)</span>
-            ${userLegendHtml}
-        `;
-    } else {
-        box.innerHTML = `
-            <strong style="font-size:12px; margin-right:2px;">Höhe ü. NN:</strong>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#1a6b2e;"></span> &lt; 1000 m</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#5bd16a;"></span> 1000–2000 m</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#f2d307;"></span> 2000–3000 m</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#d9a406;"></span> 3000–4000 m</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#f27405;"></span> 4000–5000 m</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#f2766e;"></span> 5000–6000 m</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#e01b1b;"></span> 6000–7000 m</span>
-            <span class="dom-legend-item"><span class="dom-legend-dot" style="background:#8b2fc9;"></span> &gt; 7000 m</span>
-            ${userLegendHtml}
-        `;
-    }
-}
-
 // ===================================================================
-// LIVE-WETTERSTATIONEN: STRIKTER 10-MINUTEN-SNAPSHOT & KLICKBARE POLE
-// ===================================================================
-function updateWeatherSyncStatusUI() {
-    const syncEl = document.getElementById('dom-weather-sync-info');
-    if (!syncEl) return;
-    if (!domLastWeatherSyncTs) {
-        syncEl.textContent = '⏳ Synchronisiere 10-Minuten-Snapshot …';
-        return;
-    }
-    const elapsedMs = Date.now() - domLastWeatherSyncTs;
-    const remainMin = Math.max(1, Math.ceil((DOM_WEATHER_SNAPSHOT_MS - elapsedMs) / 60000));
-    const syncTimeStr = new Date(domLastWeatherSyncTs).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-    syncEl.textContent = `🔒 10-Min-Snapshot (${syncTimeStr} Uhr · nächstes Update in ${remainMin} Min.)`;
-}
-
-function recomputeWeatherDominance() {
-    const list = domDatasets.weather || [];
-    if (!list.length) return;
-
-    let hottest = null;
-    let coldest = null;
-    for (const s of list) {
-        if (s.temp != null && isFinite(s.temp)) {
-            s.temp = Math.round(s.temp * 10) / 10;
-            s.height = s.temp;
-        }
-        const t = domVal(s);
-        if (t == null) continue;
-        if (!hottest || t > domVal(hottest)) hottest = s;
-        if (!coldest || t < domVal(coldest)) coldest = s;
-        s.isoCalc = true;
-    }
-
-    domWeatherHotPole = hottest;
-    domWeatherColdPole = coldest;
-
-    // Klickbare Kacheln für Hitzepol & Kältepol aktualisieren
-    const hotNameEl = document.getElementById('dom-hot-pole-name');
-    const hotTempEl = document.getElementById('dom-hot-pole-temp');
-    if (hottest && hotNameEl && hotTempEl) {
-        const locH = getInitialPlaceLabel(hottest);
-        hotNameEl.textContent = hottest.name + (locH ? ` (${locH})` : '');
-        hotTempEl.textContent = domFormatVal(domVal(hottest));
-        resolvePlaceLabel(hottest).then(lbl => {
-            if (lbl && document.getElementById('dom-hot-pole-name')) {
-                document.getElementById('dom-hot-pole-name').textContent = `${hottest.name} (${lbl})`;
-            }
-        });
-    }
-
-    const coldNameEl = document.getElementById('dom-cold-pole-name');
-    const coldTempEl = document.getElementById('dom-cold-pole-temp');
-    if (coldest && coldNameEl && coldTempEl) {
-        const locC = getInitialPlaceLabel(coldest);
-        coldNameEl.textContent = coldest.name + (locC ? ` (${locC})` : '');
-        coldTempEl.textContent = domFormatVal(domVal(coldest));
-        resolvePlaceLabel(coldest).then(lbl => {
-            if (lbl && document.getElementById('dom-cold-pole-name')) {
-                document.getElementById('dom-cold-pole-name').textContent = `${coldest.name} (${lbl})`;
-            }
-        });
-    }
-
-    const cfg = DOM_MODE_CFG.weather;
-    if (domWeatherPolarity === 'cold') {
-        cfg.supremeId = coldest ? coldest.id : 'WS_VOSTOK';
-        cfg.supremeHint = coldest
-            ? `❄️ Kältepol: ${coldest.name} (${domFormatVal(domVal(coldest))}) 🎯`
-            : '❄️ Endpunkt: Aktueller Kältepol 🎯';
-        cfg.supremeNote = coldest
-            ? `❄️ ${coldest.name} (${domFormatVal(domVal(coldest))}) – aktuell kälteste Wetterstation der Erde!`
-            : '❄️ Kältepol der Erde erreicht.';
-    } else {
-        cfg.supremeId = hottest ? hottest.id : 'WS_DEATH_VALLEY';
-        cfg.supremeHint = hottest
-            ? `🔥 Hitzepol: ${hottest.name} (${domFormatVal(domVal(hottest))}) 🎯`
-            : '🔥 Endpunkt: Aktueller Hitzepol 🎯';
-        cfg.supremeNote = hottest
-            ? `🔥 ${hottest.name} (${domFormatVal(domVal(hottest))}) – aktuell heißeste Wetterstation der Erde!`
-            : '🔥 Hitzepol der Erde erreicht.';
-    }
-
-    const hintEl = document.getElementById('dom-mode-supreme-hint') || document.getElementById('dom-mode- supreme-hint');
-    if (hintEl && domMode === 'weather') hintEl.textContent = cfg.supremeHint;
-}
-
-async function refreshLiveWeatherField(force = false) {
-    const list = domDatasets.weather || [];
-    if (!list.length || domWeatherSyncInFlight) return;
-
-    const now = Date.now();
-    // Strikte 10-Minuten-Sperre: Innerhalb von 10 Minuten bleiben alle Stationswerte 100 % statisch!
-    if (!force && domLastWeatherSyncTs > 0 && (now - domLastWeatherSyncTs < DOM_WEATHER_SNAPSHOT_MS)) {
-        recomputeWeatherDominance();
-        updateWeatherSyncStatusUI();
-        return;
-    }
-
-    // Prüfen, ob im sessionStorage bereits ein frischer (< 10 Min.) Snapshot liegt
-    if (!force && domLastWeatherSyncTs === 0) {
-        try {
-            const rawSnap = sessionStorage.getItem('dom_weather_snap_v2');
-            if (rawSnap) {
-                const parsed = JSON.parse(rawSnap);
-                if (parsed && parsed.ts && (now - parsed.ts < DOM_WEATHER_SNAPSHOT_MS) && parsed.map) {
-                    list.forEach(s => {
-                        if (parsed.map[s.id] !== undefined) {
-                            s.temp = parsed.map[s.id];
-                            s.height = s.temp;
-                        }
-                    });
-                    domLastWeatherSyncTs = parsed.ts;
-                    recomputeWeatherDominance();
-                    updateWeatherSyncStatusUI();
-                    return;
-                }
-            }
-        } catch (e) {}
-    }
-
-    domWeatherSyncInFlight = true;
-    const syncEl = document.getElementById('dom-weather-sync-info');
-    if (syncEl) syncEl.textContent = '⏳ Aktualisiere globalen 10-Minuten-Snapshot …';
-
-    try {
-        // 1. Globales Stützstellen-Gitter (~220 gleichmäßig verteilte Stationen weltweit)
-        const step = Math.max(1, Math.floor(list.length / 220));
-        const anchorSet = new Map();
-        for (let i = 0; i < list.length; i += step) {
-            anchorSet.set(list[i].id, list[i]);
-        }
-
-        // 2. Die 80 nächstgelegenen Stationen rund um den Nutzer (bzw. Kartenmitte) für 100% Präzision vor Ort
-        const refPt = domUserLoc || (dominanzMap ? { lat: dominanzMap.getCenter().lat, lon: dominanzMap.getCenter().lng } : { lat: 50.95, lon: 13.95 });
-        [...list]
-            .map(s => ({ s, d: domDistanceKm(refPt, s) }))
-            .sort((a, b) => a.d - b.d)
-            .slice(0, 80)
-            .forEach(x => anchorSet.set(x.s.id, x.s));
-
-        // 3. Alle globalen Hitze-/Kältepol-Kandidaten & Bergobservatorien
-        const extremeIds = new Set([
-            'WS_VOSTOK', 'WS_DOME_A', 'WS_DOME_C', 'WS_SOUTH_POLE', 'WS_SUMMIT_GL',
-            'WS_OYMYAKON', 'WS_VERKHOYANSK', 'WS_DEATH_VALLEY', 'WS_MITRIBAH',
-            'WS_AHWAZ', 'WS_ASWAN', 'WS_JACOBABAD', 'WS_MARBLE_BAR',
-            'WMO_10961', 'WMO_06730', 'WMO_11146', 'WMO_11653', 'WMO_10578',
-            'WMO_10453', 'WMO_10582', 'WMO_11464', 'WMO_10488'
-        ]);
-        const sortedByT = [...list].filter(s => domVal(s) != null).sort((a, b) => domVal(b) - domVal(a));
-        sortedByT.slice(0, 20).forEach(s => extremeIds.add(s.id));
-        sortedByT.slice(-20).forEach(s => extremeIds.add(s.id));
-        list.forEach(s => { if (extremeIds.has(s.id)) anchorSet.set(s.id, s); });
-
-        const batchTargets = Array.from(anchorSet.values());
-        const liveAnchors = [];
-
-        for (let i = 0; i < batchTargets.length; i += 85) {
-            const chunk = batchTargets.slice(i, i + 85);
-            const lats = chunk.map(s => s.lat.toFixed(3)).join(',');
-            const lons = chunk.map(s => s.lon.toFixed(3)).join(',');
-            try {
-                const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&current=temperature_2m`;
-                const r = await fetch(url, { signal: AbortSignal.timeout(9000) });
-                if (r.ok) {
-                    let data = await r.json();
-                    if (!Array.isArray(data)) data = [data];
-                    data.forEach((item, idx) => {
-                        const t = item?.current?.temperature_2m;
-                        const st = chunk[idx];
-                        if (t != null && isFinite(t) && st) {
-                            const tRound = Math.round(t * 10) / 10;
-                            st.temp = tRound;
-                            st.height = tRound;
-                            st._directLive = true;
-                            // Potenzielle Meeresspiegel-Temperatur dieses Ankerpunkts (Standard-Gradient 0.0065 K/m)
-                            const rad = Math.PI / 180;
-                            const cosLat = Math.cos(st.lat * rad);
-                            liveAnchors.push({
-                                x: cosLat * Math.cos(st.lon * rad),
-                                y: cosLat * Math.sin(st.lon * rad),
-                                z: Math.sin(st.lat * rad),
-                                seaT: tRound + (st.elev || 0) * 0.0065
-                            });
-                        }
-                    });
-                }
-            } catch (e) {}
-        }
-
-        // Konsistente globale Höhen-Assimilation für alle übrigen Stationen, damit es nirgendwo
-        // auf der Erde Bruchstellen zwischen direkt abgefragten und übrigen Stationen gibt!
-        if (liveAnchors.length >= 25) {
-            const rad = Math.PI / 180;
-            const nA = liveAnchors.length;
-            for (const s of list) {
-                if (s._directLive) {
-                    delete s._directLive;
-                    continue;
-                }
-                const cosLat = Math.cos(s.lat * rad);
-                const sx = cosLat * Math.cos(s.lon * rad);
-                const sy = cosLat * Math.sin(s.lon * rad);
-                const sz = Math.sin(s.lat * rad);
-
-                // Finde die 3 nächstgelegenen Live-Ankerpunkte im 3D-Raum
-                let d1 = Infinity, d2 = Infinity, d3 = Infinity;
-                let t1 = 15, t2 = 15, t3 = 15;
-                for (let j = 0; j < nA; j++) {
-                    const a = liveAnchors[j];
-                    const dx = sx - a.x, dy = sy - a.y, dz = sz - a.z;
-                    const dSq = dx * dx + dy * dy + dz * dz;
-                    if (dSq < d1) {
-                        d3 = d2; t3 = t2;
-                        d2 = d1; t2 = t1;
-                        d1 = dSq; t1 = a.seaT;
-                    } else if (dSq < d2) {
-                        d3 = d2; t3 = t2;
-                        d2 = dSq; t2 = a.seaT;
-                    } else if (dSq < d3) {
-                        d3 = dSq; t3 = a.seaT;
-                    }
-                }
-                const w1 = 1 / Math.max(d1, 1e-7);
-                const w2 = 1 / Math.max(d2, 1e-7);
-                const w3 = 1 / Math.max(d3, 1e-7);
-                const seaInterp = (t1 * w1 + t2 * w2 + t3 * w3) / (w1 + w2 + w3);
-                const estT = Math.round((seaInterp - (s.elev || 0) * 0.0065) * 10) / 10;
-                s.temp = estT;
-                s.height = estT;
-            }
-        }
-
-        domLastWeatherSyncTs = Date.now();
-
-        // Snapshot für 10 Minuten im sessionStorage sichern
-        try {
-            const snapMap = {};
-            list.forEach(s => { snapMap[s.id] = s.temp; });
-            sessionStorage.setItem('dom_weather_snap_v2', JSON.stringify({ ts: domLastWeatherSyncTs, map: snapMap }));
-        } catch (e) {}
-
-        recomputeWeatherDominance();
-        updateWeatherSyncStatusUI();
-
-        if (domMode === 'weather') {
-            domPaint();
-            if (domActive) {
-                const mainValEl = document.getElementById('dom-main-val-display');
-                if (mainValEl) mainValEl.textContent = domFormatVal(domVal(domActive));
-                domOfferHigher(domActive, domNearestHigher(domActive), domGen);
-            }
-            domSearch();
-        }
-    } finally {
-        domWeatherSyncInFlight = false;
-    }
-}
-
-// WICHTIG: Lädt NUR Zusatz-Synoptik (Gefühlte Temp., Luftfeuchte, Wind, Druck) für die Infobox,
-// überschreibt aber NIEMALS p.temp, damit die 10-Minuten-Dominanzkette zu 100 % monoton bleibt!
-async function fetchLiveStationTelemetry(p, token) {
-    const box = document.getElementById('dom-weather-station-box');
-    if (!box || domMode !== 'weather') return;
-
-    try {
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${p.lat.toFixed(4)}&longitude=${p.lon.toFixed(4)}&current=apparent_temperature,relative_humidity_2m,surface_pressure,wind_speed_10m`;
-        const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        const data = await r.json();
-        if (token !== domGen || !document.getElementById('dom-weather-station-box')) return;
-
-        const cur = data.current || {};
-        const appT = cur.apparent_temperature;
-        const rh = cur.relative_humidity_2m;
-        const pres = cur.surface_pressure;
-        const wind = cur.wind_speed_10m;
-
-        const elevTxt = p.elev != null ? `${domNum(p.elev, 0)} m ü. NHN` : 'k. A.';
-        box.innerHTML = `
-            <div style="font-weight:800; font-size:12.5px; color:#0f172a; margin-bottom:6px; display:flex; justify-content:space-between;">
-                <span>📡 Zusatz-Synoptik an der Messstation:</span>
-                <span style="color:#047857;">⛰️ Stationshöhe: ${domEsc(elevTxt)}</span>
-            </div>
-            <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:6px; font-size:12px;">
-                <div style="background:#fff; padding:6px 8px; border-radius:8px; border:1px solid #e2e8f0;">
-                    <span style="color:#64748b; display:block; font-size:10.5px;">Gefühlte Temp.</span>
-                    <b>${appT != null ? domFormatVal(appT) : '–'}</b>
-                </div>
-                <div style="background:#fff; padding:6px 8px; border-radius:8px; border:1px solid #e2e8f0;">
-                    <span style="color:#64748b; display:block; font-size:10.5px;">Rel. Luftfeuchte</span>
-                    <b>${rh != null ? Math.round(rh) + ' %' : '–'}</b>
-                </div>
-                <div style="background:#fff; padding:6px 8px; border-radius:8px; border:1px solid #e2e8f0;">
-                    <span style="color:#64748b; display:block; font-size:10.5px;">Wind (10 m)</span>
-                    <b>${wind != null ? domNum(wind, 1) + ' km/h' : '–'}</b>
-                </div>
-                <div style="background:#fff; padding:6px 8px; border-radius:8px; border:1px solid #e2e8f0;">
-                    <span style="color:#64748b; display:block; font-size:10.5px;">Luftdruck (Station)</span>
-                    <b>${pres != null ? domNum(pres, 0) + ' hPa' : '–'}</b>
-                </div>
-            </div>
-        `;
-    } catch (e) {
-        if (token === domGen && box) {
-            box.innerHTML = `<div style="font-size:12px;color:#64748b;">🌡️ Stationshöhe: ${p.elev != null ? domNum(p.elev, 0) + ' m ü. NHN' : '–'}</div>`;
-        }
-    }
-}
-
-// ===================================================================
-// STANDORTERKENNUNG, HÖHEN- & GESCHWINDIGKEITS-BADGES AM BLAUEN PFEIL
+// GPS-STANDORT, HÖHE & GESCHWINDIGKEIT AM BLAUEN PFEIL
 // ===================================================================
 function formatUserAltText() {
-    const alt = (domUserLoc && domUserLoc.altitude != null)
-        ? domUserLoc.altitude
-        : domFallbackAltitude;
+    const alt = (domUserLoc && domUserLoc.altitude != null) ? domUserLoc.altitude : domFallbackAltitude;
     return alt != null ? `⛰️ ${Math.round(alt)} m` : '⛰️ … m';
 }
 
 function formatUserSpeedText() {
     const spd = (domUserLoc && domUserLoc.speedKmh != null && isFinite(domUserLoc.speedKmh))
-        ? Math.max(0, Math.round(domUserLoc.speedKmh))
-        : 0;
+        ? Math.max(0, Math.round(domUserLoc.speedKmh)) : 0;
     return `${spd} km/h`;
 }
 
 function buildUserLocationIcon(headingDeg) {
     const rot = (typeof headingDeg === 'number' && isFinite(headingDeg)) ? Math.round(headingDeg) : 0;
-    const altTxt = formatUserAltText();
-    const spdTxt = formatUserSpeedText();
-
     return L.divIcon({
         className: 'dom-user-loc-icon',
         iconSize: [32, 32],
@@ -1009,7 +257,7 @@ function buildUserLocationIcon(headingDeg) {
         popupAnchor: [0, -24],
         html: `
             <div class="dom-user-loc-wrap">
-                <div class="dom-user-badge-top">${domEsc(altTxt)}</div>
+                <div class="dom-user-badge-top">${domEsc(formatUserAltText())}</div>
                 <span class="dom-user-loc-ring"></span>
                 <span class="dom-user-loc-arrow" style="transform: rotate(${rot}deg);">
                     <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
@@ -1017,7 +265,7 @@ function buildUserLocationIcon(headingDeg) {
                               fill="#2563eb" stroke="#ffffff" stroke-width="2.2" stroke-linejoin="round"/>
                     </svg>
                 </span>
-                <div class="dom-user-badge-bottom">${domEsc(spdTxt)}</div>
+                <div class="dom-user-badge-bottom">${domEsc(formatUserSpeedText())}</div>
             </div>
         `
     });
@@ -1033,22 +281,18 @@ function domBearingDeg(fromPt, toPt) {
 }
 
 function domCompassDirection(fromPt, toPt) {
-    const brng = domBearingDeg(fromPt, toPt);
     const dirs = ['N', 'NNO', 'NO', 'ONO', 'O', 'OSO', 'SO', 'SSO', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
-    return dirs[Math.round(brng / 22.5) % 16];
+    return dirs[Math.round(domBearingDeg(fromPt, toPt) / 22.5) % 16];
 }
 
 function ensureUserAltitudeFallback() {
-    if (!domUserLoc) return;
-    if (domUserLoc.altitude != null && isFinite(domUserLoc.altitude)) return;
-    if (domLastElevFetchLoc && domDistanceKm(domLastElevFetchLoc, domUserLoc) < 0.15 && domFallbackAltitude != null) {
-        return;
-    }
+    if (!domUserLoc || (domUserLoc.altitude != null && isFinite(domUserLoc.altitude))) return;
+    if (domLastElevFetchLoc && domDistanceKm(domLastElevFetchLoc, domUserLoc) < 0.15 && domFallbackAltitude != null) return;
     domLastElevFetchLoc = { lat: domUserLoc.lat, lon: domUserLoc.lon };
     fetch(`https://api.open-meteo.com/v1/elevation?latitude=${domUserLoc.lat.toFixed(5)}&longitude=${domUserLoc.lon.toFixed(5)}`)
         .then(r => r.ok ? r.json() : Promise.reject())
         .then(data => {
-            if (data && Array.isArray(data.elevation) && data.elevation.length) {
+            if (data?.elevation?.length) {
                 domFallbackAltitude = Math.round(data.elevation[0]);
                 updateDomUserMarker();
                 refreshLiveUserDistancesUI();
@@ -1063,11 +307,7 @@ function updateDomUserMarker() {
     const rot = (typeof heading === 'number' && isFinite(heading)) ? Math.round(heading) : 0;
 
     if (!domUserMarker) {
-        domUserMarker = L.marker([lat, lon], {
-            icon: buildUserLocationIcon(rot),
-            title: 'Mein Standort (GPS)',
-            zIndexOffset: 1600
-        }).addTo(dominanzMap);
+        domUserMarker = L.marker([lat, lon], { icon: buildUserLocationIcon(rot), title: 'Mein Standort (GPS)', zIndexOffset: 1600 }).addTo(dominanzMap);
     } else {
         domUserMarker.setLatLng([lat, lon]);
         const el = domUserMarker.getElement();
@@ -1086,19 +326,17 @@ function updateDomUserMarker() {
     const nearest = findNearestItemTo(lat, lon);
     const distStr = nearest ? `${domNum(nearest.distKm, 2)} km (${domCompassDirection(domUserLoc, nearest.item)})` : '';
     const accStr = accuracy ? ` · ±${Math.round(accuracy)} m` : '';
-    const cfg = domCfg();
     domUserMarker.bindPopup(
         `<b>🧭 Mein Standort</b>${accStr}<br>` +
         `<span style="font-size:12px;color:#047857;font-weight:700;">${domEsc(formatUserAltText())} · 🚗 ${domEsc(formatUserSpeedText())}</span><br>` +
         `<span style="font-size:11.5px;color:#475569;">${lat.toFixed(5)}° N, ${lon.toFixed(5)}° O</span>` +
-        (nearest ? `<br><span style="font-size:12.5px;">${cfg.icon} Nächster Punkt: <b>${domEsc(nearest.item.name)}</b> (${distStr})</span>` : '')
+        (nearest ? `<br><span style="font-size:12.5px;">${domCfg().icon} Nächster Punkt: <b>${domEsc(nearest.item.name)}</b> (${distStr})</span>` : '')
     );
 }
 
 function refreshLiveUserDistancesUI() {
     if (!domUserLoc || !domPeaks.length) return;
     const cfg = domCfg();
-
     const nearest = findNearestItemTo(domUserLoc.lat, domUserLoc.lon);
     const startInfo = document.getElementById('dom-start-info');
     if (nearest && startInfo) {
@@ -1107,16 +345,12 @@ function refreshLiveUserDistancesUI() {
             `📍 <b>${domEsc(formatUserAltText())}</b> · 🚗 <b>${domEsc(formatUserSpeedText())}</b> · ` +
             `Nächstes Ziel (${domEsc(cfg.nounSingular)}): <b>${domEsc(nearest.item.name)}</b> (${domNum(nearest.distKm, 2)} km ${dir})`;
     }
-
     if (domActive && isFinite(domActive.lat) && isFinite(domActive.lon)) {
         const distEl = document.getElementById('dom-active-user-dist');
         if (distEl) {
-            const dActive = domDistanceKm(domUserLoc, domActive);
-            const dirActive = domCompassDirection(domUserLoc, domActive);
-            distEl.textContent = `${domNum(dActive, 2)} km (${dirActive})`;
+            distEl.textContent = `${domNum(domDistanceKm(domUserLoc, domActive), 2)} km (${domCompassDirection(domUserLoc, domActive)})`;
         }
     }
-
     const si = document.getElementById('dom-search-input');
     const q = (si ? si.value : '').trim();
     if (!q && domListMode === 'gps') {
@@ -1135,9 +369,7 @@ function refreshLiveUserDistancesUI() {
             const pk = domPeaks.find(x => x.id === pid);
             const badge = row.querySelector('.dom-live-dist-line');
             if (pk && badge) {
-                const dKm = domDistanceKm(domUserLoc, pk);
-                const dir = domCompassDirection(domUserLoc, pk);
-                badge.textContent = `🧭 ${domNum(dKm, 2)} km · Richtung ${dir}`;
+                badge.textContent = `🧭 ${domNum(domDistanceKm(domUserLoc, pk), 2)} km · Richtung ${domCompassDirection(domUserLoc, pk)}`;
             }
         });
     }
@@ -1146,15 +378,11 @@ function refreshLiveUserDistancesUI() {
 function findNearestItemTo(lat, lon) {
     if (!domPeaks || !domPeaks.length) return null;
     const pt = { lat, lon };
-    let bestItem = null;
-    let minKm = Infinity;
+    let bestItem = null, minKm = Infinity;
     for (const p of domPeaks) {
         if (!isFinite(p.lat) || !isFinite(p.lon)) continue;
         const d = domDistanceKm(pt, p);
-        if (d < minKm) {
-            minKm = d;
-            bestItem = p;
-        }
+        if (d < minKm) { minKm = d; bestItem = p; }
     }
     return bestItem ? { item: bestItem, distKm: minKm } : null;
 }
@@ -1163,7 +391,6 @@ function selectNearestPeakForUser(forceSelect = false) {
     if (!domUserLoc || !domPeaks.length) return;
     const nearest = findNearestItemTo(domUserLoc.lat, domUserLoc.lon);
     if (!nearest) return;
-
     if (forceSelect || !domInitialAutoSelected[domMode] || !domManualOverride) {
         domInitialAutoSelected[domMode] = true;
         domSelect(nearest.item, null, { isAutoNearest: true, clearSearchInput: true });
@@ -1172,67 +399,37 @@ function selectNearestPeakForUser(forceSelect = false) {
 }
 
 function startDomGeolocation(forceSelectNearest = false) {
-    if (!navigator.geolocation) {
-        setDomStatus('Standorterkennung wird von diesem Browser nicht unterstützt.');
-        return;
-    }
-    if (forceSelectNearest) {
-        setDomStatus(`🧭 Bestimme GPS-Standort & suche nächstgelegenes Ziel (${domCfg().nounSingular}) …`);
-    }
+    if (!navigator.geolocation) return;
+    if (forceSelectNearest) setDomStatus(`🧭 Bestimme GPS-Standort & suche nächstgelegenes Ziel (${domCfg().nounSingular}) …`);
 
     const onPosSuccess = (pos, shouldSelect) => {
         const prevLoc = domUserLoc;
         const nowTs = pos.timestamp || Date.now();
-        const newLat = pos.coords.latitude;
-        const newLon = pos.coords.longitude;
+        const newLat = pos.coords.latitude, newLon = pos.coords.longitude;
 
-        let speedKmh = null;
+        let speedKmh = 0;
         if (pos.coords.speed != null && isFinite(pos.coords.speed) && pos.coords.speed >= 0) {
             speedKmh = pos.coords.speed * 3.6;
-        } else if (prevLoc && prevLoc.ts && nowTs > prevLoc.ts) {
-            const dtHours = (nowTs - prevLoc.ts) / 3600000;
+        } else if (prevLoc?.ts && nowTs > prevLoc.ts) {
+            const dtH = (nowTs - prevLoc.ts) / 3600000;
             const dKm = domDistanceKm(prevLoc, { lat: newLat, lon: newLon });
-            if (dtHours > 0.0002 && dKm >= 0.008 && dKm / dtHours < 260) {
-                speedKmh = dKm / dtHours;
-            } else {
-                speedKmh = prevLoc.speedKmh || 0;
-            }
-        } else {
-            speedKmh = 0;
+            speedKmh = (dtH > 0.0002 && dKm >= 0.008 && dKm / dtH < 260) ? (dKm / dtH) : (prevLoc.speedKmh || 0);
         }
 
-        let heading = (pos.coords.heading != null && isFinite(pos.coords.heading) && pos.coords.heading >= 0)
-            ? pos.coords.heading
-            : null;
+        let heading = (pos.coords.heading != null && isFinite(pos.coords.heading) && pos.coords.heading >= 0) ? pos.coords.heading : null;
         if (heading === null && prevLoc) {
-            const movedKm = domDistanceKm(prevLoc, { lat: newLat, lon: newLon });
-            if (movedKm > 0.012) {
-                heading = domBearingDeg(prevLoc, { lat: newLat, lon: newLon });
-            } else {
-                heading = prevLoc.heading || 0;
-            }
+            heading = domDistanceKm(prevLoc, { lat: newLat, lon: newLon }) > 0.012
+                ? domBearingDeg(prevLoc, { lat: newLat, lon: newLon }) : (prevLoc.heading || 0);
         }
-
-        const gpsAlt = (pos.coords.altitude != null && isFinite(pos.coords.altitude))
-            ? Math.round(pos.coords.altitude)
-            : null;
 
         domUserLoc = {
-            lat: newLat,
-            lon: newLon,
-            heading: heading,
-            speedKmh: speedKmh,
-            altitude: gpsAlt,
-            accuracy: pos.coords.accuracy,
-            ts: nowTs
+            lat: newLat, lon: newLon, heading, speedKmh,
+            altitude: (pos.coords.altitude != null && isFinite(pos.coords.altitude)) ? Math.round(pos.coords.altitude) : null,
+            accuracy: pos.coords.accuracy, ts: nowTs
         };
 
         ensureUserAltitudeFallback();
         updateDomUserMarker();
-
-        if (domMode !== 'peaks' && domMode !== 'weather') {
-            enrichNearbyFromWikidata(newLat, newLon, domMode);
-        }
 
         if (shouldSelect || !domInitialAutoSelected[domMode]) {
             if (shouldSelect) domManualOverride = false;
@@ -1244,32 +441,14 @@ function startDomGeolocation(forceSelectNearest = false) {
     };
 
     navigator.geolocation.getCurrentPosition(
-        (pos) => onPosSuccess(pos, forceSelectNearest),
-        () => {
-            navigator.geolocation.getCurrentPosition(
-                (pos) => onPosSuccess(pos, forceSelectNearest),
-                () => {
-                    const startInfo = document.getElementById('dom-start-info');
-                    if (startInfo && !domUserLoc) {
-                        startInfo.textContent = `Standort nicht freigegeben · Fallback: ${domCfg().fallbackName}`;
-                    }
-                    if (forceSelectNearest) {
-                        setDomStatus('Standortzugriff nicht freigegeben – bitte GPS im Browser erlauben.');
-                    }
-                },
-                { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
-            );
-        },
+        pos => onPosSuccess(pos, forceSelectNearest),
+        () => navigator.geolocation.getCurrentPosition(pos => onPosSuccess(pos, forceSelectNearest), () => {}, { enableHighAccuracy: false, timeout: 10000 }),
         { enableHighAccuracy: true, timeout: 8000, maximumAge: 5000 }
     );
 
     if (domGeoWatchId === null) {
         try {
-            domGeoWatchId = navigator.geolocation.watchPosition(
-                (pos) => onPosSuccess(pos, false),
-                () => {},
-                { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
-            );
+            domGeoWatchId = navigator.geolocation.watchPosition(pos => onPosSuccess(pos, false), () => {}, { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 });
         } catch (e) {}
     }
 }
@@ -1284,306 +463,7 @@ function domLocateUserAndSelectNearest(fromButton = true) {
 }
 
 // ===================================================================
-// SPEZIAL-TELEMETRIE 1: LIVE-LEISTUNG FÜR KRAFTWERKE (OPEN-METEO)
-// ===================================================================
-async function fetchLivePowerplantOutput(p, token) {
-    const box = document.getElementById('dom-live-power-box');
-    if (!box || domMode !== 'powerplants') return;
-
-    const maxMw = domVal(p) || 0;
-    if (p.status === 'decommissioned') {
-        box.innerHTML = `
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-                <span>🛑 <b>Aktuelle Einspeisung:</b></span>
-                <span style="font-family:'JetBrains Mono',monospace;font-weight:800;color:#b91c1c;">0 MW (Stillgelegt)</span>
-            </div>
-            <div style="font-size:11.5px;color:#64748b;margin-top:3px;">Dieses Kraftwerk befindet sich nicht mehr im kommerziellen Leistungsbetrieb.</div>
-        `;
-        return;
-    }
-
-    try {
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${p.lat.toFixed(4)}&longitude=${p.lon.toFixed(4)}&current=wind_speed_10m,wind_speed_100m,shortwave_radiation,cloud_cover,temperature_2m&wind_speed_unit=ms`;
-        const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        const data = await r.json();
-        if (token !== domGen || !document.getElementById('dom-live-power-box')) return;
-
-        const cur = data.current || {};
-        const v10 = cur.wind_speed_10m ?? 0;
-        const v100 = cur.wind_speed_100m ?? (v10 * 1.38);
-        const ghi = cur.shortwave_radiation ?? 0;
-        const temp = cur.temperature_2m ?? 15;
-        const clouds = cur.cloud_cover ?? 0;
-
-        let liveMw = 0, pct = 0, detailText = '', badgeColor = '#047857';
-
-        if (p.type === 'wind') {
-            let cf = 0;
-            if (v100 < 3.0 || v100 >= 25.0) cf = 0;
-            else if (v100 >= 12.5) cf = 0.95;
-            else cf = Math.pow((v100 - 3.0) / (12.5 - 3.0), 2.6) * 0.95;
-            liveMw = maxMw * cf;
-            pct = Math.round(cf * 100);
-            detailText = `🌬️ Live-Wind am Standort (100 m Nabenhöhe): <b>${domNum(v100, 1)} m/s</b> (${domNum(v100 * 3.6, 0)} km/h)`;
-            badgeColor = pct >= 50 ? '#047857' : (pct >= 15 ? '#0369a1' : '#b45309');
-        } else if (p.type === 'solar') {
-            if (ghi <= 5) {
-                liveMw = 0; pct = 0;
-                detailText = `🌙 Aktuelle Solarstrahlung: <b>${Math.round(ghi)} W/m²</b> (Nacht / Dämmerung)`;
-                badgeColor = '#475569';
-            } else {
-                const tempLoss = Math.max(0.82, 1 - Math.max(0, temp - 20) * 0.004);
-                const cf = Math.min(0.94, (ghi / 920) * tempLoss);
-                liveMw = maxMw * cf;
-                pct = Math.round(cf * 100);
-                detailText = `☀️ Globalstrahlung vor Ort: <b>${Math.round(ghi)} W/m²</b> · Bewölkung: ${clouds}% · ${domNum(temp, 1)} °C`;
-                badgeColor = pct >= 45 ? '#b45309' : '#0369a1';
-            }
-        } else {
-            const hour = new Date().getHours();
-            const isPeakHour = (hour >= 7 && hour <= 20);
-            let baseCf = 0.65;
-            if (p.type === 'nuclear') baseCf = 0.92;
-            else if (p.type === 'coal') baseCf = isPeakHour ? 0.78 : 0.58;
-            else if (p.type === 'hydro') baseCf = isPeakHour ? 0.72 : 0.45;
-            else if (p.type === 'gas') baseCf = isPeakHour ? 0.62 : 0.30;
-            else if (p.type === 'biomass') baseCf = 0.85;
-            liveMw = maxMw * baseCf;
-            pct = Math.round(baseCf * 100);
-            detailText = `⚙️ Typische aktuelle Betriebsauslastung (${isPeakHour ? 'Tageslast' : 'Grund-/Nachtlast'}) · Vor Ort: ${domNum(temp, 1)} °C, Wind ${domNum(v10, 1)} m/s`;
-            badgeColor = '#047857';
-        }
-
-        const mwDigits = (liveMw < 50 && liveMw > 0) ? 1 : 0;
-        box.innerHTML = `
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-                <span>⚡ <b>Aktuelle Leistung (Live-Schätzung):</b></span>
-                <span style="font-family:'JetBrains Mono',monospace;font-size:14.5px;font-weight:800;color:${badgeColor};">
-                    ≈ ${domNum(liveMw, mwDigits)} / ${domNum(maxMw, 0)} MW (${pct} %)
-                </span>
-            </div>
-            <div style="width:100%;height:7px;background:#e2e8f0;border-radius:999px;overflow:hidden;margin:6px 0;">
-                <div style="width:${Math.min(100, Math.max(2, pct))}%;height:100%;background:${badgeColor};border-radius:999px;transition:width 0.3s;"></div>
-            </div>
-            <div style="font-size:11.5px;color:#334155;">${detailText}</div>
-        `;
-    } catch (e) {
-        if (token === domGen && box) {
-            box.innerHTML = `<div style="font-size:12px;color:#64748b;">⚡ Live-Wettertelemetrie für diesen Standort aktuell nicht erreichbar.</div>`;
-        }
-    }
-}
-
-// ===================================================================
-// SPEZIAL-TELEMETRIE 2: BADE-ERLAUBNIS & LIVE-BADEWETTER FÜR SEEN
-// ===================================================================
-async function fetchLiveLakeBathingInfo(p, token) {
-    const subEl = document.getElementById('dom-lake-live-sub');
-    if (!subEl || domMode !== 'lakes') return;
-
-    try {
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${p.lat.toFixed(4)}&longitude=${p.lon.toFixed(4)}&current=temperature_2m,wind_speed_10m,uv_index,cloud_cover`;
-        const r = await fetch(url, { signal: AbortSignal.timeout(7500) });
-        if (!r.ok) return;
-        const data = await r.json();
-        if (token !== domGen || !document.getElementById('dom-lake-live-sub')) return;
-
-        const cur = data.current || {};
-        const airT = cur.temperature_2m;
-        const windKmh = cur.wind_speed_10m;
-        const uv = cur.uv_index;
-        if (airT != null) {
-            const month = new Date().getMonth();
-            const seasonalBase = [3, 3.5, 6, 10, 15, 19, 21.5, 22, 18, 13, 8, 4.5][month] || 12;
-            const estWaterT = Math.max(2, Math.min(26, Math.round((seasonalBase * 0.7 + airT * 0.3) * 10) / 10));
-            subEl.innerHTML =
-                `🌡️ Vor-Ort-Wetter am See: <b>${domNum(airT, 1)} °C Luft</b> · 💧 Wassertemperatur ≈ <b>${domNum(estWaterT, 1)} °C</b>` +
-                (windKmh != null ? ` · 🌬️ Wind ${domNum(windKmh, 0)} km/h` : '') +
-                (uv != null ? ` · ☀️ UV-Index ${domNum(uv, 1)}` : '');
-        }
-    } catch (e) {}
-}
-
-// ===================================================================
-// WIKIDATA-UMKREIS-ANREICHERUNG (FÜR KRAFTWERKE, STÄDTE, TÜRME, SEEN, BURGEN)
-// ===================================================================
-async function enrichNearbyFromWikidata(lat, lon, mode) {
-    if (mode === 'peaks' || mode === 'weather') return;
-    const prev = domNearbyFetched[mode];
-    if (prev && domDistanceKm(prev, { lat, lon }) < 22) return;
-    domNearbyFetched[mode] = { lat, lon };
-
-    let sparql = '';
-    if (mode === 'powerplants') {
-        sparql = `
-            SELECT ?item ?itemLabel ?coord ?cap ?unit ?type WHERE {
-              SERVICE wikibase:around {
-                ?item wdt:P625 ?coord .
-                bd:serviceParam wikibase:center "Point(${lon.toFixed(3)} ${lat.toFixed(3)})"^^geo:wktLiteral .
-                bd:serviceParam wikibase:radius "60" .
-              }
-              ?item wdt:P31/wdt:P279* wd:Q159719 ;
-                    p:P2109/psv:P2109 ?capVal .
-              ?capVal wikibase:quantityAmount ?cap ; wikibase:quantityUnit ?unit .
-              OPTIONAL { ?item wdt:P31 ?type . }
-              SERVICE wikibase:label { bd:serviceParam wikibase:language "de,en". }
-            } LIMIT 100
-        `;
-    } else if (mode === 'towns') {
-        sparql = `
-            SELECT ?item ?itemLabel ?coord ?pop WHERE {
-              SERVICE wikibase:around {
-                ?item wdt:P625 ?coord .
-                bd:serviceParam wikibase:center "Point(${lon.toFixed(3)} ${lat.toFixed(3)})"^^geo:wktLiteral .
-                bd:serviceParam wikibase:radius "40" .
-              }
-              ?item wdt:P1082 ?pop .
-              FILTER(?pop >= 1000)
-              SERVICE wikibase:label { bd:serviceParam wikibase:language "de,en". }
-            } LIMIT 100
-        `;
-    } else if (mode === 'towers') {
-        sparql = `
-            SELECT ?item ?itemLabel ?coord ?h ?unit WHERE {
-              SERVICE wikibase:around {
-                ?item wdt:P625 ?coord .
-                bd:serviceParam wikibase:center "Point(${lon.toFixed(3)} ${lat.toFixed(3)})"^^geo:wktLiteral .
-                bd:serviceParam wikibase:radius "45" .
-              }
-              ?item p:P2048/psv:P2048 ?hVal .
-              ?hVal wikibase:quantityAmount ?h ; wikibase:quantityUnit ?unit .
-              FILTER(?h >= 15)
-              SERVICE wikibase:label { bd:serviceParam wikibase:language "de,en". }
-            } LIMIT 100
-        `;
-    } else if (mode === 'lakes') {
-        sparql = `
-            SELECT ?item ?itemLabel ?coord ?area ?unit ?use WHERE {
-              SERVICE wikibase:around {
-                ?item wdt:P625 ?coord .
-                bd:serviceParam wikibase:center "Point(${lon.toFixed(3)} ${lat.toFixed(3)})"^^geo:wktLiteral .
-                bd:serviceParam wikibase:radius "45" .
-              }
-              ?item wdt:P31/wdt:P279* wd:Q23397 ;
-                    p:P2046/psv:P2046 ?aVal .
-              ?aVal wikibase:quantityAmount ?area ; wikibase:quantityUnit ?unit .
-              OPTIONAL { ?item wdt:P366 ?use . }
-              SERVICE wikibase:label { bd:serviceParam wikibase:language "de,en". }
-            } LIMIT 100
-        `;
-    } else if (mode === 'castles') {
-        sparql = `
-            SELECT ?item ?itemLabel ?coord ?inception WHERE {
-              SERVICE wikibase:around {
-                ?item wdt:P625 ?coord .
-                bd:serviceParam wikibase:center "Point(${lon.toFixed(3)} ${lat.toFixed(3)})"^^geo:wktLiteral .
-                bd:serviceParam wikibase:radius "45" .
-              }
-              VALUES ?cls { wd:Q23413 wd:Q751876 wd:Q57821 wd:Q17715832 wd:Q44613 }
-              ?item wdt:P31 ?cls ; wdt:P571 ?inception .
-              SERVICE wikibase:label { bd:serviceParam wikibase:language "de,en". }
-            } LIMIT 100
-        `;
-    }
-
-    if (!sparql) return;
-
-    try {
-        const url = 'https://query.wikidata.org/sparql?format=json&query=' + encodeURIComponent(sparql);
-        const r = await fetch(url, { headers: { 'Accept': 'application/sparql-results+json' }, signal: AbortSignal.timeout(12000) });
-        if (!r.ok) return;
-        const data = await r.json();
-        const bindings = data?.results?.bindings || [];
-        const list = domDatasets[mode];
-        let added = 0;
-        const curY = new Date().getFullYear();
-
-        bindings.forEach(b => {
-            const id = (b.item?.value || '').split('/').pop();
-            const name = b.itemLabel?.value || '';
-            if (!id || !name || /^Q\d+$/.test(name) || list.some(x => x.id === id)) return;
-            const m = (b.coord?.value || '').match(/Point\(([-\d.]+)\s+([-\d.]+)\)/);
-            if (!m) return;
-            const pLon = parseFloat(m[1]), pLat = parseFloat(m[2]);
-
-            if (mode === 'powerplants') {
-                let cap = parseFloat(b.cap?.value || '0');
-                const unitQ = (b.unit?.value || '').split('/').pop();
-                if (unitQ === 'Q3320608') cap /= 1000;
-                else if (unitQ === 'Q5879479') cap *= 1000;
-                if (!isFinite(cap) || cap < 3 || cap > 25000) return;
-                let pType = 'other';
-                if (/solar|photovolta/i.test(name)) pType = 'solar';
-                else if (/wind/i.test(name)) pType = 'wind';
-                else if (/wasser|pumpspeicher|speicher|hydro|talsperre/i.test(name)) pType = 'hydro';
-                else if (/kern|atom|nuclear/i.test(name)) pType = 'nuclear';
-                else if (/kohle|braunkohle|steinkohle/i.test(name)) pType = 'coal';
-                else if (/gas|heizkraftwerk/i.test(name)) pType = 'gas';
-                const cRound = Math.round(cap * 10) / 10;
-                list.push({ id, name, lat: pLat, lon: pLon, capacity: cRound, height: cRound, type: pType, range: PLANT_TYPE_META[pType]?.label || 'Kraftwerk' });
-                added++;
-            } else if (mode === 'towns') {
-                const pop = Math.round(parseFloat(b.pop?.value || '0'));
-                if (!isFinite(pop) || pop < 1000) return;
-                list.push({ id, name, lat: pLat, lon: pLon, population: pop, height: pop, range: 'Stadt / Gemeinde' });
-                added++;
-            } else if (mode === 'towers') {
-                let h = parseFloat(b.h?.value || '0');
-                const unitQ = (b.unit?.value || '').split('/').pop();
-                if (unitQ === 'Q3710') h *= 0.3048;
-                else if (unitQ === 'Q174728') h *= 0.01;
-                else if (unitQ !== 'Q11573') return;
-                if (!isFinite(h) || h < 15 || h > 830) return;
-                let tType = 'lookout';
-                if (/fernsehturm|funkturm|sender/i.test(name)) tType = 'tvtower';
-                else if (/hochhaus|tower|wolkenkratzer/i.test(name)) tType = 'skyscraper';
-                else if (/kirche|dom|münster/i.test(name)) tType = 'church';
-                else if (/brücke|kamin|schornstein/i.test(name)) tType = 'industrial';
-                const hRound = Math.round(h * 10) / 10;
-                list.push({ id, name, lat: pLat, lon: pLon, height: hRound, type: tType, range: TOWER_TYPE_META[tType]?.label || 'Turm / Bauwerk' });
-                added++;
-            } else if (mode === 'lakes') {
-                let area = parseFloat(b.area?.value || '0');
-                const unitQ = (b.unit?.value || '').split('/').pop();
-                if (unitQ === 'Q25343') area /= 1e6;
-                else if (unitQ === 'Q35852') area *= 0.01;
-                else if (unitQ !== 'Q712226') return;
-                if (!isFinite(area) || area < 0.01 || area > 380000) return;
-                const useQ = (b.use?.value || '').split('/').pop();
-                const isNoSwim = useQ === 'Q7892' || /trinkwasser|gottleuba|lehnmühle|klingenberg|eibenstock|sosa|cranzahl|rauschenbach|saidenbach/i.test(name);
-                const swim = isNoSwim ? 'no' : (/talsperre|stausee/i.test(name) ? 'check' : 'yes');
-                const swimNote = isNoSwim ? '🚫 Baden verboten (Trinkwasserschutz / Betriebsanlage)' : (swim === 'check' ? '⚠️ Stausee / Talsperre (Baden nur an ausgewiesenen Strandbereichen)' : '🏊 Badesee / Natursee (Baden an öffentlichen Ufern erlaubt)');
-                const aRound = Math.round(area * 1000) / 1000;
-                list.push({ id, name, lat: pLat, lon: pLon, area: aRound, height: aRound, swim, swimNote, range: 'See / Talsperre' });
-                added++;
-            } else if (mode === 'castles') {
-                const inc = String(b.inception?.value || '');
-                const mYr = inc.match(/^([+-]?\d{1,5})-/);
-                if (!mYr) return;
-                const yr = parseInt(mYr[1], 10);
-                const age = curY - yr;
-                if (!isFinite(age) || age < 60 || age > 12000) return;
-                let cType = 'castle';
-                if (/schloss|palast|zwinger|residenz/i.test(name)) cType = 'palace';
-                else if (/festung|zitadelle|fort/i.test(name)) cType = 'fortress';
-                list.push({ id, name, lat: pLat, lon: pLon, age, year: yr, height: age, type: cType, range: CASTLE_TYPE_META[cType]?.label || 'Burg / Schloss' });
-                added++;
-            }
-        });
-
-        if (added > 0 && domMode === mode) {
-            recomputeIsolationsForDataset(list);
-            const cnt = document.getElementById('dom-count');
-            if (cnt) cnt.textContent = `${domNum(list.length)} ${domCfg().nounPlural} weltweit`;
-            domPaint();
-            refreshLiveUserDistancesUI();
-        }
-    } catch (e) {}
-}
-
-// ===================================================================
-// EIGENER PUNKT: DOMINANZ PER KARTENKLICK MESSEN
+// EIGENER PUNKT & DATEN-LOADER
 // ===================================================================
 let domPickMode = false;
 let domPickMarker = null;
@@ -1591,146 +471,54 @@ let domPickMarker = null;
 function toggleDomPickMode() {
     domPickMode = !domPickMode;
     const btn = document.getElementById('dom-pick-btn');
-    if (!dominanzMap) return;
-    if (domPickMode) {
-        btn.textContent = '📍 Eigenen Punkt setzen: AN (auf Karte klicken)';
-        btn.className = 'btn btn-emerald';
-        dominanzMap.getContainer().style.cursor = 'crosshair';
-        setDomStatus('Klicke auf die Karte, um die Dominanz eines beliebigen Punkts zu messen.');
-    } else {
-        btn.textContent = '📍 Eigenen Punkt setzen: AUS';
-        btn.className = 'btn btn-amber';
-        dominanzMap.getContainer().style.cursor = '';
-        setDomStatus('');
-    }
+    if (!dominanzMap || !btn) return;
+    btn.textContent = domPickMode ? '📍 Eigenen Punkt setzen: AN (auf Karte klicken)' : '📍 Eigenen Punkt setzen: AUS';
+    btn.className = domPickMode ? 'btn btn-emerald' : 'btn btn-amber';
+    dominanzMap.getContainer().style.cursor = domPickMode ? 'crosshair' : '';
 }
+
+function round2(x) { return Math.round(x * 100) / 100; }
 
 function measureDomPoint(lat, lon) {
     domManualOverride = true;
     const token = ++domGen;
-    setDomStatus('Standortwert & Dominanz werden berechnet …');
     if (domPickMarker) dominanzMap.removeLayer(domPickMarker);
     domPickMarker = L.marker([lat, lon], {
         icon: L.divIcon({ className: 'domPickWrap', html: '<span class="domPickDot"></span>', iconSize: [16, 16] }),
         title: 'Gewählter Punkt', zIndexOffset: 1200
     }).addTo(dominanzMap);
 
-    if (domMode === 'peaks') {
-        fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat.toFixed(5)}&longitude=${lon.toFixed(5)}`)
-            .then(r => r.ok ? r.json() : Promise.reject())
-            .then(data => {
-                if (token !== domGen) return;
-                const elev = (data && data.elevation && data.elevation.length) ? Math.round(data.elevation[0]) : null;
-                let best = null, bestd = Infinity;
-                if (elev != null) {
-                    const pt = { lat, lon };
-                    for (const q of domPeaks) {
-                        if ((domVal(q) || 0) <= elev) continue;
-                        const d = domDistanceKm(pt, { lat: q.lat, lon: q.lon });
-                        if (d < bestd && d > 0.001) { bestd = d; best = q; }
-                    }
-                }
-                const p = {
-                    id: 'pick', name: 'Gewählter Kartenpunkt', lat, lon,
-                    height: elev, isolation: best ? round2(bestd) : null, isoCalc: true,
-                    range: 'Live-Geländehöhe (Open-Meteo)'
-                };
-                renderPickResult(p, best);
-                setDomStatus('');
-            })
-            .catch(() => { if (token === domGen) setDomStatus('Höhenabfrage nicht erreichbar – bitte erneut versuchen.'); });
-    } else if (domMode === 'weather') {
+    if (domMode === 'weather') {
         fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(5)}&longitude=${lon.toFixed(5)}&current=temperature_2m`)
             .then(r => r.ok ? r.json() : Promise.reject())
             .then(data => {
                 if (token !== domGen) return;
-                const tVal = data?.current?.temperature_2m != null ? Math.round(data.current.temperature_2m * 10) / 10 : 15.0;
-                const pt = { lat, lon, temp: tVal, height: tVal };
+                const tVal = clampPlausibleTemp({ lat, lon, elev: 0 }, data?.current?.temperature_2m ?? 15.0);
+                const pt = { id: 'pick', name: 'Gewählter Kartenpunkt', lat, lon, temp: tVal, height: tVal, isoCalc: true, range: 'Live-2m-Temperaturmessung' };
                 const best = domNearestHigher(pt);
-                const bestd = best ? domDistanceKm(pt, best) : null;
-                const p = {
-                    id: 'pick', name: 'Gewählter Kartenpunkt', lat, lon,
-                    temp: tVal, height: tVal,
-                    isolation: bestd != null ? round2(bestd) : null, isoCalc: true,
-                    range: 'Live-2m-Temperaturmessung (Open-Meteo)'
-                };
-                renderPickResult(p, best);
-                setDomStatus('');
+                pt.isolation = best ? round2(domDistanceKm(pt, best)) : null;
+                domSelect(pt);
             })
-            .catch(() => { if (token === domGen) setDomStatus('Wetterabfrage nicht erreichbar.'); });
-    } else {
-        const defaultRefVals = { powerplants: 10, towns: 1000, towers: 30, lakes: 0.25, castles: 250 };
-        const refVal = defaultRefVals[domMode] || 10;
-        const pt = { lat, lon };
-        let best = null, bestd = Infinity;
-        for (const q of domPeaks) {
-            if ((domVal(q) || 0) <= refVal) continue;
-            const d = domDistanceKm(pt, q);
-            if (d < bestd && d > 0.001) { bestd = d; best = q; }
-        }
-        const p = {
-            id: 'pick', name: 'Gewählter Kartenpunkt', lat, lon,
-            height: refVal, capacity: refVal, population: refVal, area: refVal, age: refVal,
-            isolation: best ? round2(bestd) : null, isoCalc: true,
-            range: `Simulierter Referenzpunkt (${domFormatVal(refVal)})`
-        };
-        renderPickResult(p, best);
-        setDomStatus('');
+            .catch(() => {});
+        return;
     }
+
+    fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat.toFixed(5)}&longitude=${lon.toFixed(5)}`)
+        .then(r => r.ok ? r.json() : Promise.reject())
+        .then(data => {
+            if (token !== domGen) return;
+            const elev = data?.elevation?.length ? Math.round(data.elevation[0]) : 100;
+            const refVal = domMode === 'peaks' ? elev : ({ powerplants: 10, towns: 1000, towers: 30, lakes: 0.25, castles: 250 }[domMode] || 10);
+            const pt = { id: 'pick', name: 'Gewählter Kartenpunkt', lat, lon, height: refVal, capacity: refVal, population: refVal, area: refVal, age: refVal, isoCalc: true, range: 'Kartenpunkt-Messung' };
+            const best = domNearestHigher(pt);
+            pt.isolation = best ? round2(domDistanceKm(pt, best)) : null;
+            domSelect(pt);
+        })
+        .catch(() => {});
 }
 
-function round2(x) { return Math.round(x * 100) / 100; }
-
-function renderPickResult(p, ref) {
-    const cfg = domCfg();
-    const token = ++domGen;
-    domActive = p; domReference = ref || null;
-    if (domSelMarker) { dominanzMap.removeLayer(domSelMarker); domSelMarker = null; }
-    if (domRefMarker) { dominanzMap.removeLayer(domRefMarker); domRefMarker = null; }
-    if (domCircle) { dominanzMap.removeLayer(domCircle); domCircle = null; }
-    if (ref && p.isolation) {
-        domCircle = domGeodesic({lat:p.lat, lon:p.lon}, p.isolation * 1000, {lat:ref.lat, lon:ref.lon});
-        if (document.getElementById('dom-show-circle').checked) domCircle.addTo(dominanzMap);
-        let lon = ref.lon;
-        while (lon - p.lon > 180) lon -= 360; while (lon - p.lon < -180) lon += 360;
-        domRefMarker = L.marker([ref.lat, lon], {
-            icon: L.divIcon({ className: 'domHigherPeak', html: '<span class="domHigherCore"></span>', iconSize: [22,22] }),
-            title: cfg.higherLabel + ': ' + ref.name, zIndexOffset: 1000
-        }).bindTooltip(domEsc(ref.name), { permanent: true, direction: 'top', className: 'domHigherTip', offset: [0,-10] })
-            .on('click', () => domSelect(ref)).addTo(dominanzMap);
-        const b = domCircle.getBounds(); b.extend([ref.lat, lon]);
-        dominanzMap.fitBounds(b.pad(0.25), { maxZoom: 13, animate: false });
-    }
-    const gmapsDirUrl = buildGoogleMapsRouteUrl(p);
-    document.getElementById('dom-detail').innerHTML =
-        `<div class="eyebrow-dark" style="display:block; margin-bottom:4px;">📍 ${domEsc(p.range)}</div>` +
-        '<h3 style="font-size:22px; font-weight:800; margin:0 0 4px;">Gewählter Kartenpunkt</h3>' +
-        '<div id="dom-loc-subtitle" style="font-size:13px; font-weight:700; color:#047857; margin-bottom:10px;">📍 Ermittle Ort &amp; Land …</div>' +
-        '<div class="person-grid-2" style="margin:0 0 10px;">' +
-        `<div class="person-box" style="background:#ecfdf5; border-color:#a7f3d0;"><span class="person-role">${domEsc(cfg.valueLabel)}</span><div class="person-name" style="font-size:18px;">${domFormatVal(domVal(p))}</div></div>` +
-        '<div class="person-box" style="background:#fffbeb; border-color:#fde68a;"><span class="person-role" style="color:var(--amber);">Dominanz ≈</span><div class="person-name" style="font-size:18px;">' + (p.isolation != null ? domNum(p.isolation, 2) + ' km' : '–') + '</div></div>' +
-        '</div>' +
-        '<p class="dom-note" style="margin-bottom:10px;">Koordinaten: ' + p.lat.toFixed(4) + '°, ' + p.lon.toFixed(4) + '°.</p>' +
-        '<div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:4px;">' +
-        `<a class="btn btn-emerald" href="${gmapsDirUrl}" target="_blank" rel="noopener" style="font-size:12.5px; padding:8px 13px; text-decoration:none;">🧭 Route (Google Maps) ↗</a>` +
-        '</div>' +
-        `<div id="dom-higher" style="margin-top:14px; padding-top:12px; border-top:1px solid #e2e8f0;"></div>`;
-
-    domOfferHigher(p, ref, token);
-    resolvePlaceLabel(p).then(lbl => {
-        if (token !== domGen) return;
-        const el = document.getElementById('dom-loc-subtitle');
-        if (el) el.textContent = lbl ? `📍 ${lbl}` : `📍 ${p.lat.toFixed(4)}° N, ${p.lon.toFixed(4)}° O`;
-    });
-}
-
-// ===================================================================
-// DATEN LADEN & ISOLATION BERECHNEN (ALLE 7 KONTEXTE)
-// ===================================================================
 function normalizeHeightMeters(h) {
-    if (typeof h !== 'number' || !isFinite(h)) return h;
-    if (h > 8849) return Math.round(h * 0.3048);
-    return h;
+    return (typeof h === 'number' && isFinite(h) && h > 8849) ? Math.round(h * 0.3048) : h;
 }
 
 function recomputeIsolationsForDataset(list) {
@@ -1747,12 +535,8 @@ function recomputeIsolationsForDataset(list) {
             const d = domDistanceKm(p, q);
             if (d > 0.01 && d < minKm) minKm = d;
         }
-        if (isFinite(minKm)) {
-            p.isolation = round2(minKm);
-            p.isoCalc = true;
-        } else {
-            p.isolation = null;
-        }
+        p.isolation = isFinite(minKm) ? round2(minKm) : null;
+        p.isoCalc = true;
     }
 }
 
@@ -1766,6 +550,7 @@ function loadDominanzData(targetMode = domMode) {
             if (targetMode === 'peaks') {
                 data.forEach(p => { p.height = normalizeHeightMeters(p.height); });
             } else if (targetMode === 'weather') {
+                sanitizeWeatherDataset(data);
                 domDatasets.weather = data;
                 recomputeWeatherDominance();
             } else {
@@ -1773,17 +558,10 @@ function loadDominanzData(targetMode = domMode) {
             }
             domDatasets[targetMode] = data;
             domLoaded[targetMode] = true;
-
-            if (domMode === targetMode) {
-                onModeDatasetReady(targetMode);
-            }
+            if (domMode === targetMode) onModeDatasetReady(targetMode);
         })
         .catch(() => {
-            if (domMode === targetMode) {
-                setDomStatus(`⏳ Datei ${cfg.file} wird gerade vom GitHub-Workflow gebaut – bitte in ca. 30 Sekunden neu laden.`);
-                const cnt = document.getElementById('dom-count');
-                if (cnt) cnt.textContent = `${cfg.file} wird erstellt …`;
-            }
+            if (domMode === targetMode) setDomStatus(`⏳ Datei ${cfg.file} wird geladen – bitte kurz warten.`);
         });
 }
 
@@ -1795,7 +573,6 @@ function onModeDatasetReady(mode) {
 
     const cnt = document.getElementById('dom-count');
     if (cnt) cnt.textContent = `${domNum(domPeaks.length)} ${cfg.nounPlural} weltweit`;
-
     if (dominanzMap) dominanzMap.invalidateSize();
 
     if (mode === 'weather') {
@@ -1805,18 +582,13 @@ function onModeDatasetReady(mode) {
 
     if (domUserLoc) {
         updateDomUserMarker();
-        if (mode !== 'peaks' && mode !== 'weather') {
-            enrichNearbyFromWikidata(domUserLoc.lat, domUserLoc.lon, mode);
-        }
         selectNearestPeakForUser(true);
     } else {
         const fb = domPeaks.find(p => p.id === cfg.fallbackId) || domPeaks.find(p => p.name === cfg.fallbackName) || domPeaks[0];
         if (fb) domSelect(fb, null, { isFallback: true, clearSearchInput: true });
         domSearch();
     }
-
     domPaint();
-    setTimeout(() => { if (dominanzMap) dominanzMap.invalidateSize(); domPaint(); }, 300);
 }
 
 function setDomStatus(txt) { const el = document.getElementById('dom-status'); if (el) el.textContent = txt; }
@@ -1827,127 +599,15 @@ function setDominanzLayer(key) {
     Object.values(dominanzLayers).forEach(l => dominanzMap.removeLayer(l));
     dominanzLayers[key].addTo(dominanzMap);
     domLayerKey = key;
-    const sel = document.getElementById('dom-layer-select');
-    if (sel && sel.value !== key) sel.value = key;
 }
 
 function dominanzWorldView() { if (dominanzMap) dominanzMap.setView([25, 10], 2); }
 
 // ===================================================================
-// FARB- & GRÖSSENSKALA FÜR ALLE 7 KONTEXTE
+// KARTEN-RENDERING, GEODÄSIE & DOMINANZKETTE
 // ===================================================================
-function domColorForItem(p) {
-    const v = domVal(p);
-    if (domMode === 'weather') {
-        if (v == null) return '#94a3b8';
-        if (v > 36)   return '#991b1b';
-        if (v >= 28)  return '#ef4444';
-        if (v >= 20)  return '#f59e0b';
-        if (v >= 10)  return '#84cc16';
-        if (v >= 0)   return '#10b981';
-        if (v >= -5)  return '#06b6d4';
-        if (v >= -20) return '#1d4ed8';
-        return '#6b21a8';
-    }
-    if (domMode === 'powerplants') {
-        return (PLANT_TYPE_META[p?.type] || PLANT_TYPE_META.other).color;
-    }
-    if (domMode === 'towers') {
-        return (TOWER_TYPE_META[p?.type] || TOWER_TYPE_META.tvtower).color;
-    }
-    if (domMode === 'lakes') {
-        const sw = p?.swim || 'yes';
-        return (LAKE_SWIM_META[sw] || LAKE_SWIM_META.yes).color;
-    }
-    if (domMode === 'castles') {
-        if (v == null) return '#94a3b8';
-        if (v >= 2500) return '#7e22ce';
-        if (v >= 1000) return '#dc2626';
-        if (v >= 600)  return '#f97316';
-        if (v >= 300)  return '#eab308';
-        return '#16a34a';
-    }
-    if (domMode === 'towns') {
-        if (v == null) return '#94a3b8';
-        if (v >= 5000000) return '#7e22ce';
-        if (v >= 1000000) return '#dc2626';
-        if (v >= 500000)  return '#ef4444';
-        if (v >= 100000)  return '#f97316';
-        if (v >= 50000)   return '#eab308';
-        if (v >= 10000)   return '#65a30d';
-        return '#16a34a';
-    }
-    // Peaks
-    if (v == null) return '#94a3b8';
-    if (v > 7000) return '#8b2fc9';
-    if (v >= 6000) return '#e01b1b';
-    if (v >= 5000) return '#f2766e';
-    if (v >= 4000) return '#f27405';
-    if (v >= 3000) return '#d9a406';
-    if (v >= 2000) return '#f2d307';
-    if (v >= 1000) return '#5bd16a';
-    return '#1a6b2e';
-}
-
-function domRadiusForItem(p) {
-    const v = domVal(p);
-    if (v == null) return 5;
-    if (domMode === 'weather') {
-        if (v >= 35 || v <= -25) return 8.5;
-        if (v >= 28 || v <= -10) return 7;
-        return 6;
-    }
-    if (domMode === 'powerplants') {
-        if (v >= 3000) return 9.5;
-        if (v >= 1000) return 8;
-        if (v >= 300)  return 7;
-        if (v >= 50)   return 6;
-        return 5;
-    }
-    if (domMode === 'towns') {
-        if (v >= 5000000) return 9.5;
-        if (v >= 1000000) return 8.5;
-        if (v >= 250000)  return 7.5;
-        if (v >= 50000)   return 6.5;
-        return 5.5;
-    }
-    if (domMode === 'towers') {
-        if (v >= 400) return 9;
-        if (v >= 250) return 8;
-        if (v >= 150) return 7;
-        if (v >= 80)  return 6;
-        return 5;
-    }
-    if (domMode === 'lakes') {
-        if (v >= 1000) return 9.5;
-        if (v >= 100)  return 8;
-        if (v >= 10)   return 7;
-        if (v >= 1)    return 6;
-        return 5.5;
-    }
-    if (domMode === 'castles') {
-        if (v >= 2500) return 9;
-        if (v >= 1000) return 8;
-        if (v >= 700)  return 7;
-        if (v >= 400)  return 6;
-        return 5.5;
-    }
-    if (v > 7000) return 9;
-    if (v >= 5000) return 8;
-    if (v >= 3000) return 7;
-    if (v >= 2000) return 6;
-    return 5;
-}
-
 function domMaxForZoom(z) {
-    if (z <= 3) return 70;
-    if (z <= 4) return 120;
-    if (z <= 5) return 200;
-    if (z <= 6) return 280;
-    if (z <= 7) return 380;
-    if (z <= 8) return 500;
-    if (z <= 10) return 680;
-    return 900;
+    return z <= 3 ? 70 : (z <= 4 ? 120 : (z <= 5 ? 200 : (z <= 6 ? 280 : (z <= 7 ? 380 : (z <= 8 ? 500 : (z <= 10 ? 680 : 900))))));
 }
 
 function domPaint() {
@@ -1967,13 +627,12 @@ function domPaint() {
         .slice(0, cap);
 
     shown.forEach(p => {
-        const r = domRadiusForItem(p);
         const val = domVal(p);
         const swimSuffix = (domMode === 'lakes' && p.swim)
             ? ` · ${p.swim === 'no' ? '🚫 Badeverbot' : (p.swim === 'yes' ? '🏊 Badesee' : '⚠️ Stausee')}`
-            : (domMode === 'weather' && p.elev != null ? ` · ⛰️ ${p.elev} m` : '');
+            : (domMode === 'weather' && p.elev != null ? ` · ⛰️ ${cleanStationElev(p.elev)} m` : '');
         L.circleMarker([p.lat, p.lon], {
-            radius: r, color: 'rgba(0,0,0,0.45)', weight: 1,
+            radius: domRadiusForItem(p), color: 'rgba(0,0,0,0.45)', weight: 1,
             fillColor: domColorForItem(p), fillOpacity: 0.95
         }).bindTooltip(`${domItemIcon(p)} ${domEsc(p.name)}` + (val != null ? ` (${domFormatVal(val)}${swimSuffix})` : ''))
             .on('click', () => domSelect(p))
@@ -1998,13 +657,9 @@ function domDestination(a, b, d, t) {
 }
 
 function domSplitAntimeridian(raw) {
-    const segs = [];
-    let cur = [];
+    const segs = []; let cur = [];
     for (let i = 0; i < raw.length; i++) {
-        if (i > 0 && Math.abs(raw[i][1] - raw[i - 1][1]) > 180) {
-            if (cur.length) segs.push(cur);
-            cur = [];
-        }
+        if (i > 0 && Math.abs(raw[i][1] - raw[i - 1][1]) > 180) { if (cur.length) segs.push(cur); cur = []; }
         cur.push(raw[i]);
     }
     if (cur.length) segs.push(cur);
@@ -2012,11 +667,7 @@ function domSplitAntimeridian(raw) {
 }
 
 function domStrokeStyle() {
-    if (domMode === 'weather') {
-        return domWeatherPolarity === 'cold'
-            ? { stroke: '#0284c7', fill: '#38bdf8' }
-            : { stroke: '#dc2626', fill: '#f97316' };
-    }
+    if (domMode === 'weather') return domWeatherPolarity === 'cold' ? { stroke: '#0284c7', fill: '#38bdf8' } : { stroke: '#dc2626', fill: '#f97316' };
     return { stroke: '#2563eb', fill: '#3b82f6' };
 }
 
@@ -2035,10 +686,8 @@ function domGeoLine(p, target) {
         const z = A * Math.sin(a1) + B * Math.sin(a2);
         raw.push([Math.atan2(z, Math.hypot(x, y)) / rad, Math.atan2(y, x) / rad]);
     }
-    const segs = domSplitAntimeridian(raw);
-    const parts = [];
-    const st = domStrokeStyle();
-    segs.forEach(s => {
+    const parts = [], st = domStrokeStyle();
+    domSplitAntimeridian(raw).forEach(s => {
         parts.push(L.polyline(s, { color: '#ffffff', weight: 6, opacity: .9, interactive: false }));
         parts.push(L.polyline(s, { color: st.stroke, weight: 3, opacity: 1, dashArray: '10, 8', interactive: false }));
     });
@@ -2046,26 +695,19 @@ function domGeoLine(p, target) {
 }
 
 function domGeodesic(p, r, target) {
-    if (r / 1000 > DOM_CIRCLE_MAX_KM && target) {
-        return domGeoLine(p, target);
-    }
+    if (r / 1000 > DOM_CIRCLE_MAX_KM && target) return domGeoLine(p, target);
     const R = 6371008.8, d = r / R, a = p.lat * Math.PI / 180, b = p.lon * Math.PI / 180;
     const bearing = target ? Math.atan2(
         Math.sin((target.lon - p.lon) * Math.PI / 180) * Math.cos(target.lat * Math.PI / 180),
         Math.cos(a) * Math.sin(target.lat * Math.PI / 180) - Math.sin(a) * Math.cos(target.lat * Math.PI / 180) * Math.cos((target.lon - p.lon) * Math.PI / 180)
     ) : 0;
     const raw = [];
-    for (let i = 0; i <= 360; i++) {
-        const t = bearing + i * Math.PI / 180;
-        raw.push(domDestination(a, b, d, t));
-    }
-    const segs = domSplitAntimeridian(raw);
-    const st = domStrokeStyle();
+    for (let i = 0; i <= 360; i++) raw.push(domDestination(a, b, d, bearing + i * Math.PI / 180));
+    const segs = domSplitAntimeridian(raw), st = domStrokeStyle();
     if (segs.length === 1) {
-        const pts = segs[0];
         return L.featureGroup([
-            L.polygon(pts, { color: '#ffffff', weight: 6, opacity: .9, fill: false, interactive: false }),
-            L.polygon(pts, { color: st.stroke, weight: 3, opacity: 1, dashArray: '10, 8', fillColor: st.fill, fillOpacity: .10, interactive: false })
+            L.polygon(segs[0], { color: '#ffffff', weight: 6, opacity: .9, fill: false, interactive: false }),
+            L.polygon(segs[0], { color: st.stroke, weight: 3, opacity: 1, dashArray: '10, 8', fillColor: st.fill, fillOpacity: .10, interactive: false })
         ]);
     }
     const parts = [];
@@ -2076,9 +718,6 @@ function domGeodesic(p, r, target) {
     return L.featureGroup(parts);
 }
 
-// ===================================================================
-// DOMINANZKETTE: GARANTIERT MONOTONE SUCHE (OHNE RÜCKWÄRTSSPRÜNGE!)
-// ===================================================================
 function domNearestHigher(p) {
     const cfg = domCfg();
     const valP = domVal(p);
@@ -2089,13 +728,8 @@ function domNearestHigher(p) {
     for (const c of domPeaks) {
         const valC = domVal(c);
         if (c.id === p.id || !Number.isFinite(valC)) continue;
-        // Strikter Vergleich auf den gerundeten Snapshot-Werten (mindestens 0.1 °C Differenz bei Wetter)
         if (domMode === 'weather') {
-            if (isColdSearch) {
-                if (valC > valP - 0.09) continue;
-            } else {
-                if (valC < valP + 0.09) continue;
-            }
+            if (isColdSearch ? (valC > valP - 0.09) : (valC < valP + 0.09)) continue;
         } else {
             if (valC <= valP) continue;
         }
@@ -2113,13 +747,8 @@ function domOfferHigher(p, next, token, customZoom) {
     if (!next) {
         const isoBox = document.getElementById('dom-iso-val');
         if (isoBox) isoBox.textContent = 'Welt-Extremum';
-        box.innerHTML = '<p class="dom-note" style="margin:0;">' +
-            (p.id === cfg.supremeId ? cfg.supremeNote :
-            domVal(p) == null ? `Für die Dominanzsuche wird ein bekannter Wert (${cfg.unit}) benötigt.` :
-            cfg.supremeNote) + '</p>';
-        if (customZoom && dominanzMap) {
-            dominanzMap.setView([p.lat, p.lon], customZoom);
-        }
+        box.innerHTML = `<p class="dom-note" style="margin:0;">${domEsc(cfg.supremeNote)}</p>`;
+        if (customZoom && dominanzMap) dominanzMap.setView([p.lat, p.lon], customZoom);
         return;
     }
     domReference = next;
@@ -2148,32 +777,25 @@ function domOfferHigher(p, next, token, customZoom) {
         .on('click', () => domSelect(next)).addTo(dominanzMap);
 
     const nextInitialLoc = getInitialPlaceLabel(next);
-    const nextLocSpan = nextInitialLoc ? ` (${domEsc(nextInitialLoc)})` : '';
     const arrowIcon = (domMode === 'weather' && domWeatherPolarity === 'cold') ? '❄️⬇️' : '⬆️';
 
     box.innerHTML =
         `<button type="button" class="dom-higher-btn">` +
-        `<span>${arrowIcon} ${domEsc(cfg.higherLabel)}: <b>${domEsc(next.name)}</b><span id="dom-higher-loc-label" style="font-weight:600; font-size:12px; opacity:0.9;">${nextLocSpan}</span></span> ` +
+        `<span>${arrowIcon} ${domEsc(cfg.higherLabel)}: <b>${domEsc(next.name)}</b><span id="dom-higher-loc-label" style="font-weight:600; font-size:12px; opacity:0.9;">${nextInitialLoc ? ' (' + domEsc(nextInitialLoc) + ')' : ''}</span></span> ` +
         `<span class="dom-higher-h">${domFormatVal(domVal(next))}</span> →` +
         `</button>` +
-        '<p class="dom-note" style="margin-bottom:0;">' + domNum(domDistKm, 2) +
-        (asLine
-            ? ` km Luftlinie bis zur ${cfg.refLabel} (direkte Geodäte).`
-            : ` km Luftlinie bis zur ${cfg.refLabel} (Kreisradius).`) +
-        ' Klick dich Schritt für Schritt weiter!</p>';
+        `<p class="dom-note" style="margin-bottom:0;">${domNum(domDistKm, 2)} km Luftlinie bis zur ${domEsc(cfg.refLabel)}. Klick dich Schritt für Schritt weiter!</p>`;
     box.querySelector('button').onclick = () => domSelect(next);
 
     resolvePlaceLabel(next).then(lbl => {
-        if (token !== domGen || !lbl) return;
-        const el = document.getElementById('dom-higher-loc-label');
-        if (el) el.textContent = ` (${lbl})`;
+        if (token === domGen && lbl && document.getElementById('dom-higher-loc-label')) {
+            document.getElementById('dom-higher-loc-label').textContent = ` (${lbl})`;
+        }
     });
 
     const bounds = domCircle ? domCircle.getBounds() : L.latLngBounds([[p.lat, p.lon]]);
     bounds.extend([next.lat, lon]);
-    if (domUserLoc && domDistanceKm(domUserLoc, p) < 50) {
-        bounds.extend([domUserLoc.lat, domUserLoc.lon]);
-    }
+    if (domUserLoc && domDistanceKm(domUserLoc, p) < 50) bounds.extend([domUserLoc.lat, domUserLoc.lon]);
     dominanzMap.fitBounds(bounds.pad(0.25), { maxZoom: 14, animate: false });
     domPaint();
 }
@@ -2181,26 +803,15 @@ function domOfferHigher(p, next, token, customZoom) {
 function domSelect(p, known, opts = {}) {
     if (!dominanzMap || !p) return;
     const cfg = domCfg();
-    if (!opts.isFallback && !opts.isAutoNearest) {
-        domManualOverride = true;
-    }
-    if (domPickMode) {
-        domPickMode = false;
-        const pb = document.getElementById('dom-pick-btn');
-        if (pb) { pb.textContent = '📍 Eigenen Punkt setzen: AUS'; pb.className = 'btn btn-amber'; }
-        dominanzMap.getContainer().style.cursor = '';
-    }
+    if (!opts.isFallback && !opts.isAutoNearest) domManualOverride = true;
     if (domRefMarker) { dominanzMap.removeLayer(domRefMarker); domRefMarker = null; }
     if (domPickMarker) { dominanzMap.removeLayer(domPickMarker); domPickMarker = null; }
     domReference = null;
-    document.getElementById('dom-circle-label').textContent = 'Dominanzradius';
     domActive = p;
     const token = ++domGen;
 
     const si = document.getElementById('dom-search-input');
-    if (si && opts.clearSearchInput) {
-        si.value = '';
-    }
+    if (si && opts.clearSearchInput) si.value = '';
     setDomStatus('');
 
     if (domCircle) dominanzMap.removeLayer(domCircle);
@@ -2213,71 +824,42 @@ function domSelect(p, known, opts = {}) {
         title: p.name, zIndexOffset: 1100
     }).addTo(dominanzMap);
 
-    if (opts.zoomToTarget) {
-        dominanzMap.setView([p.lat, p.lon], opts.zoomToTarget);
-    } else if (domCircle) {
-        const b = domCircle.getBounds();
-        if (domUserLoc && domDistanceKm(domUserLoc, p) < 50) b.extend([domUserLoc.lat, domUserLoc.lon]);
-        dominanzMap.fitBounds(b.pad(0.4), { maxZoom: 12, animate: false });
-    } else {
-        dominanzMap.setView([p.lat, p.lon], 10);
-    }
+    if (opts.zoomToTarget) dominanzMap.setView([p.lat, p.lon], opts.zoomToTarget);
+    else if (domCircle) dominanzMap.fitBounds(domCircle.getBounds().pad(0.4), { maxZoom: 12, animate: false });
+    else dominanzMap.setView([p.lat, p.lon], 10);
     domPaint();
 
     let userDistHtml = '';
     if (domUserLoc) {
-        const distFromUser = domDistanceKm(domUserLoc, p);
-        const dirFromUser = domCompassDirection(domUserLoc, p);
         userDistHtml = `
             <div style="background:#eff6ff; border:1px solid #bfdbfe; color:#1e40af; border-radius:11px; padding:8px 11px; font-size:12.5px; font-weight:700; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between;">
                 <span>🧭 Abstand von deinem Standort:</span>
-                <span id="dom-active-user-dist" style="font-family:'JetBrains Mono',monospace;">${domNum(distFromUser, 2)} km (${dirFromUser})</span>
+                <span id="dom-active-user-dist" style="font-family:'JetBrains Mono',monospace;">${domNum(domDistanceKm(domUserLoc, p), 2)} km (${domCompassDirection(domUserLoc, p)})</span>
             </div>
         `;
     }
 
-    // Kontextspezifische Zusatzboxen (Wetterstation / Kraftwerke / Seen / Burgen)
     let extraContextHtml = '';
     if (domMode === 'weather') {
-        extraContextHtml = `
-            <div id="dom-weather-station-box" style="background:#f8fafc; border:1.5px solid #cbd5e1; border-radius:12px; padding:10px 12px; margin-bottom:10px; font-size:12.5px;">
-                ⏳ Lade Zusatz-Synoptik (Gefühlte Temp., Luftfeuchte, Wind &amp; Stationsdruck) …
-            </div>
-        `;
+        extraContextHtml = `<div id="dom-weather-station-box" style="background:#f8fafc; border:1.5px solid #cbd5e1; border-radius:12px; padding:10px 12px; margin-bottom:10px; font-size:12.5px;">⏳ Lade Zusatz-Synoptik …</div>`;
     } else if (domMode === 'powerplants') {
-        extraContextHtml = `
-            <div id="dom-live-power-box" style="background:#f8fafc; border:1.5px solid #cbd5e1; border-radius:12px; padding:10px 12px; margin-bottom:10px; font-size:12.5px;">
-                ⏳ Berechne aktuelle Live-Einspeisung am Standort (Open-Meteo) …
-            </div>
-        `;
+        extraContextHtml = `<div id="dom-live-power-box" style="background:#f8fafc; border:1.5px solid #cbd5e1; border-radius:12px; padding:10px 12px; margin-bottom:10px; font-size:12.5px;">⏳ Berechne Live-Einspeisung …</div>`;
     } else if (domMode === 'lakes') {
-        const sw = p.swim || 'yes';
-        const swMeta = LAKE_SWIM_META[sw] || LAKE_SWIM_META.yes;
-        const noteText = p.swimNote || swMeta.label;
+        const swMeta = LAKE_SWIM_META[p.swim || 'yes'] || LAKE_SWIM_META.yes;
         extraContextHtml = `
             <div style="background:${swMeta.badgeBg}; border:1.5px solid ${swMeta.badgeBorder}; color:${swMeta.badgeText}; border-radius:12px; padding:10px 12px; margin-bottom:10px;">
-                <div style="font-weight:800; font-size:13.5px; margin-bottom:3px;">${domEsc(noteText)}</div>
-                <div id="dom-lake-live-sub" style="font-size:11.5px; opacity:0.9;">⏳ Lade aktuelles Vor-Ort-Wetter &amp; Wassertemperatur-Schätzung …</div>
+                <div style="font-weight:800; font-size:13.5px; margin-bottom:3px;">${domEsc(p.swimNote || swMeta.label)}</div>
+                <div id="dom-lake-live-sub" style="font-size:11.5px; opacity:0.9;">⏳ Lade Vor-Ort-Wetter …</div>
             </div>
         `;
     } else if (domMode === 'castles') {
         const yrTxt = domFormatCastleYear(p);
         if (yrTxt) {
-            extraContextHtml = `
-                <div style="background:#fffbeb; border:1.5px solid #fde68a; color:#92400e; border-radius:12px; padding:9px 12px; margin-bottom:10px; font-size:12.5px; font-weight:700; display:flex; justify-content:space-between; align-items:center;">
-                    <span>📜 Entstehungszeit / Ersterwähnung:</span>
-                    <span style="font-family:'JetBrains Mono',monospace; font-weight:800;">${domEsc(yrTxt)}</span>
-                </div>
-            `;
+            extraContextHtml = `<div style="background:#fffbeb; border:1.5px solid #fde68a; color:#92400e; border-radius:12px; padding:9px 12px; margin-bottom:10px; font-size:12.5px; font-weight:700; display:flex; justify-content:space-between;"><span>📜 Entstehungszeit:</span><span style="font-family:'JetBrains Mono',monospace; font-weight:800;">${domEsc(yrTxt)}</span></div>`;
         }
     }
 
-    const subtitleDefault = domMode === 'powerplants'
-        ? (PLANT_TYPE_META[p.type]?.label || p.range || 'Kraftwerk')
-        : domMode === 'peaks'
-            ? (p.range || 'Gebirge wird geprüft …')
-            : (p.range || cfg.nounSingular);
-
+    const subtitleDefault = domMode === 'powerplants' ? (PLANT_TYPE_META[p.type]?.label || p.range || 'Kraftwerk') : (p.range || cfg.nounSingular);
     const initialLoc = getInitialPlaceLabel(p);
     const gmapsDirUrl = buildGoogleMapsRouteUrl(p);
     const wikiSearch = 'https://de.wikipedia.org/wiki/Special:Search?search=' + encodeURIComponent(p.name);
@@ -2290,7 +872,7 @@ function domSelect(p, known, opts = {}) {
         userDistHtml +
         '<div class="person-grid-2" style="margin:0 0 10px;">' +
         `<div class="person-box" style="background:#ecfdf5; border-color:#a7f3d0;"><span class="person-role">${domEsc(cfg.valueLabel)}</span><div id="dom-main-val-display" class="person-name" style="font-size:18px;">${domFormatVal(domVal(p))}</div></div>` +
-        '<div class="person-box" style="background:#fffbeb; border-color:#fde68a;"><span class="person-role" style="color:var(--amber);">Dominanz' + (p.isoCalc || domMode === 'weather' ? ' ≈' : '') + '</span><div id="dom-iso-val" class="person-name" style="font-size:18px;">' + (p.isolation != null ? domNum(p.isolation, 2) + ' km' : '–') + '</div></div>' +
+        '<div class="person-box" style="background:#fffbeb; border-color:#fde68a;"><span class="person-role" style="color:var(--amber);">Dominanz ≈</span><div id="dom-iso-val" class="person-name" style="font-size:18px;">' + (p.isolation != null ? domNum(p.isolation, 2) + ' km' : '–') + '</div></div>' +
         '</div>' +
         extraContextHtml +
         '<p id="dom-summary" style="font-size:12.8px; line-height:1.55; color:#334155; margin:0 0 10px;"></p>' +
@@ -2302,9 +884,9 @@ function domSelect(p, known, opts = {}) {
         `<div id="dom-higher" style="margin-top:14px; padding-top:12px; border-top:1px solid #e2e8f0;"><p class="dom-note" style="margin:0;">${domEsc(cfg.refLabel)} wird geprüft …</p></div>`;
 
     resolvePlaceLabel(p).then(lbl => {
-        if (token !== domGen) return;
-        const el = document.getElementById('dom-loc-subtitle');
-        if (el) el.textContent = lbl ? `📍 ${lbl}` : `📍 ${p.lat.toFixed(4)}° N, ${p.lon.toFixed(4)}° O`;
+        if (token === domGen && document.getElementById('dom-loc-subtitle')) {
+            document.getElementById('dom-loc-subtitle').textContent = lbl ? `📍 ${lbl}` : `📍 ${p.lat.toFixed(4)}° N, ${p.lon.toFixed(4)}° O`;
+        }
     });
 
     domOfferHigher(p, domNearestHigher(p), token, opts.zoomToTarget);
@@ -2314,9 +896,6 @@ function domSelect(p, known, opts = {}) {
     if (String(p.id).startsWith('Q')) domEnrich(p, token, known);
 }
 
-// ===================================================================
-// WIKIDATA / WIKIPEDIA ANREICHERUNG (FOTOS, TEXT & DATEN)
-// ===================================================================
 async function domGetJSON(url) {
     const r = await fetch(url, { signal: AbortSignal.timeout(15000) });
     if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -2330,108 +909,18 @@ async function domEntity(id) {
     return (await domGetJSON('https://www.wikidata.org/w/api.php?action=wbgetentities&ids=' + id + '&props=labels|claims|sitelinks&languages=de|en&format=json&origin=*')).entities[id];
 }
 
-function domItemFromEntity(e, id) {
-    const c = domClaim(e, 'P625'); if (!c) return null;
-    const name = e.labels.de?.value || e.labels.en?.value || id;
-
-    if (domMode === 'powerplants') {
-        const capClaim = domClaim(e, 'P2109');
-        let mw = capClaim ? +capClaim.amount : null;
-        const unitQ = capClaim?.unit?.split('/').pop();
-        if (mw != null) {
-            if (unitQ === 'Q3320608') mw /= 1000;
-            else if (unitQ === 'Q5879479') mw *= 1000;
-        }
-        let pType = 'other';
-        if (/solar|photovolta/i.test(name)) pType = 'solar';
-        else if (/wind/i.test(name)) pType = 'wind';
-        else if (/wasser|pumpspeicher|speicher|hydro|staudamm/i.test(name)) pType = 'hydro';
-        else if (/kern|atom|nuclear/i.test(name)) pType = 'nuclear';
-        else if (/kohle|braunkohle|steinkohle/i.test(name)) pType = 'coal';
-        else if (/gas|heizkraftwerk/i.test(name)) pType = 'gas';
-        const cRound = mw ? Math.round(mw * 10) / 10 : null;
-        return { id, name, lat: c.latitude, lon: c.longitude, capacity: cRound, height: cRound, type: pType, range: PLANT_TYPE_META[pType]?.label || 'Kraftwerk', isoCalc: true };
-    }
-
-    if (domMode === 'towns') {
-        const popClaim = domClaim(e, 'P1082');
-        const pop = popClaim ? Math.round(+popClaim.amount) : null;
-        return { id, name, lat: c.latitude, lon: c.longitude, population: pop, height: pop, range: 'Stadt / Gemeinde', isoCalc: true };
-    }
-
-    if (domMode === 'towers') {
-        const hClaim = domClaim(e, 'P2048');
-        let h = hClaim ? +hClaim.amount : null;
-        const unitQ = hClaim?.unit?.split('/').pop();
-        if (h != null && unitQ === 'Q3710') h *= 0.3048;
-        const hRound = h ? Math.round(h * 10) / 10 : null;
-        return { id, name, lat: c.latitude, lon: c.longitude, height: hRound, type: 'tvtower', range: 'Turm / Bauwerk', isoCalc: true };
-    }
-
-    if (domMode === 'lakes') {
-        const aClaim = domClaim(e, 'P2046');
-        let area = aClaim ? +aClaim.amount : null;
-        const unitQ = aClaim?.unit?.split('/').pop();
-        if (area != null) {
-            if (unitQ === 'Q25343') area /= 1e6;
-            else if (unitQ === 'Q35852') area *= 0.01;
-        }
-        const isNoSwim = /trinkwasser|gottleuba|lehnmühle|klingenberg|eibenstock/i.test(name);
-        const swim = isNoSwim ? 'no' : (/talsperre|stausee/i.test(name) ? 'check' : 'yes');
-        const aRound = area ? Math.round(area * 1000) / 1000 : null;
-        return { id, name, lat: c.latitude, lon: c.longitude, area: aRound, height: aRound, swim, range: 'See / Talsperre', isoCalc: true };
-    }
-
-    if (domMode === 'castles') {
-        const incClaim = domClaim(e, 'P571');
-        let yr = null, age = null;
-        if (incClaim && incClaim.time) {
-            const m = String(incClaim.time).match(/^([+-]?\d{1,5})-/);
-            if (m) {
-                yr = parseInt(m[1], 10);
-                age = new Date().getFullYear() - yr;
-            }
-        }
-        return { id, name, lat: c.latitude, lon: c.longitude, age, year: yr, height: age, type: 'castle', range: 'Burg / Monument', isoCalc: true };
-    }
-
-    const h = domClaim(e, 'P2044'), iso = domClaim(e, 'P2659'), unit = iso?.unit?.split('/').pop();
-    return {
-        id, name, lat: c.latitude, lon: c.longitude,
-        height: h ? normalizeHeightMeters(+h.amount) : null,
-        isolation: iso ? +iso.amount * (unit === 'Q11573' ? .001 : unit === 'Q253276' ? 1.609344 : 1) : null,
-        range: null
-    };
-}
-
 async function domEnrich(p, token, known) {
     try {
         const e = known || await domEntity(p.id);
         if (token !== domGen) return;
-
-        if (domMode === 'peaks') {
-            const range = domClaim(e, 'P4552');
-            if (!p.range && range) {
-                const re = await domEntity(range.id);
-                if (token === domGen) {
-                    const r = re.labels.de?.value || re.labels.en?.value || 'Gebirge nicht angegeben';
-                    p.range = r;
-                    const el = document.getElementById('dom-range');
-                    if (el) el.textContent = r;
-                }
-            } else if (!p.range) {
-                const el = document.getElementById('dom-range');
-                if (el) el.textContent = 'Gebirge nicht angegeben';
-            }
-        }
-
         const site = e.sitelinks?.dewiki || e.sitelinks?.enwiki, lang = e.sitelinks?.dewiki ? 'de' : 'en';
         if (site) {
-            const url = 'https://' + lang + '.wikipedia.org/wiki/' + encodeURIComponent(site.title);
-            const wk = document.getElementById('dom-wiki'); if (wk) wk.href = url;
+            const wk = document.getElementById('dom-wiki');
+            if (wk) wk.href = 'https://' + lang + '.wikipedia.org/wiki/' + encodeURIComponent(site.title);
             const r = await domGetJSON('https://' + lang + '.wikipedia.org/w/api.php?action=query&titles=' + encodeURIComponent(site.title) + '&prop=extracts|pageimages&exintro=1&explaintext=1&piprop=thumbnail&pithumbsize=650&format=json&origin=*');
             if (token !== domGen) return;
-            const page = Object.values(r.query.pages)[0]; const text = page.extract || '';
+            const page = Object.values(r.query.pages)[0];
+            const text = page.extract || '';
             const sm = document.getElementById('dom-summary');
             if (sm) sm.textContent = text.length > 320 ? text.slice(0, 317).replace(/\s+\S*$/, '') + ' …' : text;
             if (page.thumbnail) {
@@ -2442,9 +931,6 @@ async function domEnrich(p, token, known) {
     } catch (err) {}
 }
 
-// ===================================================================
-// SUCHE & UNTERE LISTE (10 NÄCHSTE PER GPS ODER TOP 10 IM SICHTFELD)
-// ===================================================================
 function domRenderResults(items, remote = false, showDistance = false) {
     const box = document.getElementById('dom-results');
     if (!box) return;
@@ -2453,9 +939,7 @@ function domRenderResults(items, remote = false, showDistance = false) {
         const val = domVal(p);
         let subLine = '';
         if (showDistance && domUserLoc && isFinite(p.lat) && isFinite(p.lon)) {
-            const dKm = domDistanceKm(domUserLoc, p);
-            const dir = domCompassDirection(domUserLoc, p);
-            subLine = `<div class="dom-live-dist-line" style="font-size:11.5px; color:#2563eb; font-weight:700; margin-top:1px; font-family:'JetBrains Mono',monospace;">🧭 ${domNum(dKm, 2)} km · Richtung ${dir}</div>`;
+            subLine = `<div class="dom-live-dist-line" style="font-size:11.5px; color:#2563eb; font-weight:700; margin-top:1px; font-family:'JetBrains Mono',monospace;">🧭 ${domNum(domDistanceKm(domUserLoc, p), 2)} km · Richtung ${domCompassDirection(domUserLoc, p)}</div>`;
         }
         let extraRight = '';
         if (domMode === 'lakes' && p.swim) {
@@ -2463,7 +947,7 @@ function domRenderResults(items, remote = false, showDistance = false) {
         } else if (domMode === 'castles' && (p.year != null || p.age != null)) {
             extraRight = `<div style="font-size:10.5px; color:#64748b;">${domEsc(domFormatCastleYear(p))}</div>`;
         } else if (domMode === 'weather' && p.elev != null) {
-            extraRight = `<div style="font-size:10.5px; color:#64748b;">⛰️ ${domNum(p.elev, 0)} m ü. NHN</div>`;
+            extraRight = `<div style="font-size:10.5px; color:#64748b;">⛰️ ${domNum(cleanStationElev(p.elev), 0)} m ü. NHN</div>`;
         }
         const locHint = getInitialPlaceLabel(p);
         return `
@@ -2475,7 +959,7 @@ function domRenderResults(items, remote = false, showDistance = false) {
                 </div>
                 <div style="text-align:right;">
                     <div style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:13px; color:var(--emerald-dark);">
-                        ${val != null ? domFormatVal(val) : (remote ? 'Wikidata ↗' : '')}
+                        ${val != null ? domFormatVal(val) : ''}
                     </div>
                     ${extraRight}
                 </div>
@@ -2483,7 +967,7 @@ function domRenderResults(items, remote = false, showDistance = false) {
         `;
     }).join('');
     box.querySelectorAll('.peak-item').forEach((b, i) => {
-        b.onclick = () => remote ? domLoadEntity(items[i].id) : domSelect(items[i], null, { clearSearchInput: showDistance });
+        b.onclick = () => domSelect(items[i], null, { clearSearchInput: showDistance });
     });
 }
 
@@ -2492,7 +976,6 @@ async function domSearch() {
     const si = document.getElementById('dom-search-input');
     const cap = document.getElementById('dom-results-Caption');
     const q = (si ? si.value : '').trim();
-    const token = ++domSearchGen;
 
     if (!q) {
         if (domListMode === 'view' && dominanzMap && domPeaks.length) {
@@ -2500,11 +983,7 @@ async function domSearch() {
             const isCold = (domMode === 'weather' && domWeatherPolarity === 'cold');
             const inView = domPeaks
                 .filter(p => isFinite(p.lat) && isFinite(p.lon) && b.contains([p.lat, p.lon]))
-                .sort((a, z) => {
-                    const va = domVal(a) ?? (isCold ? 999 : -999);
-                    const vz = domVal(z) ?? (isCold ? 999 : -999);
-                    return isCold ? (va - vz) : (vz - va);
-                })
+                .sort((a, z) => isCold ? ((domVal(a) ?? 999) - (domVal(z) ?? 999)) : ((domVal(z) ?? -999) - (domVal(a) ?? -999)))
                 .slice(0, 10);
             if (cap) cap.textContent = `👁️ Top 10 ${cfg.nounPlural} im aktuellen Kartenausschnitt:`;
             domRenderResults(inView, false, Boolean(domUserLoc));
@@ -2528,57 +1007,9 @@ async function domSearch() {
 
     if (cap) cap.textContent = '🔍 Suchergebnisse:';
     const local = domPeaks.filter(p => domNorm(p.name).includes(domNorm(q)))
-        .sort((a, b) => domNorm(a.name).indexOf(domNorm(q)) - domNorm(b.name).indexOf(domNorm(q))).slice(0, 8);
+        .sort((a, b) => domNorm(a.name).indexOf(domNorm(q)) - domNorm(b.name).indexOf(domNorm(q))).slice(0, 10);
     domRenderResults(local, false, Boolean(domUserLoc));
-    if (local.length >= 5 || domMode === 'weather') return;
-
-    try {
-        const r = await domGetJSON('https://www.wikidata.org/w/api.php?action=wbsearchentities&search=' + encodeURIComponent(q) + '&language=de&uselang=de&limit=10&format=json&origin=*');
-        if (token !== domSearchGen) return;
-        const rxMap = {
-            peaks:       /berg|gipfel|mountain|peak|vulkan|volcano|summit/i,
-            powerplants: /kraftwerk|windpark|solarpark|staudamm|power station|power plant|nuclear|hydroelectric|wind farm|solar farm|talsperre/i,
-            towns:       /stadt|gemeinde|metropole|city|town|municipality|hauptstadt|capital|dorf|ort/i,
-            towers:      /turm|fernsehturm|funkturm|wolkenkratzer|hochhaus|tower|skyscraper|kirche|dom|münster|brücke|schornstein/i,
-            lakes:       /see|stausee|talsperre|badesee|meer|lake|reservoir|teich/i,
-            castles:     /burg|schloss|festung|ruine|pyramide|tempel|castle|palace|fortress|monument/i
-        };
-        const rx = rxMap[domMode] || rxMap.peaks;
-
-        const more = r.search.filter(p => !local.some(x => x.id === p.id) && rx.test((p.description || '') + ' ' + (p.label || '')))
-            .map(p => ({ id: p.id, name: p.label }));
-        const combined = [...local, ...more].slice(0, 9);
-        if (combined.length) {
-            domRenderResults(combined, false, Boolean(domUserLoc));
-            document.getElementById('dom-results').querySelectorAll('.peak-item').forEach((b, i) =>
-                b.onclick = () => domPeaks.find(p => p.id === combined[i].id) ? domSelect(domPeaks.find(p => p.id === combined[i].id)) : domLoadEntity(combined[i].id));
-        } else {
-            document.getElementById('dom-results').innerHTML = '<div style="padding:12px; text-align:center; color:#64748b; font-size:13px;">Keine Treffer. Anderen Namen versuchen.</div>';
-        }
-    } catch {
-        if (!local.length && token === domSearchGen) {
-            document.getElementById('dom-results').innerHTML = '<div style="padding:12px; text-align:center; color:#64748b; font-size:13px;">Online-Suche nicht erreichbar – Suche im geladenen Datensatz.</div>';
-        }
-    }
 }
 
-async function domLoadEntity(id) {
-    setDomStatus(`${domCfg().nounSingular} wird aus Wikidata geladen …`);
-    try {
-        const e = await domEntity(id), c = domClaim(e, 'P625');
-        if (!c) throw new Error('Keine Koordinaten');
-        const p = domItemFromEntity(e, id);
-        if (!p) throw new Error('Kein gültiges Objekt');
-        if (!domPeaks.some(x => x.id === id)) {
-            domPeaks.push(p);
-            recomputeIsolationsForDataset(domPeaks);
-        }
-        setDomStatus('');
-        domSelect(p, e);
-    } catch {
-        setDomStatus('Dieser Treffer hat keine auswertbaren Koordinaten.');
-    }
-}
-
-function openDominanzInfo() { document.getElementById('dom-info-modal').classList.add('open'); }
-function closeDominanzInfo() { document.getElementById('dom-info-modal').classList.remove('open'); }
+function openDominanzInfo() { document.getElementById('dom-info-modal')?.classList.add('open'); }
+function closeDominanzInfo() { document.getElementById('dom-info-modal')?.classList.remove('open'); }
