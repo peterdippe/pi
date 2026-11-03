@@ -394,7 +394,7 @@
             </button>
         </div>
 
-        <!-- BIPOLARER WETTER-UMSCHALTER + KLICKBARE HITZE- & KÄLTEPOLE -->
+        <!-- BIPOLARER WETTER-UMSCHALTER + MANUELLER TRIGGER + KLICKBARE HITZE- & KÄLTEPOLE -->
         <div id="dom-weather-polarity-bar" class="dom-weather-bar">
             <div class="dom-weather-top-row">
                 <div class="dom-pol-group">
@@ -408,6 +408,9 @@
                 </div>
                 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                     <span id="dom-weather-sync-info" style="font-size:11.5px; font-weight:700; color:#0f766e;">⏳ Lade 10-Minuten-Snapshot …</span>
+                    <button type="button" id="dom-weather-force-btn" class="btn btn-emerald" style="padding:5px 11px; font-size:11.5px; font-weight:800;" onclick="refreshLiveWeatherField(true)" title="10-Minuten-Sperre überspringen und alle Wetterstationen sofort live neu abrufen">
+                        🔄 Jetzt neu abrufen
+                    </button>
                 </div>
             </div>
 
@@ -515,7 +518,7 @@
                 <li><strong>📡 Türme &amp; Bauwerke (Höhe über Grund in m):</strong> Vom Aussichtsturm oder Fernsehturm bis zum <em>Burj Khalifa (828 m)</em>.</li>
                 <li><strong>🌊 Seen &amp; Talsperren (Wasserfläche in km²):</strong> Vom lokalen Badesee oder Stausee (inkl. Info, ob <strong>Baden erlaubt</strong> ist!) bis zum <em>Kaspischen Meer (371.000 km²)</em>.</li>
                 <li><strong>🏰 Burgen &amp; Monumente (Alter in Jahren):</strong> Von regionalen Schlössern und Ritterburgen bis zu den Pyramiden und <em>Göbekli Tepe (~11.500 Jahre)</em>.</li>
-                <li><strong>🌡️ Wetterstationen (Live-Temperatur in °C):</strong> Über 14.000 WMO-/ICAO-Wetterstationen weltweit im konsistenten 10-Minuten-Snapshot. Du kannst zwischen <strong>🔥 Hitze-Kette</strong> und <strong>❄️ Kälte-Kette</strong> wechseln und den aktuellen Hitze- oder Kältepol direkt anklicken!</li>
+                <li><strong>🌡️ Wetterstationen (Live-Temperatur in °C):</strong> Über 14.000 WMO-/ICAO-Wetterstationen weltweit im konsistenten 10-Minuten-Snapshot. Du kannst zwischen <strong>🔥 Hitze-Kette</strong> und <strong>❄️ Kälte-Kette</strong> wechseln, den Hitze- oder Kältepol direkt anklicken oder das globale Feld jederzeit manuell neu abrufen!</li>
             </ul>
             <p style="margin-bottom:4px;">
                 🔗 Grundprinzip bei Wikipedia:
